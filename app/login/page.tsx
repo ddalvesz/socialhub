@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, Suspense } from 'react'
-import { useSearchParams, redirect } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -82,7 +82,6 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
-  redirect('/')
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm text-center">

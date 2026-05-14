@@ -8,17 +8,18 @@ export const dynamic = 'force-dynamic'
 export default async function HomePage() {
   const supabase = await createClient()
 
-  // Bypassing login check for now
-  // const { data: { user } } = await supabase.auth.getUser()
-  // if (!user) redirect('/login')
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const { data: posts } = await supabase
     .from('posts')
     .select('*')
     .order('date', { ascending: true })
 
-  const userEmail = 'visitante@socialhub.local'
-  const userName = 'Usuário (Visitante)'
+  const userEmail = user.email ?? ''
+  const userName = (user.user_metadata?.full_name as string | undefined)
+    ?? (user.user_metadata?.name as string | undefined)
+    ?? userEmail
 
   return (
     <SocialHubApp

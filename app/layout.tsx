@@ -18,6 +18,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "SocialHub · Gocase",
   description: "Calendário editorial de redes sociais Gocase",
+  icons: { icon: '/icone_web.png' },
 };
 
 export default function RootLayout({

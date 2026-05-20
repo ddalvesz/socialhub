@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Icon, PlatformIcon } from './Icons'
 import { GenericSelect, PackToggle, FieldCheckbox } from './FormHelpers'
-import { Post, MONTH_ABBR, fmtBR, PLATFORMS, Campaign, PACKAGE_INFO, todayISO } from '@/lib/types'
-import { CAMPAIGNS_LIST, CAMP_TIPOS, TEAM_NAMES } from '@/lib/data'
+import { Post, MONTH_ABBR, fmtBR, PLATFORMS, Campaign, Collection, Linking, PACKAGE_INFO, todayISO, COLECAO_TIPOS, colProgress } from '@/lib/types'
+import { CAMP_TIPOS, TEAM_NAMES } from '@/lib/data'
 
 const tipoColors: Record<string, string> = {
   'Institucional':       'oklch(0.55 0.13 265)',
@@ -309,20 +309,122 @@ function CampaignFormModal({ initial, onClose, onSave }: { initial?: Campaign | 
   )
 }
 
+// ─── CollectionLinkSection ───────────────────────────────────
+function CollectionLinkSection({ campaign, collections, pickerOpen, onTogglePicker, onLink, onCreate, onUnlink, onNavigate }: {
+  campaign: Campaign
+  collections: Collection[]
+  pickerOpen: boolean
+  onTogglePicker: () => void
+  onLink: (id: number) => void
+  onCreate: () => void
+  onUnlink: () => void
+  onNavigate: (id: number) => void
+}) {
+  const linked = campaign.colecaoId != null ? collections.find(c => c.id === campaign.colecaoId) : null
+  const available = collections.filter(c => c.campaignId == null || c.campaignId === campaign.id)
+  const tipo = linked ? COLECAO_TIPOS.find(t => t.id === linked.tipo) : null
+
+  return (
+    <div className="link-section" onClick={e => e.stopPropagation()} style={{ marginTop: 22 }}>
+      <div className="link-section-head">
+        <Icon.collections />
+        <span className="link-section-label">Coleção</span>
+        <span className="link-section-sub">
+          {linked ? 'O progresso desta campanha é calculado pela coleção' : 'Toda campanha precisa de uma coleção para ter progresso automático'}
+        </span>
+      </div>
+      {linked ? (
+        <div className="link-chip-row">
+          <button className="link-chip" onClick={() => onNavigate(linked.id)} type="button">
+            <span className="link-chip-icon" style={{
+              background: tipo ? `color-mix(in oklab, ${tipo.color}, white 80%)` : 'var(--accent-soft)',
+              color: tipo ? tipo.color : 'var(--accent-deep)',
+            }}>
+              <Icon.collections />
+            </span>
+            <span className="link-chip-name">{linked.nome}</span>
+            <span className="link-chip-meta">
+              {tipo && <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 11, background: `color-mix(in oklab, ${tipo.color}, white 88%)`, color: tipo.color }}>{tipo.label}</span>}
+              <span>· abrir coleção</span>
+              <Icon.chevR />
+            </span>
+          </button>
+          <button className="link-unlink" onClick={onUnlink} type="button" title="Desvincular">
+            <Icon.x />
+          </button>
+        </div>
+      ) : (
+        <div style={{ position: 'relative' }}>
+          <button className="btn btn-ghost link-add-btn" onClick={onTogglePicker} type="button">
+            <Icon.plus /> Vincular coleção
+          </button>
+          {pickerOpen && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 30 }} onClick={onTogglePicker} />
+              <div className="link-picker">
+                <div className="link-picker-head">Vincular a uma coleção</div>
+                {available.length > 0 ? (
+                  <div className="link-picker-list">
+                    {available.map(col => {
+                      const tp = COLECAO_TIPOS.find(t => t.id === col.tipo)!
+                      return (
+                        <button key={col.id} type="button" onClick={() => onLink(col.id)}>
+                          <span style={{ width: 8, height: 8, borderRadius: 50, background: tp.color, flex: '0 0 8px' }} />
+                          <span className="lp-name">{col.nome}</span>
+                          <span className="lp-sub">{tp.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="link-picker-empty">Todas as coleções já têm campanha vinculada</div>
+                )}
+                <button type="button" className="link-picker-create" onClick={onCreate}>
+                  <Icon.plus /> Criar nova coleção a partir desta campanha
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Campaigns View ──────────────────────────────────────────
 interface CampaignsProps {
   posts: Post[]
   onPostClick: (post: Post) => void
+  linking: Linking
+  onNavigateCollection: (id: number) => void
 }
 
-export default function CampaignsView({ posts, onPostClick }: CampaignsProps) {
+export default function CampaignsView({ posts, onPostClick, linking, onNavigateCollection }: CampaignsProps) {
+  const { collections, campaigns: items, setCampaigns: setItems,
+    linkColCamp, unlinkColCamp, createCollectionFromCampaign,
+    setCampaignLaunched } = linking
+
   const [filter, setFilter] = useState('all')
   const [expanded, setExpanded] = useState<number | null>(null)
   const [linkedCampaign, setLinkedCampaign] = useState<Campaign | null>(null)
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
   const [deletingCampaign, setDeletingCampaign] = useState<Campaign | null>(null)
-  const [items, setItems] = useState<Campaign[]>(CAMPAIGNS_LIST)
   const [showForm, setShowForm] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState<number | null>(null)
+
+  useEffect(() => {
+    const h = (e: Event) => setExpanded((e as CustomEvent).detail)
+    window.addEventListener('focusCampaign', h)
+    return () => window.removeEventListener('focusCampaign', h)
+  }, [])
+
+  const getEffectiveProgress = (c: Campaign) => {
+    if (c.colecaoId != null) {
+      const col = collections.find(x => x.id === c.colecaoId)
+      if (col) return colProgress(col)
+    }
+    return c.progresso
+  }
 
   const updateCampaign = (id: number, patch: Partial<Campaign>) => {
     setItems(arr => arr.map(c => c.id === id ? { ...c, ...patch } : c))
@@ -330,7 +432,7 @@ export default function CampaignsView({ posts, onPostClick }: CampaignsProps) {
 
   const addCampaign = (data: any) => {
     const id = items.reduce((m, c) => Math.max(m, c.id), 0) + 1
-    setItems(arr => [...arr, { id, ...data } as Campaign])
+    setItems(arr => [...arr, { id, colecaoId: null, ...data } as Campaign])
   }
 
   const deleteCampaign = (id: number) => {
@@ -393,6 +495,8 @@ export default function CampaignsView({ posts, onPostClick }: CampaignsProps) {
 
           {filtered.map(c => {
             const isOpen = expanded === c.id
+            const effProg = getEffectiveProgress(c)
+            const linkedColecao = c.colecaoId != null ? collections.find(x => x.id === c.colecaoId) : null
             return (
               <div key={c.id}>
                 <div
@@ -411,7 +515,14 @@ export default function CampaignsView({ posts, onPostClick }: CampaignsProps) {
                       <Icon.chevD />
                     </span>
                   </div>
-                  <div className="cell" style={{ fontWeight: 500, fontSize: 13 }}>{c.nome}</div>
+                  <div className="cell" style={{ fontWeight: 500, fontSize: 13 }}>
+                    {c.nome}
+                    {linkedColecao && (
+                      <span className="link-badge" title={`Coleção vinculada: ${linkedColecao.nome}`}>
+                        <Icon.collections /> Coleção
+                      </span>
+                    )}
+                  </div>
                   <div className="cell"><span className={`event-pack ${c.pack.toLowerCase()}`}>{c.pack}</span></div>
                   <div className="cell">
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
@@ -435,14 +546,26 @@ export default function CampaignsView({ posts, onPostClick }: CampaignsProps) {
                     }
                   </div>
                   <div className="cell">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div className="progress" style={{ flex: 1 }}>
-                        <div style={{ width: `${c.progresso}%` }} />
+                    {linkedColecao ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div className="progress from-link" style={{ flex: 1 }}>
+                          <div style={{ width: `${effProg}%` }} />
+                        </div>
+                        <span style={{ fontSize: 11, color: 'var(--ink-3)', minWidth: 30, textAlign: 'right', fontVariantNumeric: 'tabular-nums', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          {effProg}%
+                          <span className="link-icon-mini" title="Calculado pela coleção"><Icon.link /></span>
+                        </span>
                       </div>
-                      <span style={{ fontSize: 11, color: 'var(--ink-3)', minWidth: 30, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                        {c.progresso}%
-                      </span>
-                    </div>
+                    ) : (
+                      <button
+                        className="progress-missing"
+                        onClick={(e) => { e.stopPropagation(); setExpanded(c.id); setPickerOpen(c.id) }}
+                        title="Toda campanha precisa de uma coleção"
+                      >
+                        <span className="pm-dot" />
+                        <span>Vincule uma coleção</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -467,15 +590,34 @@ export default function CampaignsView({ posts, onPostClick }: CampaignsProps) {
                         <div className="v"><span className={`event-pack ${c.pack.toLowerCase()}`}>{c.pack}</span></div>
                       </div>
                       <div className="exp-cell">
-                        <label>Conclusão</label>
-                        <div className="v" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div className="progress" style={{ flex: 1, maxWidth: 130 }}>
-                            <div style={{ width: `${c.progresso}%` }} />
+                        <label>
+                          Conclusão {linkedColecao && <span style={{ color: 'var(--accent-deep)' }}>· vem da coleção</span>}
+                        </label>
+                        {linkedColecao ? (
+                          <div className="v" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div className="progress from-link" style={{ flex: 1, maxWidth: 130 }}>
+                              <div style={{ width: `${effProg}%` }} />
+                            </div>
+                            <span style={{ fontSize: 11 }}>{effProg}%</span>
                           </div>
-                          <span style={{ fontSize: 11 }}>{c.progresso}%</span>
-                        </div>
+                        ) : (
+                          <div className="v" style={{ fontSize: 12.5, color: 'oklch(0.55 0.18 25)', fontWeight: 500 }}>
+                            Sem coleção vinculada
+                          </div>
+                        )}
                       </div>
                     </div>
+
+                    <CollectionLinkSection
+                      campaign={c}
+                      collections={collections}
+                      pickerOpen={pickerOpen === c.id}
+                      onTogglePicker={() => setPickerOpen(pickerOpen === c.id ? null : c.id)}
+                      onLink={colId => { linkColCamp(colId, c.id); setPickerOpen(null) }}
+                      onCreate={() => { createCollectionFromCampaign(c); setPickerOpen(null) }}
+                      onUnlink={() => unlinkColCamp(c.colecaoId!, c.id)}
+                      onNavigate={onNavigateCollection}
+                    />
 
                     <div style={{ marginTop: 22 }}>
                       <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
@@ -491,12 +633,15 @@ export default function CampaignsView({ posts, onPostClick }: CampaignsProps) {
                       >
                         <Icon.link /> Ver posts vinculados
                       </button>
-                      <button 
-                        className="btn btn-ghost" 
+                      <button
+                        className="btn btn-ghost"
                         onClick={e => { e.stopPropagation(); setEditingCampaign(c) }}
                       >
                         Editar campanha
                       </button>
+                      <FieldCheckbox label="Lançada (já no site)"
+                        value={c.launched}
+                        onChange={v => setCampaignLaunched(c.id, v)} />
                       <div style={{ flex: 1 }} />
                       <button className="btn btn-ghost" style={{ color: 'var(--ink-3)' }} onClick={e => { e.stopPropagation(); setDeletingCampaign(c) }}>
                         <Icon.trash /> Excluir

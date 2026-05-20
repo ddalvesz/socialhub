@@ -19,7 +19,7 @@ export function Popover({ open, onClose, anchor = 'left', children }: {
 
 export function GenericSelect({ value, options, onChange, placeholder = 'Selecionar...', width = 200 }: {
   value: string | null; options: { id: string; label: string }[];
-  onChange: (v: string) => void; placeholder?: string; width?: number
+  onChange: (v: string) => void; placeholder?: string; width?: number | string
 }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')

@@ -1,11 +1,16 @@
 import type { Campaign, Collection, EventDate, FutebolEvent, TeamProfile } from './types'
 
 export const TEAM_PROFILES: TeamProfile[] = [
-  { id: 'Eduarda', name: 'Eduarda Alves',   role: 'Social Media',       email: 'eduarda.alves@gocase.com', joined: '2024-01-15', color: 'oklch(0.72 0.16 55)',  initial: 'E', isMe: true },
-  { id: 'Arno',    name: 'Arno Bertoldi',   role: 'Estrategista',       email: 'arno@gocase.com',          joined: '2023-01-09', color: 'oklch(0.6 0.16 230)',  initial: 'A' },
-  { id: 'Pat',     name: 'Patrícia Lima',   role: 'Designer / Editora', email: 'pat@gocase.com',           joined: '2023-04-22', color: 'oklch(0.65 0.16 320)', initial: 'P' },
-  { id: 'Lara',    name: 'Lara Mendes',     role: 'Produtora',          email: 'lara@gocase.com',          joined: '2024-02-10', color: 'oklch(0.62 0.15 18)',  initial: 'L' },
-  { id: 'Sâmia',   name: 'Sâmia Costa',     role: 'Conteúdo / TikTok', email: 'samia@gocase.com',         joined: '2024-08-05', color: 'oklch(0.62 0.15 150)', initial: 'S' },
+  { id: 'Arno',    name: 'Arno',    role: '', email: 'arno@gocase.com',    joined: '2023-01-09', color: 'oklch(0.6 0.16 230)',  initial: 'A' },
+  { id: 'Pat',     name: 'Pat',     role: '', email: 'pat@gocase.com',     joined: '2023-04-22', color: 'oklch(0.65 0.16 320)', initial: 'P' },
+  { id: 'Lara',    name: 'Lara',    role: '', email: 'lara@gocase.com',    joined: '2024-02-10', color: 'oklch(0.62 0.15 18)',  initial: 'L' },
+  { id: 'Sâmia',  name: 'Sâmia',  role: '', email: 'samia@gocase.com',   joined: '2024-08-05', color: 'oklch(0.62 0.15 150)', initial: 'S' },
+  { id: 'Thaissa', name: 'Thaissa', role: '', email: 'thaissa@gocase.com', joined: '2024-01-01', color: 'oklch(0.62 0.15 265)', initial: 'T' },
+  { id: 'Duda',    name: 'Duda',    role: '', email: 'duda@gocase.com',    joined: '2024-01-01', color: 'oklch(0.72 0.16 55)',  initial: 'D', isMe: true },
+  { id: 'Kel',     name: 'Kel',     role: '', email: 'kel@gocase.com',     joined: '2024-01-01', color: 'oklch(0.62 0.13 75)',  initial: 'K' },
+  { id: 'Carina',  name: 'Carina',  role: '', email: 'carina@gocase.com',  joined: '2024-01-01', color: 'oklch(0.62 0.15 340)', initial: 'C' },
+  { id: 'Marina',  name: 'Marina',  role: '', email: 'marina@gocase.com',  joined: '2024-01-01', color: 'oklch(0.62 0.15 200)', initial: 'M' },
+  { id: 'Rebeca',  name: 'Rebeca',  role: '', email: 'rebeca@gocase.com',  joined: '2024-01-01', color: 'oklch(0.62 0.15 120)', initial: 'R' },
 ]
 
 export const TEAM_NAMES = TEAM_PROFILES.map(p => p.id)

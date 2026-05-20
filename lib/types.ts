@@ -1,4 +1,4 @@
-export type Platform = 'ig' | 'tiktok' | 'canal' | 'twitter'
+export type Platform = 'ig' | 'tiktok' | 'daily' | 'canal' | 'twitter'
 export type PostStatus = 'prod' | 'sched' | 'pub' | 'cancel'
 
 export interface Post {
@@ -185,6 +185,7 @@ export interface TeamProfile {
 export const PLATFORMS = [
   { id: 'ig' as Platform,      label: 'Instagram', color: '#E1306C' },
   { id: 'tiktok' as Platform,  label: 'TikTok',    color: '#111111' },
+  { id: 'daily' as Platform,   label: 'Daily',     color: '#2F9ED8' },
   { id: 'canal' as Platform,   label: 'Canal',     color: '#FF0033' },
   { id: 'twitter' as Platform, label: 'Twitter',   color: '#111111' },
 ]

@@ -54,6 +54,11 @@ export function PlatformIcon({ platform, size = 12, color = 'white' }: PlatformI
       <path d="M19.6 6.7a5 5 0 0 1-3.5-1.6 5 5 0 0 1-1.2-2.3h-3v12.4a2.7 2.7 0 1 1-1.9-2.6V9.4A5.6 5.6 0 1 0 14.9 15V9.3a8 8 0 0 0 4.7 1.5V7.6c-.1 0 0-.5 0-.9z"/>
     </svg>
   )
+  if (platform === 'daily') return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
+      <path d="M19.6 6.7a5 5 0 0 1-3.5-1.6 5 5 0 0 1-1.2-2.3h-3v12.4a2.7 2.7 0 1 1-1.9-2.6V9.4A5.6 5.6 0 1 0 14.9 15V9.3a8 8 0 0 0 4.7 1.5V7.6c-.1 0 0-.5 0-.9z"/>
+    </svg>
+  )
   if (platform === 'canal') return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
       <path d="M21.6 7.2a2.6 2.6 0 0 0-1.8-1.9C18.2 5 12 5 12 5s-6.2 0-7.8.3A2.6 2.6 0 0 0 2.4 7.2 27 27 0 0 0 2 12a27 27 0 0 0 .4 4.8 2.6 2.6 0 0 0 1.8 1.9C5.8 19 12 19 12 19s6.2 0 7.8-.3a2.6 2.6 0 0 0 1.8-1.9c.3-1.6.4-3.2.4-4.8s-.1-3.2-.4-4.8zM10 15V9l5.2 3-5.2 3z"/>

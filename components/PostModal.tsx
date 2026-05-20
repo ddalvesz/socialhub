@@ -147,6 +147,13 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
 
   const teamOptions = TEAM_NAMES.map(t => ({ id: t, label: t }))
   const lineaOptions = LINHAS_ED.map(l => ({ id: l.id, label: l.label }))
+  const productOptions = [
+    'Cases', 'Garrafas', 'Garrafa Fresh', 'Garrafa Magsafe', 'Garrafa Flip',
+    'Tote Daily', 'Tote Mini', 'Tote Shopper', 'Tote Pop', 'Tote Moon', 'Tote Care',
+    'Bolsa Fitness', 'Bolsa Move', 'Bolsa Joy',
+    'Mochila Care', 'Mochila Rodinhas', 'Lancheiras',
+    'Copo Vibe', 'Taça Termica',
+  ].map(p => ({ id: p, label: p }))
   const campOptions = [{ id: '', label: 'Sem campanha' }, ...campaigns.map(c => ({ id: c.slug, label: c.nome }))]
 
   const urls = draft.image_urls ?? []
@@ -199,7 +206,18 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
 
               <label>Data e hora</label>
               <div className="field-inline">
-                <input className="field" type="date" value={draft.date} onChange={e => set('date', e.target.value)} />
+                <input
+                  className="field"
+                  placeholder="dd/mm/aaaa"
+                  value={draft.date ? draft.date.split('-').reverse().join('/') : ''}
+                  onChange={e => {
+                    const v = e.target.value.replace(/\D/g, '')
+                    const fmt = v.length <= 2 ? v : v.length <= 4 ? `${v.slice(0,2)}/${v.slice(2)}` : `${v.slice(0,2)}/${v.slice(2,4)}/${v.slice(4,8)}`
+                    if (v.length === 8) set('date', `${v.slice(4,8)}-${v.slice(2,4)}-${v.slice(0,2)}`)
+                    else set('date', fmt)
+                  }}
+                  maxLength={10}
+                />
                 <input className="field" type="time" value={draft.time} onChange={e => set('time', e.target.value)} />
               </div>
 
@@ -211,7 +229,9 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
               {showProduct && (
                 <>
                   <label>Produto</label>
-                  <input className="field" placeholder="ex: Carteira Care..." value={draft.product || ''} onChange={e => set('product', e.target.value)} />
+                  <div className="field-wrap">
+                    <GenericSelect value={draft.product || ''} options={productOptions} onChange={v => set('product', v)} width="100%" />
+                  </div>
                 </>
               )}
 
@@ -257,13 +277,38 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
               </div>
             </div>
 
-            <div className="stacked">
-              <label>Link da mídia</label>
-              <div className="field link-field">
-                <Icon.media />
-                <input placeholder="https://..." value={urls[0] ?? ''} onChange={e => setUrl(0, e.target.value)} />
+            {draft.platform === 'ig' && draft.type === 'Carrossel' ? (
+              <div className="stacked">
+                <label>Links da mídia <span className="hint">até 10 imagens</span></label>
+                {(urls.length === 0 ? [''] : urls).map((url, i) => (
+                  <div key={i} className="field link-field" style={{ marginTop: i > 0 ? 6 : 0 }}>
+                    <Icon.media />
+                    <input placeholder={`Imagem ${i + 1}...`} value={url} onChange={e => setUrl(i, e.target.value)} />
+                    {urls.length > 1 && (
+                      <button
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', padding: '0 4px', flexShrink: 0 }}
+                        onClick={() => set('image_urls', urls.filter((_, j) => j !== i))}
+                      ><Icon.x /></button>
+                    )}
+                  </div>
+                ))}
+                {urls.length < 10 && (
+                  <button
+                    className="modal-tag-add"
+                    style={{ marginTop: 6, alignSelf: 'flex-start' }}
+                    onClick={() => set('image_urls', [...urls, ''])}
+                  >+ Adicionar imagem</button>
+                )}
               </div>
-            </div>
+            ) : (
+              <div className="stacked">
+                <label>Link da mídia</label>
+                <div className="field link-field">
+                  <Icon.media />
+                  <input placeholder="https://..." value={urls[0] ?? ''} onChange={e => setUrl(0, e.target.value)} />
+                </div>
+              </div>
+            )}
 
             {draft.type === 'Reels' && (
               <div className="stacked">

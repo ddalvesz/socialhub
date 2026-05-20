@@ -506,7 +506,6 @@ export default function CampaignsView({ posts, onPostClick, linking, onNavigateC
     setCampaignLaunched } = linking
 
   const [filter, setFilter] = useState('all')
-  const [viewMode, setViewMode] = useState<'list' | 'gallery'>('list')
   const [dateRange, setDateRange] = useState<DateRange>({ from: '', to: '' })
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState<number | null>(null)
@@ -600,39 +599,13 @@ export default function CampaignsView({ posts, onPostClick, linking, onNavigateC
         ))}
         <div style={{ flex: 1 }} />
         <DateRangeFilter value={dateRange} onChange={setDateRange} />
-        <div className="view-toggle">
-          <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')}>Lista</button>
-          <button className={viewMode === 'gallery' ? 'active' : ''} onClick={() => setViewMode('gallery')}>Galeria</button>
-        </div>
         <span className="count-pill">{filtered.length} {filtered.length === 1 ? 'campanha' : 'campanhas'}</span>
         <button className="btn btn-accent" onClick={() => setShowForm(true)}><Icon.plus /> Nova campanha</button>
       </div>
 
-      {viewMode === 'gallery' ? (
-        <div className="list-wrap">
-          <div className="camp-grid">
-            {filtered.map(c => {
-              const effProg = getEffectiveProgress(c)
-              return (
-                <CampaignCard
-                  key={c.id}
-                  campaign={c}
-                  posts={posts}
-                  collections={collections}
-                  effProg={effProg}
-                  onOpen={() => { setViewMode('list'); setExpanded(c.id) }}
-                  onPostsClick={() => setLinkedCampaign(c)}
-                />
-              )
-            })}
-          </div>
-        </div>
-      ) : null}
-
-      {viewMode === 'list' ? (
       <div className="list-wrap">
         <div className="list">
-          <div className="list-row list-head" style={{ gridTemplateColumns: '32px 2.4fr 90px 1.2fr 1.5fr 0.85fr 1.2fr 1.5fr 1.1fr' }}>
+          <div className="list-row list-head" style={{ gridTemplateColumns: '32px 2.2fr 80px 1.1fr 1.3fr 0.7fr 1fr 1.3fr 1.6fr' }}>
             <div className="cell" />
             <div className="cell">Campanha</div>
             <div className="cell">Pacote</div>
@@ -652,7 +625,7 @@ export default function CampaignsView({ posts, onPostClick, linking, onNavigateC
               <div key={c.id}>
                 <div
                   className={`list-row expandable ${isOpen ? 'expanded' : ''}`}
-                  style={{ gridTemplateColumns: '32px 2.4fr 90px 1.2fr 1.5fr 0.85fr 1.2fr 1.5fr 1.1fr' }}
+                  style={{ gridTemplateColumns: '32px 2.2fr 80px 1.1fr 1.3fr 0.7fr 1fr 1.3fr 1.6fr' }}
                   onClick={() => setExpanded(isOpen ? null : c.id)}
                 >
                   <div className="cell" style={{ padding: '14px 0 14px 16px' }}>
@@ -805,7 +778,6 @@ export default function CampaignsView({ posts, onPostClick, linking, onNavigateC
           })}
         </div>
       </div>
-      ) : null}
 
       {linkedCampaign && (
         <LinkedPostsDrawer

@@ -442,7 +442,7 @@ export default function CollectionsView({ linking, onNavigateCampaign }: Collect
     setCollections(arr => arr.map(c => c.id === data.id ? { ...c, ...data } : c))
   }
 
-  const gridCols = '40px 2.1fr 0.9fr 90px 1fr 1fr 130px 130px 130px 150px'
+  const gridCols = '32px 2fr 0.9fr 100px 0.8fr 0.8fr 1.1fr 1.1fr 1.1fr 1fr'
 
   return (
     <>

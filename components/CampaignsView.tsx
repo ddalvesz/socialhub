@@ -508,6 +508,8 @@ export default function CampaignsView({ posts, onPostClick, linking, onNavigateC
   const [filter, setFilter] = useState('all')
   const [viewMode, setViewMode] = useState<'list' | 'gallery'>('list')
   const [dateRange, setDateRange] = useState<DateRange>({ from: '', to: '' })
+  const [search, setSearch] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
   const [expanded, setExpanded] = useState<number | null>(null)
   const [linkedCampaign, setLinkedCampaign] = useState<Campaign | null>(null)
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
@@ -560,12 +562,32 @@ export default function CampaignsView({ posts, onPostClick, linking, onNavigateC
     if (!hasDateFilter && ref && ref < '2026-01-01') return false
     if (dateRange.from && ref && ref < dateRange.from) return false
     if (dateRange.to && ref && ref > dateRange.to) return false
+    if (search && !c.nome.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
 
   return (
     <>
-      <PackageInfoPanel />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <PackageInfoPanel />
+        {searchOpen ? (
+          <div className="field link-field" style={{ width: 220 }}>
+            <Icon.search />
+            <input
+              placeholder="Buscar campanha..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Escape') { setSearch(''); setSearchOpen(false) } }}
+              autoFocus
+            />
+            {search && <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', padding: '0 4px' }} onClick={() => setSearch('')}><Icon.x /></button>}
+          </div>
+        ) : (
+          <button className="btn btn-ghost" style={{ padding: '5px 10px' }} onClick={() => setSearchOpen(true)}>
+            <Icon.search />
+          </button>
+        )}
+      </div>
 
       <div className="filter-bar" style={{ paddingTop: 16 }}>
         {[

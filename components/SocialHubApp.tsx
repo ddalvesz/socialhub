@@ -380,8 +380,8 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
           {([
             { id: 'calendar', label: 'Calendário do mês', icon: <Icon.cal />,      count: monthPosts.length },
             { id: 'stories',  label: 'Stories',           icon: <Icon.stories />,  count: monthPosts.filter(p => p.platform === 'ig' && p.type === 'Story').length },
-            { id: 'branding', label: 'Branding',          icon: <Icon.branding />, count: posts.filter(p => p.tags?.includes('branding')).length },
-            { id: 'mh',       label: 'Máquina de Hits',  icon: <Icon.mh />,       count: posts.filter(p => p.tags?.includes('mh')).length },
+            { id: 'branding', label: 'Branding',          icon: <Icon.branding />, count: monthPosts.filter(p => p.tags?.includes('branding')).length },
+            { id: 'mh',       label: 'Máquina de Hits',  icon: <Icon.mh />,       count: monthPosts.filter(p => p.tags?.includes('mh')).length },
           ] as const).map(item => (
             <button key={item.id} className={`sb-item ${view === item.id ? 'active' : ''}`} onClick={() => setView(item.id)}>
               {item.icon} <span>{item.label}</span>

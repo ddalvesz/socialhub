@@ -1,10 +1,10 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { PlatformIcon } from './Icons'
 import {
   Post, buildMonthGrid, WEEKDAYS, todayISO,
-  parseISO, toISO, EventDate, FutebolEvent,
+  parseISO, toISO, EventDate, FutebolEvent, fmtBR,
 } from '@/lib/types'
 import { EVENT_TYPES, FUT_TYPES } from '@/lib/data'
 
@@ -34,11 +34,57 @@ function PostCard({ post, onClick }: { post: Post; onClick: () => void }) {
   )
 }
 
+function DayPopover({ date, posts, onPostClick, onClose }: {
+  date: string
+  posts: Post[]
+  onPostClick: (p: Post) => void
+  onClose: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [onClose])
+
+  return (
+    <div ref={ref} style={{
+      position: 'absolute', zIndex: 50, top: '100%', left: 0,
+      background: 'var(--surface)', border: '1px solid var(--line)',
+      borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.12)',
+      padding: '10px 8px', minWidth: 240, maxWidth: 300,
+      display: 'flex', flexDirection: 'column', gap: 4,
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-3)', letterSpacing: '.04em', padding: '0 4px 4px' }}>
+        {fmtBR(date)} — {posts.length} posts
+      </div>
+      {posts.map(p => (
+        <button
+          key={p.id}
+          className={`post-card plat-${p.platform} status-${p.status}`}
+          style={{ width: '100%' }}
+          onClick={() => { onPostClick(p); onClose() }}
+        >
+          <span className={`pc-icon plat-${p.platform}`}>
+            <PlatformIcon platform={p.platform} size={9} color="white" />
+          </span>
+          <span className="pc-time">{p.time}</span>
+          <span className="pc-title">{p.title}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function CalendarGrid({
   year, month, posts, events = [], onPostClick, onNewPost, maxPerCell = 3,
 }: Props) {
   const cells = useMemo(() => buildMonthGrid(year, month), [year, month])
   const today = todayISO()
+  const [expandedDay, setExpandedDay] = useState<string | null>(null)
 
   const postsByDay = useMemo(() => {
     const map: Record<string, Post[]> = {}
@@ -84,6 +130,7 @@ export default function CalendarGrid({
           <div
             key={i}
             className={`cal-cell ${c.other ? 'other' : ''} ${isToday ? 'today' : ''}`}
+            style={{ position: 'relative' }}
             onClick={() => !c.other && onNewPost?.(c.iso)}
           >
             <div className="cal-num-row">
@@ -102,7 +149,21 @@ export default function CalendarGrid({
               </div>
             ))}
             {more > 0 && (
-              <div className="cal-more" onClick={e => e.stopPropagation()}>+{more} mais</div>
+              <div
+                className="cal-more"
+                onClick={e => { e.stopPropagation(); setExpandedDay(c.iso === expandedDay ? null : c.iso) }}
+                style={{ cursor: 'pointer' }}
+              >
+                +{more} mais
+              </div>
+            )}
+            {expandedDay === c.iso && (
+              <DayPopover
+                date={c.iso}
+                posts={dayPosts}
+                onPostClick={onPostClick}
+                onClose={() => setExpandedDay(null)}
+              />
             )}
           </div>
         )

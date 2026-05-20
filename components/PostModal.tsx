@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { Icon, PlatformIcon } from './Icons'
 import { Popover, GenericSelect } from './FormHelpers'
 import {
-  Post, Platform, PostStatus,
-  PLATFORMS, STATUSES, TAGS, LINHAS_ED, CAMP_LIST,
+  Post, Platform, PostStatus, Campaign,
+  PLATFORMS, STATUSES, TAGS, LINHAS_ED,
   CONTENT_TYPES_IG, CONTENT_TYPES_OTHER,
 } from '@/lib/types'
 import { TEAM_NAMES } from '@/lib/data'
@@ -17,6 +17,7 @@ interface Props {
   onDelete: (post: Post) => void
   onDuplicate: (post: Post) => void
   showProduct?: boolean
+  campaigns?: Campaign[]
 }
 
 // ─── Status select ───────────────────────────────────────────
@@ -130,7 +131,7 @@ function Stars({ value, onChange }: { value: number; onChange: (v: number) => vo
 }
 
 // ─── Main modal ──────────────────────────────────────────────
-export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate, showProduct }: Props) {
+export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate, showProduct, campaigns = [] }: Props) {
   const [draft, setDraft] = useState<Post>(post)
 
   useEffect(() => { setDraft(post) }, [post.id])
@@ -146,7 +147,7 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
 
   const teamOptions = TEAM_NAMES.map(t => ({ id: t, label: t }))
   const lineaOptions = LINHAS_ED.map(l => ({ id: l.id, label: l.label }))
-  const campOptions = [{ id: '', label: 'Sem campanha' }, ...CAMP_LIST]
+  const campOptions = [{ id: '', label: 'Sem campanha' }, ...campaigns.map(c => ({ id: c.slug, label: c.nome }))]
 
   const urls = draft.image_urls ?? []
   const setUrl = (i: number, val: string) => {

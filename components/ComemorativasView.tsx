@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { Icon } from './Icons'
-import { GenericSelect, PackToggle, FieldCheckbox } from './FormHelpers'
+import { GenericSelect, PackToggle, FieldCheckbox, DateRangeFilter, DateRange } from './FormHelpers'
 import { EventDate, MONTHS, WEEKDAYS, fmtBR, buildMonthGrid, parseISO, toISO, todayISO, FORMATS_LIST } from '@/lib/types'
-import { COMEMORATIVAS, EVENT_TYPES } from '@/lib/data'
+import { EVENT_TYPES } from '@/lib/data'
 
 function getColor(e: EventDate) {
   return EVENT_TYPES.find(t => t.id === e.type)?.color ?? '#999'
@@ -129,15 +129,21 @@ function ComemorativaFormModal({ onClose, onSave }: { onClose: () => void, onSav
   )
 }
 
-export default function ComemorativasView() {
+export default function ComemorativasView({ initialItems }: { initialItems: EventDate[] }) {
   const [view, setView] = useState<'list' | 'calendar'>('list')
   const [filter, setFilter] = useState('all')
   const [month, setMonth] = useState(4)
   const [year] = useState(2026)
-  const [items, setItems] = useState<EventDate[]>(COMEMORATIVAS)
+  const [items, setItems] = useState<EventDate[]>(initialItems)
   const [showForm, setShowForm] = useState(false)
+  const [dateRange, setDateRange] = useState<DateRange>({ from: '', to: '' })
 
-  const filtered = filter === 'all' ? items : items.filter(e => e.type === filter)
+  const filtered = (filter === 'all' ? items : items.filter(e => e.type === filter))
+    .filter(e => {
+      if (dateRange.from && e.end < dateRange.from) return false
+      if (dateRange.to && e.start > dateRange.to) return false
+      return true
+    })
 
   const toggleField = (id: number, field: 'potencial' | 'postado') => {
     setItems(arr => arr.map(e => e.id === id ? { ...e, [field]: !e[field] } : e))
@@ -159,6 +165,7 @@ export default function ComemorativasView() {
           </button>
         ))}
         <div style={{ flex: 1 }} />
+        <DateRangeFilter value={dateRange} onChange={setDateRange} />
         <div className="view-toggle">
           <button className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>Lista</button>
           <button className={view === 'calendar' ? 'active' : ''} onClick={() => setView('calendar')}>Calendário</button>

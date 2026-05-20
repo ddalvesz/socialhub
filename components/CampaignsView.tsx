@@ -5,6 +5,7 @@ import { Icon, PlatformIcon } from './Icons'
 import { GenericSelect, PackToggle, FieldCheckbox } from './FormHelpers'
 import { Post, MONTH_ABBR, fmtBR, PLATFORMS, Campaign, Collection, Linking, PACKAGE_INFO, todayISO, COLECAO_TIPOS, colProgress } from '@/lib/types'
 import { CAMP_TIPOS, TEAM_NAMES } from '@/lib/data'
+import { DateRangeFilter, DateRange } from './FormHelpers'
 
 const tipoColors: Record<string, string> = {
   'Institucional':       'oklch(0.55 0.13 265)',
@@ -391,6 +392,106 @@ function CollectionLinkSection({ campaign, collections, pickerOpen, onTogglePick
   )
 }
 
+// ─── Campaign Card (galeria) ─────────────────────────────────
+function CampaignCard({ campaign, posts, collections, effProg, onOpen, onPostsClick }: {
+  campaign: Campaign
+  posts: Post[]
+  collections: Collection[]
+  effProg: number
+  onOpen: () => void
+  onPostsClick: () => void
+}) {
+  const color = tipoColors[campaign.tipo] ?? '#999'
+  const linkedCol = campaign.colecaoId != null ? collections.find(c => c.id === campaign.colecaoId) : null
+  const postCount = posts.filter(p => p.campanha === campaign.slug).length
+  const milestones = [
+    { label: 'B', done: !!campaign.brainstormDone },
+    { label: 'A', done: !!campaign.aprovComercialDone },
+    { label: 'S', done: !!campaign.shootingDone },
+  ]
+  const today = todayISO()
+  const isSoon = (d: string) => d && d !== '-' && d > today && d <= today.slice(0, 7) + '-31'
+
+  return (
+    <div className="camp-card" onClick={onOpen} style={{ '--tipo-color': color } as React.CSSProperties}>
+      <div className="camp-card-body">
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span className={`event-pack ${campaign.pack.toLowerCase()}`}>{campaign.pack}</span>
+            <span style={{
+              padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 500,
+              background: `color-mix(in oklab, ${color}, white 88%)`, color,
+            }}>{campaign.tipo}</span>
+          </div>
+          {campaign.launched
+            ? <span className="status-pill s-pub" style={{ fontSize: 11, padding: '2px 8px' }}><span className="sdot" />Lançado</span>
+            : <span className="status-pill s-prod" style={{ fontSize: 11, padding: '2px 8px' }}><span className="sdot" />Pendente</span>
+          }
+        </div>
+
+        <div className="camp-card-name">{campaign.nome}</div>
+        {linkedCol && (
+          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Icon.collections /> {linkedCol.nome}
+          </div>
+        )}
+
+        <div style={{ margin: '12px 0 4px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+            <span style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 500 }}>Progresso</span>
+            <span style={{ fontSize: 11, color: 'var(--ink-2)', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{effProg}%</span>
+          </div>
+          <div className={`progress ${linkedCol ? 'from-link' : ''}`} style={{ height: 8 }}>
+            <div style={{ width: `${effProg}%` }} />
+          </div>
+        </div>
+
+        <div className="camp-card-dates">
+          {[
+            { label: 'Insta', val: campaign.dataInsta },
+            { label: 'Site', val: campaign.dataSite },
+            { label: 'Final', val: campaign.dataFinal },
+          ].map(({ label, val }) => val && val !== '-' ? (
+            <div key={label} className="camp-date-cell">
+              <span className="camp-date-label">{label}</span>
+              <span className={`camp-date-val ${isSoon(val) ? 'soon' : ''}`}>{fmtBR(val)}</span>
+            </div>
+          ) : null)}
+        </div>
+      </div>
+
+      <div className="camp-card-footer">
+        <span className="sb-avatar" style={{ width: 24, height: 24, fontSize: 12, flex: '0 0 24px' }}>
+          {campaign.dono.charAt(0)}
+        </span>
+        <span style={{ fontSize: 12, color: 'var(--ink-2)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {campaign.dono}
+        </span>
+
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          {milestones.map(m => (
+            <span key={m.label} title={m.label} style={{
+              width: 16, height: 16, borderRadius: '50%', fontSize: 9, fontWeight: 700,
+              display: 'grid', placeItems: 'center',
+              background: m.done ? 'oklch(0.6 0.13 150)' : 'var(--surface-3)',
+              color: m.done ? 'white' : 'var(--ink-4)',
+              border: `1.5px solid ${m.done ? 'oklch(0.6 0.13 150)' : 'var(--line-2)'}`,
+            }}>{m.label}</span>
+          ))}
+        </div>
+
+        <button
+          className="camp-posts-btn"
+          onClick={e => { e.stopPropagation(); onPostsClick() }}
+          title="Ver posts vinculados"
+        >
+          {postCount} {postCount === 1 ? 'post' : 'posts'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Campaigns View ──────────────────────────────────────────
 interface CampaignsProps {
   posts: Post[]
@@ -405,6 +506,8 @@ export default function CampaignsView({ posts, onPostClick, linking, onNavigateC
     setCampaignLaunched } = linking
 
   const [filter, setFilter] = useState('all')
+  const [viewMode, setViewMode] = useState<'list' | 'gallery'>('list')
+  const [dateRange, setDateRange] = useState<DateRange>({ from: '', to: '' })
   const [expanded, setExpanded] = useState<number | null>(null)
   const [linkedCampaign, setLinkedCampaign] = useState<Campaign | null>(null)
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
@@ -447,10 +550,18 @@ export default function CampaignsView({ posts, onPostClick, linking, onNavigateC
     setDeletingCampaign(null)
   }
 
-  const filtered = filter === 'all' ? items
+  const filtered = (filter === 'all' ? items
     : filter === 'launched' ? items.filter(i => i.launched)
     : filter === 'pending' ? items.filter(i => !i.launched)
     : items.filter(i => i.tipo === filter)
+  ).filter(c => {
+    const ref = c.dataInsta || c.previsao || ''
+    const hasDateFilter = dateRange.from || dateRange.to
+    if (!hasDateFilter && ref && ref < '2026-01-01') return false
+    if (dateRange.from && ref && ref < dateRange.from) return false
+    if (dateRange.to && ref && ref > dateRange.to) return false
+    return true
+  })
 
   return (
     <>
@@ -475,10 +586,37 @@ export default function CampaignsView({ posts, onPostClick, linking, onNavigateC
           </button>
         ))}
         <div style={{ flex: 1 }} />
+        <DateRangeFilter value={dateRange} onChange={setDateRange} />
+        <div className="view-toggle">
+          <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')}>Lista</button>
+          <button className={viewMode === 'gallery' ? 'active' : ''} onClick={() => setViewMode('gallery')}>Galeria</button>
+        </div>
         <span className="count-pill">{filtered.length} {filtered.length === 1 ? 'campanha' : 'campanhas'}</span>
         <button className="btn btn-accent" onClick={() => setShowForm(true)}><Icon.plus /> Nova campanha</button>
       </div>
 
+      {viewMode === 'gallery' ? (
+        <div className="list-wrap">
+          <div className="camp-grid">
+            {filtered.map(c => {
+              const effProg = getEffectiveProgress(c)
+              return (
+                <CampaignCard
+                  key={c.id}
+                  campaign={c}
+                  posts={posts}
+                  collections={collections}
+                  effProg={effProg}
+                  onOpen={() => { setViewMode('list'); setExpanded(c.id) }}
+                  onPostsClick={() => setLinkedCampaign(c)}
+                />
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {viewMode === 'list' ? (
       <div className="list-wrap">
         <div className="list">
           <div className="list-row list-head" style={{ gridTemplateColumns: '32px 2.4fr 90px 1.2fr 1.5fr 0.85fr 1.2fr 1.5fr 1.1fr' }}>
@@ -654,6 +792,7 @@ export default function CampaignsView({ posts, onPostClick, linking, onNavigateC
           })}
         </div>
       </div>
+      ) : null}
 
       {linkedCampaign && (
         <LinkedPostsDrawer

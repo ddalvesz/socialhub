@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { Icon } from './Icons'
-import { GenericSelect } from './FormHelpers'
+import { GenericSelect, DateRangeFilter, DateRange } from './FormHelpers'
 import { FutebolEvent, MONTHS, WEEKDAYS, fmtBR, buildMonthGrid, parseISO, toISO, todayISO } from '@/lib/types'
-import { FUTEBOL_2026, FUT_TYPES } from '@/lib/data'
+import { FUT_TYPES } from '@/lib/data'
 
 function MiniCalendar({ events, year, month }: { events: FutebolEvent[]; year: number; month: number }) {
   const cells = buildMonthGrid(year, month)
@@ -99,16 +99,23 @@ function FutebolFormModal({ onClose, onSave }: { onClose: () => void, onSave: (d
   )
 }
 
-export default function FutebolView() {
+export default function FutebolView({ initialItems }: { initialItems: FutebolEvent[] }) {
   const [view, setView] = useState<'list' | 'calendar'>('list')
   const [filter, setFilter] = useState('all')
   const [month, setMonth] = useState(4)
   const [year] = useState(2026)
   const [showForm, setShowForm] = useState(false)
+  const [dateRange, setDateRange] = useState<DateRange>({ from: '', to: '' })
   const today = todayISO()
 
-  const [items, setItems] = useState<FutebolEvent[]>(FUTEBOL_2026)
-  const filtered = filter === 'all' ? items : items.filter(e => e.type === filter)
+  const [items, setItems] = useState<FutebolEvent[]>(initialItems)
+  const filtered = (filter === 'all' ? items : items.filter(e => e.type === filter))
+    .filter(e => e.date && e.date !== '-')
+    .filter(e => {
+      if (dateRange.from && e.date < dateRange.from) return false
+      if (dateRange.to && e.date > dateRange.to) return false
+      return true
+    })
   const sorted = [...filtered].sort((a, b) => a.date.localeCompare(b.date))
 
   const addItem = (data: any) => {
@@ -127,6 +134,7 @@ export default function FutebolView() {
           </button>
         ))}
         <div style={{ flex: 1 }} />
+        <DateRangeFilter value={dateRange} onChange={setDateRange} />
         <div className="view-toggle">
           <button className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>Lista</button>
           <button className={view === 'calendar' ? 'active' : ''} onClick={() => setView('calendar')}>Calendário</button>
@@ -143,7 +151,7 @@ export default function FutebolView() {
               ))}
             </div>
             {sorted.map(e => {
-              const tp = FUT_TYPES.find(t => t.id === e.type)!
+              const tp = FUT_TYPES.find(t => t.id === e.type) ?? { color: '#999', label: e.type }
               const past = e.date < today
               return (
                 <div key={e.id} className="list-row" style={{ gridTemplateColumns: '40px 1.1fr 2fr 160px', opacity: past ? 0.5 : 1 }}>

@@ -133,8 +133,8 @@ export interface Linking {
   setCampaigns: (fn: (arr: Campaign[]) => Campaign[]) => void
   linkColCamp: (collectionId: number, campaignId: number) => void
   unlinkColCamp: (collectionId: number, campaignId: number) => void
-  createCampaignFromCollection: (collection: Collection) => Campaign
-  createCollectionFromCampaign: (campaign: Campaign) => Collection
+  createCampaignFromCollection: (collection: Collection) => Promise<Campaign>
+  createCollectionFromCampaign: (campaign: Campaign) => Promise<Collection>
   setCollectionLaunched: (collectionId: number, launched: boolean) => void
   setCampaignLaunched: (campaignId: number, launched: boolean) => void
 }
@@ -204,11 +204,17 @@ export const TAGS = [
 ]
 
 export const LINHAS_ED = [
-  { id: 'escritorio', label: 'Escritório' },
-  { id: 'produtos',   label: 'Produtos'   },
-  { id: 'trends',     label: 'Trends'     },
-  { id: 'asmr',       label: 'ASMR'       },
-  { id: 'ads',        label: 'Ads'        },
+  { id: 'produtos',          label: 'Produtos'           },
+  { id: 'asmr',             label: 'ASMR'               },
+  { id: 'escritorio',       label: 'Escritório'          },
+  { id: 'trends',           label: 'Trends'             },
+  { id: 'combinando',       label: 'Combinando Capinhas' },
+  { id: 'teste_cabe',       label: 'Teste o que cabe'   },
+  { id: 'julgando',         label: 'Julgando'           },
+  { id: 'copa',             label: 'Copa'               },
+  { id: 'godivas',          label: 'Godivas'            },
+  { id: 'campanhas',        label: 'Campanhas'          },
+  { id: 'futebol',          label: 'Futebol'            },
 ]
 
 export const CAMP_LIST = [

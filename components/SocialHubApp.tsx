@@ -4,12 +4,16 @@ import { useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Post, Platform, AppView, CalendarMode, Campaign, Collection, Linking,
+  EventDate, FutebolEvent,
   MONTHS, PLATFORMS, TAGS, STATUSES,
   addDaysISO, startOfWeekISO, todayISO, parseISO,
   CONTENT_TYPES_IG, CONTENT_TYPES_OTHER,
   colProgress,
 } from '@/lib/types'
-import { TEAM_PROFILES, CAMPAIGNS_LIST, COLLECTIONS_LIST, COMEMORATIVAS, FUTEBOL_2026 } from '@/lib/data'
+import { TEAM_PROFILES } from '@/lib/data'
+import {
+  campaignToDb, collectionToDb,
+} from '@/lib/supabase/mappers'
 import { Icon, PlatformIcon } from './Icons'
 import CalendarGrid from './CalendarGrid'
 import WeekView from './WeekView'
@@ -26,6 +30,10 @@ import ExportModal from './ExportModal'
 
 interface Props {
   initialPosts: Post[]
+  initialCampaigns: Campaign[]
+  initialCollections: Collection[]
+  initialEventDates: EventDate[]
+  initialFutebolEvents: FutebolEvent[]
   userEmail: string
   userName: string
 }
@@ -42,14 +50,14 @@ function getMeId(email: string) {
   return profile?.id ?? getOwnerName(email)
 }
 
-export default function SocialHubApp({ initialPosts, userEmail, userName }: Props) {
+export default function SocialHubApp({ initialPosts, initialCampaigns, initialCollections, initialEventDates, initialFutebolEvents, userEmail, userName }: Props) {
   const supabase = createClient()
   const meId = getMeId(userEmail)
   const ownerName = getOwnerName(userEmail)
 
   const [posts, setPosts] = useState<Post[]>(initialPosts)
-  const [collections, setCollections] = useState<Collection[]>(COLLECTIONS_LIST)
-  const [campaigns, setCampaigns] = useState<Campaign[]>(CAMPAIGNS_LIST)
+  const [collections, setCollectionsRaw] = useState<Collection[]>(initialCollections)
+  const [campaigns, setCampaignsRaw] = useState<Campaign[]>(initialCampaigns)
   const [view, setView] = useState<AppView>('calendar')
 
   const today = todayISO()
@@ -69,6 +77,45 @@ export default function SocialHubApp({ initialPosts, userEmail, userName }: Prop
   const [showExport, setShowExport] = useState(false)
   const [profileId, setProfileId] = useState(meId)
   const [photos, setPhotos] = useState<Record<string, string>>({})
+
+  // ─── Persistent state setters ────────────────────────────────
+  const setCollections = useCallback((fn: (arr: Collection[]) => Collection[]) => {
+    setCollectionsRaw(prev => {
+      const next = fn(prev)
+      const prevMap = new Map(prev.map(c => [c.id, c]))
+      const changed = next.filter(col => {
+        const old = prevMap.get(col.id)
+        return !old || JSON.stringify(old) !== JSON.stringify(col)
+      })
+      if (changed.length > 0) {
+        setTimeout(() => {
+          changed.forEach(col => {
+            supabase.from('collections').update(collectionToDb(col)).eq('id', col.id).then(() => {})
+          })
+        }, 0)
+      }
+      return next
+    })
+  }, [supabase])
+
+  const setCampaigns = useCallback((fn: (arr: Campaign[]) => Campaign[]) => {
+    setCampaignsRaw(prev => {
+      const next = fn(prev)
+      const prevMap = new Map(prev.map(c => [c.id, c]))
+      const changed = next.filter(camp => {
+        const old = prevMap.get(camp.id)
+        return !old || JSON.stringify(old) !== JSON.stringify(camp)
+      })
+      if (changed.length > 0) {
+        setTimeout(() => {
+          changed.forEach(camp => {
+            supabase.from('campaigns').update(campaignToDb(camp)).eq('id', camp.id).then(() => {})
+          })
+        }, 0)
+      }
+      return next
+    })
+  }, [supabase])
 
   // ─── Filtering ────────────────────────────────────────────────
   let shownPosts = posts
@@ -114,8 +161,22 @@ export default function SocialHubApp({ initialPosts, userEmail, userName }: Prop
 
   // ─── CRUD ─────────────────────────────────────────────────────
   const savePost = async (p: Post) => {
-    setPosts(arr => arr.map(x => x.id === p.id ? p : x))
-    const { id, user_id, ...payload } = p
+    const upper = p.title.toUpperCase()
+    const COPA_KEYWORDS = ['WHIND', 'WHINDERSSON', 'KÉFERA', 'KEFERA', 'TACI', 'CAFU', 'MELODY', 'COPA']
+    const isCopa = COPA_KEYWORDS.some(k => upper.includes(k))
+    const isMH = p.title.includes('[MH]')
+
+    let tags = [...(p.tags ?? [])]
+    if (isMH)   tags = Array.from(new Set([...tags, 'mh']))
+    if (isCopa) tags = Array.from(new Set([...tags, 'futebol']))
+
+    const saved = {
+      ...p,
+      tags,
+      linha: isCopa ? 'copa' : p.linha,
+    }
+    setPosts(arr => arr.map(x => x.id === saved.id ? saved : x))
+    const { id, user_id, ...payload } = saved
     await supabase.from('posts').update(payload).eq('id', id)
   }
 
@@ -182,35 +243,45 @@ export default function SocialHubApp({ initialPosts, userEmail, userName }: Prop
     setCampaigns(arr => arr.map(c => c.id === campaignId ? { ...c, colecaoId: null } : c))
   }
 
-  const createCampaignFromCollection = (collection: Collection): Campaign => {
-    const id = campaigns.reduce((m, c) => Math.max(m, c.id), 0) + 1
+  const createCampaignFromCollection = async (collection: Collection): Promise<Campaign> => {
     const slug = collection.nome.toLowerCase()
       .normalize('NFD').replace(/[̀-ͯ]/g, '')
-      .replace(/[^a-z0-9]+/g, '-').slice(0, 20)
-    const newCamp: Campaign = {
-      id, slug, nome: collection.nome,
+      .replace(/[^a-z0-9]+/g, '-').slice(0, 40)
+    const payload = {
+      slug, nome: collection.nome,
       pack: collection.marketing.pack, dono: collection.marketing.dono,
       tipo: 'Coleção', mes: collection.mes || '',
-      dataInsta: collection.dataMarketing || todayISO(),
-      dataSite: collection.dataSite || '-',
-      dataComercial: '-', dataFinal: '',
+      data_insta: collection.dataMarketing || todayISO(),
+      data_site: collection.dataSite || '-',
+      data_comercial: '-', data_final: '',
       previsao: collection.dataSite || todayISO(),
       launched: collection.launched, progresso: 0,
-      colecaoId: collection.id,
+      colecao_id: collection.id,
     }
-    setCampaigns(arr => [...arr, newCamp])
-    setCollections(arr => arr.map(c => c.id === collection.id ? { ...c, campaignId: id } : c))
+    const { data } = await supabase.from('campaigns').insert(payload).select().single()
+    if (!data) throw new Error('Falha ao criar campanha')
+    const newCamp: Campaign = {
+      id: data.id, slug: data.slug, nome: data.nome,
+      pack: data.pack, dono: data.dono, tipo: data.tipo, mes: data.mes,
+      dataInsta: data.data_insta, dataSite: data.data_site,
+      dataComercial: data.data_comercial, dataFinal: data.data_final,
+      previsao: data.previsao, launched: data.launched, progresso: data.progresso,
+      colecaoId: data.colecao_id ?? null,
+    }
+    setCampaignsRaw(arr => [...arr, newCamp])
+    setCollectionsRaw(arr => arr.map(c => c.id === collection.id ? { ...c, campaignId: newCamp.id } : c))
+    supabase.from('collections').update({ campaign_id: newCamp.id }).eq('id', collection.id).then(() => {})
     return newCamp
   }
 
-  const createCollectionFromCampaign = (campaign: Campaign): Collection => {
-    const id = collections.reduce((m, c) => Math.max(m, c.id), 0) + 1
-    const newCol: Collection = {
-      id, nome: campaign.nome, tipo: 'autoral',
+  const createCollectionFromCampaign = async (campaign: Campaign): Promise<Collection> => {
+    const payload = {
+      nome: campaign.nome, tipo: 'autoral',
       mes: campaign.mes || '',
-      dataSite: campaign.dataSite && campaign.dataSite !== '-' ? campaign.dataSite : campaign.previsao || todayISO(),
-      dataMarketing: campaign.dataInsta || todayISO(),
+      data_site: campaign.dataSite && campaign.dataSite !== '-' ? campaign.dataSite : campaign.previsao || todayISO(),
+      data_marketing: campaign.dataInsta || todayISO(),
       confirmado: 'ok', launched: campaign.launched,
+      campaign_id: campaign.id,
       ilustra: { status: 'naoIniciada', criacao: false, adaptacao: false, aprovEnabled: false, aprov: false, cadastro: false },
       marketing: { status: 'naoIniciada', pack: campaign.pack, dono: campaign.dono,
         banner: false,
@@ -219,10 +290,19 @@ export default function SocialHubApp({ initialPosts, userEmail, userName }: Prop
         reelsEnabled: false, reels: false, trincaEnabled: false, trinca: false,
         shootingEnabled: false, shooting: false, storiesEnabled: false, stories: false,
         influsEnabled: false, influs: false },
-      campaignId: campaign.id,
     }
-    setCollections(arr => [...arr, newCol])
-    setCampaigns(arr => arr.map(c => c.id === campaign.id ? { ...c, colecaoId: id } : c))
+    const { data } = await supabase.from('collections').insert(payload).select().single()
+    if (!data) throw new Error('Falha ao criar coleção')
+    const newCol: Collection = {
+      id: data.id, nome: data.nome, tipo: data.tipo, mes: data.mes,
+      dataSite: data.data_site, dataMarketing: data.data_marketing,
+      confirmado: data.confirmado, launched: data.launched,
+      campaignId: data.campaign_id ?? null,
+      ilustra: data.ilustra, marketing: data.marketing,
+    }
+    setCollectionsRaw(arr => [...arr, newCol])
+    setCampaignsRaw(arr => arr.map(c => c.id === campaign.id ? { ...c, colecaoId: newCol.id } : c))
+    supabase.from('campaigns').update({ colecao_id: newCol.id }).eq('id', campaign.id).then(() => {})
     return newCol
   }
 
@@ -273,7 +353,16 @@ export default function SocialHubApp({ initialPosts, userEmail, userName }: Prop
   const { title, sub } = viewTitles[view]
   const isCalView = view === 'calendar' || view === 'branding' || view === 'mh'
 
-  const calEvents = view === 'calendar' ? [...COMEMORATIVAS, ...FUTEBOL_2026] : []
+  const calEvents = view === 'calendar' ? [
+    ...initialEventDates.filter(e => e.start && e.end && e.start !== '-' && e.end !== '-' && e.start === e.end),
+    ...initialFutebolEvents
+      .filter(f => f.date && f.date !== '-')
+      .map(f => ({
+        id: f.id, type: f.type, name: f.name,
+        start: f.date, end: f.date,
+        pack: 'PP' as const, potencial: false, postado: false, format: 'Story',
+      }))
+  ] : []
   const navLabel = calMode === 'week' ? weekLabel : `${MONTHS[month]} ${year}`
 
   // ─── Render ───────────────────────────────────────────────────
@@ -290,7 +379,7 @@ export default function SocialHubApp({ initialPosts, userEmail, userName }: Prop
           <div className="sb-label">Calendários</div>
           {([
             { id: 'calendar', label: 'Calendário do mês', icon: <Icon.cal />,      count: monthPosts.length },
-            { id: 'stories',  label: 'Stories',           icon: <Icon.stories />,  count: undefined },
+            { id: 'stories',  label: 'Stories',           icon: <Icon.stories />,  count: monthPosts.filter(p => p.platform === 'ig' && p.format === 'Story').length },
             { id: 'branding', label: 'Branding',          icon: <Icon.branding />, count: posts.filter(p => p.tags?.includes('branding')).length },
             { id: 'mh',       label: 'Máquina de Hits',  icon: <Icon.mh />,       count: posts.filter(p => p.tags?.includes('mh')).length },
           ] as const).map(item => (
@@ -449,8 +538,8 @@ export default function SocialHubApp({ initialPosts, userEmail, userName }: Prop
         )}
 
         {view === 'stories'       && <StoriesView />}
-        {view === 'comemorativas' && <ComemorativasView />}
-        {view === 'futebol'       && <FutebolView />}
+        {view === 'comemorativas' && <ComemorativasView initialItems={initialEventDates} />}
+        {view === 'futebol'       && <FutebolView initialItems={initialFutebolEvents} />}
         {view === 'campaigns'     && (
           <CampaignsView
             posts={posts}
@@ -496,6 +585,7 @@ export default function SocialHubApp({ initialPosts, userEmail, userName }: Prop
           onDelete={deletePost}
           onDuplicate={p => setDuplicateFor(p)}
           showProduct={view === 'mh' || activePost.product !== undefined}
+          campaigns={campaigns}
         />
       )}
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Icon } from './Icons'
-import { GenericSelect, PackToggle, FieldCheckbox } from './FormHelpers'
+import { GenericSelect, PackToggle, FieldCheckbox, DateRangeFilter, DateRange } from './FormHelpers'
 import {
   Collection, Campaign, Linking,
   COLECAO_TIPOS, COL_STATUS, COL_CONFIRMADO,
@@ -398,6 +398,7 @@ export default function CollectionsView({ linking, onNavigateCampaign }: Collect
 
   const [filterTipo, setFilterTipo] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
+  const [dateRange, setDateRange] = useState<DateRange>({ from: '', to: '' })
   const [expanded, setExpanded] = useState<number | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<Collection | null>(null)
@@ -411,10 +412,14 @@ export default function CollectionsView({ linking, onNavigateCampaign }: Collect
 
   let filtered = collections
   if (filterTipo !== 'all') filtered = filtered.filter(c => c.tipo === filterTipo)
-  if (filterStatus === 'launched')  filtered = filtered.filter(c => c.launched)
-  if (filterStatus === 'pending')   filtered = filtered.filter(c => !c.launched && c.confirmado !== 'cancelada')
-  if (filterStatus === 'cancelada') filtered = filtered.filter(c => c.confirmado === 'cancelada')
+  if (filterStatus === 'launched')   filtered = filtered.filter(c => c.launched)
+  if (filterStatus === 'pending')    filtered = filtered.filter(c => !c.launched && c.confirmado !== 'cancelada')
+  if (filterStatus === 'cancelada')  filtered = filtered.filter(c => c.confirmado === 'cancelada')
   if (filterStatus === 'negociacao') filtered = filtered.filter(c => c.confirmado === 'negociacao')
+  const hasDateFilter = dateRange.from || dateRange.to
+  if (!hasDateFilter) filtered = filtered.filter(c => !c.dataSite || c.dataSite === '-' || c.dataSite >= '2026-01-01')
+  if (dateRange.from) filtered = filtered.filter(c => !c.dataSite || c.dataSite >= dateRange.from)
+  if (dateRange.to)   filtered = filtered.filter(c => !c.dataSite || c.dataSite <= dateRange.to)
 
   const update = (id: number, patch: Partial<Collection>) =>
     setCollections(arr => arr.map(c => c.id === id ? { ...c, ...patch } : c))
@@ -474,6 +479,7 @@ export default function CollectionsView({ linking, onNavigateCampaign }: Collect
         ))}
 
         <div style={{ flex: 1 }} />
+        <DateRangeFilter value={dateRange} onChange={setDateRange} />
         <span className="count-pill">{filtered.length} {filtered.length === 1 ? 'coleção' : 'coleções'}</span>
         <button className="btn btn-accent" onClick={() => setShowForm(true)}>
           <Icon.plus /> Nova coleção

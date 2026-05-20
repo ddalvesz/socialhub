@@ -24,7 +24,7 @@
   --accent-gradient-soft:   linear-gradient(135deg, oklch(0.96 0.04 35) 0%, oklch(0.93 0.07 55) 100%);
   --accent-gradient-softer: linear-gradient(135deg, oklch(0.98 0.02 30) 0%, oklch(0.96 0.04 55) 100%);
 
-  --c-ig-bg: oklch(0.94 0.045 25);  --c-ig-fg: oklch(0.42 0.13 25);
+  --c-ig-bg: oklch(0.94 0.045 25);  --c-ig-fg: #E1306C;
   --c-tt-bg: oklch(0.93 0.04 195);  --c-tt-fg: oklch(0.36 0.08 200);
   --c-yt-bg: oklch(0.93 0.045 18);  --c-yt-fg: oklch(0.45 0.16 22);
   --c-tw-bg: oklch(0.93 0.045 230); --c-tw-fg: oklch(0.4 0.12 230);
@@ -429,28 +429,28 @@ a { color: inherit; text-decoration: none }
 .post-card .pc-time { font-size: 10px; opacity: 0.7; flex: 0 0 auto; font-weight: 500; font-variant-numeric: tabular-nums }
 .post-card .pc-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500 }
 
-.post-card.plat-ig      { background: var(--c-ig-bg); color: var(--c-ig-fg) }
-.post-card.plat-tiktok  { background: var(--c-tt-bg); color: var(--c-tt-fg) }
-.post-card.plat-canal   { background: var(--c-yt-bg); color: var(--c-yt-fg) }
-.post-card.plat-twitter { background: var(--c-tw-bg); color: var(--c-tw-fg) }
-.post-card .pc-icon.plat-ig      { background: var(--c-ig-fg) }
+/* ícone da plataforma — cor única por plataforma */
+.post-card .pc-icon.plat-ig      { background: #E1306C }
 .post-card .pc-icon.plat-tiktok  { background: var(--c-tt-fg) }
 .post-card .pc-icon.plat-canal   { background: var(--c-yt-fg) }
 .post-card .pc-icon.plat-twitter { background: var(--c-tw-fg) }
 
+/* status: publicado — verde bem suave */
 .post-card.status-pub {
-  background: oklch(0.93 0.05 150) !important;
-  color: oklch(0.36 0.1 150) !important;
+  background: oklch(0.965 0.025 150) !important;
+  color: oklch(0.45 0.06 150) !important;
 }
-.post-card.status-pub .pc-icon { background: oklch(0.45 0.12 150) !important }
-.post-card.status-pub .pc-title { text-decoration: line-through; text-decoration-color: oklch(0.6 0.08 150); text-decoration-thickness: 1px }
+.post-card.status-pub .pc-icon { filter: saturate(0.4) opacity(0.6) }
+.post-card.status-pub .pc-title { text-decoration: line-through; text-decoration-thickness: 1px }
+
+/* status: cancelado */
 .post-card.status-cancel {
-  background: oklch(0.94 0.025 20) !important;
-  color: oklch(0.5 0.07 20) !important;
-  opacity: 0.7;
+  background: var(--surface-2) !important;
+  color: var(--ink-3) !important;
+  opacity: 0.55;
 }
-.post-card.status-cancel .pc-icon { background: oklch(0.55 0.1 20) !important }
-.post-card.status-cancel .pc-title { text-decoration: line-through; text-decoration-color: oklch(0.55 0.1 20) }
+.post-card.status-cancel .pc-icon { filter: saturate(0) }
+.post-card.status-cancel .pc-title { text-decoration: line-through }
 
 .cal-more { font-size: 11px; color: var(--ink-3); padding: 2px 6px; font-weight: 500; cursor: pointer }
 .cal-more:hover { color: var(--accent) }
@@ -584,20 +584,41 @@ a { color: inherit; text-decoration: none }
 .week-post .wp-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical }
 .week-post .wp-meta { font-size: 10px; opacity: 0.7; font-weight: 500; margin-top: 2px }
 
-.week-post.plat-ig      { background: var(--c-ig-bg); color: var(--c-ig-fg) }
-.week-post.plat-tiktok  { background: var(--c-tt-bg); color: var(--c-tt-fg) }
-.week-post.plat-canal   { background: var(--c-yt-bg); color: var(--c-yt-fg) }
-.week-post.plat-twitter { background: var(--c-tw-bg); color: var(--c-tw-fg) }
-.week-post.plat-ig .wp-pic     { background: var(--c-ig-fg) }
+/* week: fundo neutro + filete colorido à esquerda por plataforma */
+.week-post {
+  background: var(--surface);
+  color: var(--ink);
+  border-left: 3px solid var(--line-2);
+}
+.week-post.plat-ig      { border-left-color: #E1306C }
+.week-post.plat-tiktok  { border-left-color: var(--c-tt-fg) }
+.week-post.plat-canal   { border-left-color: var(--c-yt-fg) }
+.week-post.plat-twitter { border-left-color: var(--c-tw-fg) }
+
+/* ícone da plataforma na week view */
+.week-post.plat-ig .wp-pic     { background: #E1306C }
 .week-post.plat-tiktok .wp-pic { background: var(--c-tt-fg) }
 .week-post.plat-canal .wp-pic  { background: var(--c-yt-fg) }
 .week-post.plat-twitter .wp-pic { background: var(--c-tw-fg) }
-.week-post.status-pub { background: oklch(0.93 0.05 150) !important; color: oklch(0.36 0.1 150) !important }
-.week-post.status-pub .wp-title { text-decoration: line-through; text-decoration-color: oklch(0.6 0.08 150) }
-.week-post.status-pub .wp-pic { background: oklch(0.45 0.12 150) !important }
-.week-post.status-cancel { background: oklch(0.94 0.025 20) !important; color: oklch(0.5 0.07 20) !important; opacity: 0.65 }
+
+/* status: publicado */
+.week-post.status-pub {
+  background: oklch(0.965 0.025 150) !important;
+  color: oklch(0.45 0.06 150) !important;
+  border-left-color: oklch(0.6 0.13 150) !important;
+}
+.week-post.status-pub .wp-title { text-decoration: line-through; text-decoration-thickness: 1px }
+.week-post.status-pub .wp-pic { filter: saturate(0.4) opacity(0.6) }
+
+/* status: cancelado */
+.week-post.status-cancel {
+  background: var(--surface-2) !important;
+  color: var(--ink-3) !important;
+  border-left-color: var(--line-2) !important;
+  opacity: 0.55;
+}
 .week-post.status-cancel .wp-title { text-decoration: line-through }
-.week-post.status-cancel .wp-pic { background: oklch(0.55 0.1 20) !important }
+.week-post.status-cancel .wp-pic { filter: saturate(0) }
 
 /* ============ MODAL ============ */
 .modal-backdrop {
@@ -1747,6 +1768,102 @@ textarea.field { resize: vertical; min-height: 80px; font-family: inherit; line-
 
 @media (max-width: 1100px) {
   .stories-stats { grid-template-columns: repeat(2, 1fr) }
+}
+
+/* ============ CAMPAIGN CARDS (galeria) ============ */
+.camp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.camp-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--tipo-color, var(--line));
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+  overflow: hidden;
+}
+.camp-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(40,30,60,.09), 0 2px 6px rgba(40,30,60,.04);
+}
+
+.camp-card-body {
+  padding: 16px 16px 12px;
+  flex: 1;
+}
+
+.camp-card-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.camp-card-dates {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.camp-date-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.camp-date-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-4);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.camp-date-val {
+  font-size: 12px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+.camp-date-val.soon {
+  color: oklch(0.55 0.15 55);
+  font-weight: 700;
+}
+
+.camp-card-footer {
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.camp-posts-btn {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-weight: 500;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.camp-posts-btn:hover {
+  background: var(--accent-softer);
+  border-color: var(--accent-soft);
+  color: var(--accent-deep);
 }
 
 /* ── Caption field ─────────────────────────────────────── */

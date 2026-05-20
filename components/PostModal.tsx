@@ -151,7 +151,14 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
 
   const teamOptions = TEAM_NAMES.map(t => ({ id: t, label: t }))
   const lineaOptions = LINHAS_ED.map(l => ({ id: l.id, label: l.label }))
-  const productOptions = products.map(p => ({ id: p, label: p }))
+  const DEFAULT_PRODUCTS = [
+    'Cases','Garrafas','Garrafa Fresh','Garrafa Magsafe','Garrafa Flip',
+    'Tote Daily','Tote Mini','Tote Shopper','Tote Pop','Tote Moon','Tote Care',
+    'Bolsa Fitness','Bolsa Move','Bolsa Joy',
+    'Mochila Care','Mochila Rodinhas','Lancheiras','Copo Vibe','Taça Termica',
+  ]
+  const productList = products.length > 0 ? products : DEFAULT_PRODUCTS
+  const productOptions = productList.map(p => ({ id: p, label: p }))
   const campOptions = [{ id: '', label: 'Sem campanha' }, ...campaigns.map(c => ({ id: c.slug, label: c.nome }))]
 
   const handleAddProduct = async () => {

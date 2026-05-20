@@ -18,6 +18,8 @@ interface Props {
   onDuplicate: (post: Post) => void
   showProduct?: boolean
   campaigns?: Campaign[]
+  products?: string[]
+  onAddProduct?: (name: string) => Promise<void>
 }
 
 // ─── Status select ───────────────────────────────────────────
@@ -131,8 +133,10 @@ function Stars({ value, onChange }: { value: number; onChange: (v: number) => vo
 }
 
 // ─── Main modal ──────────────────────────────────────────────
-export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate, showProduct, campaigns = [] }: Props) {
+export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate, showProduct, campaigns = [], products = [], onAddProduct }: Props) {
   const [draft, setDraft] = useState<Post>(post)
+  const [newProduct, setNewProduct] = useState('')
+  const [addingProduct, setAddingProduct] = useState(false)
 
   useEffect(() => { setDraft(post) }, [post.id])
   useEffect(() => {
@@ -147,14 +151,17 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
 
   const teamOptions = TEAM_NAMES.map(t => ({ id: t, label: t }))
   const lineaOptions = LINHAS_ED.map(l => ({ id: l.id, label: l.label }))
-  const productOptions = [
-    'Cases', 'Garrafas', 'Garrafa Fresh', 'Garrafa Magsafe', 'Garrafa Flip',
-    'Tote Daily', 'Tote Mini', 'Tote Shopper', 'Tote Pop', 'Tote Moon', 'Tote Care',
-    'Bolsa Fitness', 'Bolsa Move', 'Bolsa Joy',
-    'Mochila Care', 'Mochila Rodinhas', 'Lancheiras',
-    'Copo Vibe', 'Taça Termica',
-  ].map(p => ({ id: p, label: p }))
+  const productOptions = products.map(p => ({ id: p, label: p }))
   const campOptions = [{ id: '', label: 'Sem campanha' }, ...campaigns.map(c => ({ id: c.slug, label: c.nome }))]
+
+  const handleAddProduct = async () => {
+    const name = newProduct.trim()
+    if (!name) return
+    await onAddProduct?.(name)
+    set('product', name)
+    setNewProduct('')
+    setAddingProduct(false)
+  }
 
   const urls = draft.image_urls ?? []
   const setUrl = (i: number, val: string) => {
@@ -228,9 +235,25 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
 
               {showProduct && (
                 <>
-                  <label>Produto</label>
-                  <div className="field-wrap">
+                  <label style={{ alignSelf: 'flex-start', paddingTop: 6 }}>Produto</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <GenericSelect value={draft.product || ''} options={productOptions} onChange={v => set('product', v)} width="100%" />
+                    {addingProduct ? (
+                      <div className="field-inline">
+                        <input
+                          className="field"
+                          placeholder="Nome do produto..."
+                          value={newProduct}
+                          onChange={e => setNewProduct(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') handleAddProduct(); if (e.key === 'Escape') setAddingProduct(false) }}
+                          autoFocus
+                        />
+                        <button className="btn btn-accent" style={{ fontSize: 12, padding: '4px 10px' }} onClick={handleAddProduct}>Salvar</button>
+                        <button className="btn btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => setAddingProduct(false)}>✕</button>
+                      </div>
+                    ) : (
+                      <button className="modal-tag-add" onClick={() => setAddingProduct(true)}>+ Novo produto</button>
+                    )}
                   </div>
                 </>
               )}

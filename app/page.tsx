@@ -20,12 +20,14 @@ export default async function HomePage() {
     { data: collections },
     { data: eventDates },
     { data: futebolEvents },
+    { data: products },
   ] = await Promise.all([
     supabase.from('posts').select('*').order('date', { ascending: true }),
     supabase.from('campaigns').select('*').order('id', { ascending: true }),
     supabase.from('collections').select('*').order('id', { ascending: true }),
     supabase.from('event_dates').select('*').order('start_date', { ascending: true }),
     supabase.from('futebol_events').select('*').order('date', { ascending: true }),
+    supabase.from('products').select('name').order('name', { ascending: true }),
   ])
 
   const userEmail = user.email ?? ''
@@ -40,6 +42,7 @@ export default async function HomePage() {
       initialCollections={(collections ?? []).map(dbToCollection)}
       initialEventDates={(eventDates ?? []).map(dbToEventDate)}
       initialFutebolEvents={(futebolEvents ?? []).map(dbToFutebolEvent)}
+      initialProducts={(products ?? []).map(p => (p as { name: string }).name)}
       userEmail={userEmail}
       userName={userName}
     />

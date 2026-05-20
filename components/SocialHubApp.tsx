@@ -34,6 +34,7 @@ interface Props {
   initialCollections: Collection[]
   initialEventDates: EventDate[]
   initialFutebolEvents: FutebolEvent[]
+  initialProducts: string[]
   userEmail: string
   userName: string
 }
@@ -50,7 +51,7 @@ function getMeId(email: string) {
   return profile?.id ?? getOwnerName(email)
 }
 
-export default function SocialHubApp({ initialPosts, initialCampaigns, initialCollections, initialEventDates, initialFutebolEvents, userEmail, userName }: Props) {
+export default function SocialHubApp({ initialPosts, initialCampaigns, initialCollections, initialEventDates, initialFutebolEvents, initialProducts, userEmail, userName }: Props) {
   const supabase = createClient()
   const meId = getMeId(userEmail)
   const ownerName = getOwnerName(userEmail)
@@ -58,6 +59,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   const [posts, setPosts] = useState<Post[]>(initialPosts)
   const [collections, setCollectionsRaw] = useState<Collection[]>(initialCollections)
   const [campaigns, setCampaignsRaw] = useState<Campaign[]>(initialCampaigns)
+  const [products, setProducts] = useState<string[]>(initialProducts)
   const [view, setView] = useState<AppView>('calendar')
 
   const today = todayISO()
@@ -586,6 +588,11 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
           onDuplicate={p => setDuplicateFor(p)}
           showProduct={view === 'mh' || activePost.product !== undefined}
           campaigns={campaigns}
+          products={products}
+          onAddProduct={async (name) => {
+            await supabase.from('products').insert({ name })
+            setProducts(prev => [...prev, name].sort())
+          }}
         />
       )}
 

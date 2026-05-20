@@ -379,7 +379,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
           <div className="sb-label">Calendários</div>
           {([
             { id: 'calendar', label: 'Calendário do mês', icon: <Icon.cal />,      count: monthPosts.length },
-            { id: 'stories',  label: 'Stories',           icon: <Icon.stories />,  count: monthPosts.filter(p => p.platform === 'ig' && p.format === 'Story').length },
+            { id: 'stories',  label: 'Stories',           icon: <Icon.stories />,  count: monthPosts.filter(p => p.platform === 'ig' && p.type === 'Story').length },
             { id: 'branding', label: 'Branding',          icon: <Icon.branding />, count: posts.filter(p => p.tags?.includes('branding')).length },
             { id: 'mh',       label: 'Máquina de Hits',  icon: <Icon.mh />,       count: posts.filter(p => p.tags?.includes('mh')).length },
           ] as const).map(item => (

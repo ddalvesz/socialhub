@@ -509,7 +509,6 @@ export default function CampaignsView({ posts, onPostClick, linking, onNavigateC
   const [viewMode, setViewMode] = useState<'list' | 'gallery'>('list')
   const [dateRange, setDateRange] = useState<DateRange>({ from: '', to: '' })
   const [search, setSearch] = useState('')
-  const [searchOpen, setSearchOpen] = useState(false)
   const [expanded, setExpanded] = useState<number | null>(null)
   const [linkedCampaign, setLinkedCampaign] = useState<Campaign | null>(null)
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
@@ -570,23 +569,15 @@ export default function CampaignsView({ posts, onPostClick, linking, onNavigateC
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <PackageInfoPanel />
-        {searchOpen ? (
-          <div className="field link-field" style={{ width: 220 }}>
-            <Icon.search />
-            <input
-              placeholder="Buscar campanha..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Escape') { setSearch(''); setSearchOpen(false) } }}
-              autoFocus
-            />
-            {search && <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', padding: '0 4px' }} onClick={() => setSearch('')}><Icon.x /></button>}
-          </div>
-        ) : (
-          <button className="btn btn-ghost" style={{ padding: '5px 10px' }} onClick={() => setSearchOpen(true)}>
-            <Icon.search />
-          </button>
-        )}
+        <div className="field link-field" style={{ width: 200 }}>
+          <Icon.search />
+          <input
+            placeholder="Buscar"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          {search && <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', padding: '0 4px' }} onClick={() => setSearch('')}><Icon.x /></button>}
+        </div>
       </div>
 
       <div className="filter-bar" style={{ paddingTop: 16 }}>

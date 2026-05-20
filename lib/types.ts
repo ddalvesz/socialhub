@@ -17,7 +17,9 @@ export interface Post {
   link: string
   ref: string
   notes: string
+  caption?: string
   product?: string
+  image_urls?: string[]
   user_id?: string
 }
 
@@ -42,6 +44,112 @@ export interface Campaign {
   aprovComercialDone?: boolean
   shootingDate?: string
   shootingDone?: boolean
+  colecaoId?: number | null
+}
+
+export interface IlustraData {
+  status: string
+  criacao: boolean
+  adaptacao: boolean
+  aprovEnabled: boolean
+  aprov: boolean
+  cadastro: boolean
+}
+
+export interface MarketingData {
+  status: string
+  pack: 'PP' | 'P' | 'M' | 'G'
+  dono: string
+  banner: boolean
+  pedidoEnabled: boolean; pedido: boolean
+  loadingEnabled: boolean; loading: boolean
+  postEnabled: boolean; post: boolean
+  carrosselEnabled: boolean; carrossel: boolean
+  reelsEnabled: boolean; reels: boolean
+  trincaEnabled: boolean; trinca: boolean
+  shootingEnabled: boolean; shooting: boolean
+  storiesEnabled: boolean; stories: boolean
+  influsEnabled: boolean; influs: boolean
+}
+
+export interface Collection {
+  id: number
+  nome: string
+  tipo: string
+  mes: string
+  dataSite: string
+  dataMarketing: string
+  confirmado: string
+  launched: boolean
+  ilustra: IlustraData
+  marketing: MarketingData
+  campaignId?: number | null
+}
+
+export const COLECAO_TIPOS = [
+  { id: 'licenciamento', label: 'Licenciamento', color: 'oklch(0.55 0.13 285)' },
+  { id: 'autoral',       label: 'Autoral',       color: 'oklch(0.55 0.13 165)' },
+  { id: 'sustentacao',   label: 'Sustentação',   color: 'oklch(0.55 0.13 230)' },
+  { id: 'artista',       label: 'Artista',       color: 'oklch(0.55 0.13 25)'  },
+]
+
+export const COL_STATUS = [
+  { id: 'naoIniciada', label: 'Não iniciada', color: 'oklch(0.62 0.012 300)' },
+  { id: 'criacao',     label: 'Em criação',   color: 'oklch(0.6 0.13 265)'   },
+  { id: 'aprovacao',   label: 'Aprovação',    color: 'oklch(0.62 0.13 75)'   },
+  { id: 'atrasada',    label: 'Atrasada',     color: 'oklch(0.55 0.18 25)'   },
+]
+
+export const COL_CONFIRMADO = [
+  { id: 'ok',         label: 'Confirmada',    color: 'oklch(0.6 0.13 150)'  },
+  { id: 'negociacao', label: 'Em negociação', color: 'oklch(0.62 0.13 75)'  },
+  { id: 'cancelada',  label: 'Cancelada',     color: 'oklch(0.6 0.05 25)'   },
+]
+
+export const ILUSTRA_TASKS = [
+  { key: 'criacao',   label: 'Criação das estampas',  optional: false },
+  { key: 'adaptacao', label: 'Adaptação',              optional: false },
+  { key: 'aprov',     label: 'Aprovação das estampas', optional: true  },
+  { key: 'cadastro',  label: 'Cadastro',               optional: false },
+]
+
+export const MKT_TASKS = [
+  { key: 'banner',    label: 'Banner',             optional: false },
+  { key: 'pedido',    label: 'Pedido de conteúdo', optional: true  },
+  { key: 'loading',   label: 'Loading page',       optional: true  },
+  { key: 'post',      label: 'Post estático',      optional: true  },
+  { key: 'carrossel', label: 'Carrossel',          optional: true  },
+  { key: 'reels',     label: 'Reels',              optional: true  },
+  { key: 'trinca',    label: 'Trinca de conteúdo', optional: true  },
+  { key: 'shooting',  label: 'Mini shooting',      optional: true  },
+  { key: 'stories',   label: 'Stories',            optional: true  },
+  { key: 'influs',    label: 'Influs',             optional: true  },
+]
+
+export interface Linking {
+  collections: Collection[]
+  campaigns: Campaign[]
+  setCollections: (fn: (arr: Collection[]) => Collection[]) => void
+  setCampaigns: (fn: (arr: Campaign[]) => Campaign[]) => void
+  linkColCamp: (collectionId: number, campaignId: number) => void
+  unlinkColCamp: (collectionId: number, campaignId: number) => void
+  createCampaignFromCollection: (collection: Collection) => Campaign
+  createCollectionFromCampaign: (campaign: Campaign) => Collection
+  setCollectionLaunched: (collectionId: number, launched: boolean) => void
+  setCampaignLaunched: (campaignId: number, launched: boolean) => void
+}
+
+export function colProgress(c: Collection): number {
+  let total = 0, done = 0
+  ILUSTRA_TASKS.forEach(t => {
+    const enabled = t.optional ? !!(c.ilustra as any)[`${t.key}Enabled`] : true
+    if (enabled) { total++; if ((c.ilustra as any)[t.key]) done++ }
+  })
+  MKT_TASKS.forEach(t => {
+    const enabled = t.optional ? !!(c.marketing as any)[`${t.key}Enabled`] : true
+    if (enabled) { total++; if ((c.marketing as any)[t.key]) done++ }
+  })
+  return total === 0 ? 0 : Math.round((done / total) * 100)
 }
 
 export interface EventDate {
@@ -118,7 +226,7 @@ export const WEEKDAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 export const WEEKDAYS_FULL = ['Dom.','Seg.','Ter.','Qua.','Qui.','Sex.','Sáb.']
 export const MONTH_ABBR = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ']
 
-export type AppView = 'calendar' | 'branding' | 'mh' | 'comemorativas' | 'futebol' | 'campaigns' | 'profile'
+export type AppView = 'calendar' | 'stories' | 'branding' | 'mh' | 'comemorativas' | 'futebol' | 'campaigns' | 'collections' | 'profile'
 export type CalendarMode = 'month' | 'week'
 
 export const pad = (n: number) => String(n).padStart(2, '0')

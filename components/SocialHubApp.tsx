@@ -3,21 +3,26 @@
 import { useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  Post, Platform, AppView, CalendarMode,
+  Post, Platform, AppView, CalendarMode, Campaign, Collection, Linking,
   MONTHS, PLATFORMS, TAGS, STATUSES,
   addDaysISO, startOfWeekISO, todayISO, parseISO,
   CONTENT_TYPES_IG, CONTENT_TYPES_OTHER,
+  colProgress,
 } from '@/lib/types'
-import { TEAM_PROFILES, CAMPAIGNS_LIST, COMEMORATIVAS, FUTEBOL_2026 } from '@/lib/data'
+import { TEAM_PROFILES, CAMPAIGNS_LIST, COLLECTIONS_LIST, COMEMORATIVAS, FUTEBOL_2026 } from '@/lib/data'
 import { Icon, PlatformIcon } from './Icons'
 import CalendarGrid from './CalendarGrid'
 import WeekView from './WeekView'
 import PostModal from './PostModal'
 import DuplicateMenu from './DuplicateMenu'
 import CampaignsView from './CampaignsView'
+import CollectionsView from './CollectionsView'
+import StoriesView from './StoriesView'
 import ComemorativasView from './ComemorativasView'
 import FutebolView from './FutebolView'
 import ProfileView from './ProfileView'
+import ExportModal from './ExportModal'
+
 
 interface Props {
   initialPosts: Post[]
@@ -43,6 +48,8 @@ export default function SocialHubApp({ initialPosts, userEmail, userName }: Prop
   const ownerName = getOwnerName(userEmail)
 
   const [posts, setPosts] = useState<Post[]>(initialPosts)
+  const [collections, setCollections] = useState<Collection[]>(COLLECTIONS_LIST)
+  const [campaigns, setCampaigns] = useState<Campaign[]>(CAMPAIGNS_LIST)
   const [view, setView] = useState<AppView>('calendar')
 
   const today = todayISO()
@@ -59,6 +66,7 @@ export default function SocialHubApp({ initialPosts, userEmail, userName }: Prop
 
   const [activePost, setActivePost] = useState<Post | null>(null)
   const [duplicateFor, setDuplicateFor] = useState<Post | null>(null)
+  const [showExport, setShowExport] = useState(false)
   const [profileId, setProfileId] = useState(meId)
   const [photos, setPhotos] = useState<Record<string, string>>({})
 
@@ -155,6 +163,92 @@ export default function SocialHubApp({ initialPosts, userEmail, userName }: Prop
     }
   }
 
+  // ─── Linking handlers ─────────────────────────────────────────
+  const linkColCamp = (collectionId: number, campaignId: number) => {
+    setCollections(arr => arr.map(c => {
+      if (c.id === collectionId) return { ...c, campaignId }
+      if (c.campaignId === campaignId) return { ...c, campaignId: null }
+      return c
+    }))
+    setCampaigns(arr => arr.map(c => {
+      if (c.id === campaignId) return { ...c, colecaoId: collectionId }
+      if (c.colecaoId === collectionId) return { ...c, colecaoId: null }
+      return c
+    }))
+  }
+
+  const unlinkColCamp = (collectionId: number, campaignId: number) => {
+    setCollections(arr => arr.map(c => c.id === collectionId ? { ...c, campaignId: null } : c))
+    setCampaigns(arr => arr.map(c => c.id === campaignId ? { ...c, colecaoId: null } : c))
+  }
+
+  const createCampaignFromCollection = (collection: Collection): Campaign => {
+    const id = campaigns.reduce((m, c) => Math.max(m, c.id), 0) + 1
+    const slug = collection.nome.toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '-').slice(0, 20)
+    const newCamp: Campaign = {
+      id, slug, nome: collection.nome,
+      pack: collection.marketing.pack, dono: collection.marketing.dono,
+      tipo: 'Coleção', mes: collection.mes || '',
+      dataInsta: collection.dataMarketing || todayISO(),
+      dataSite: collection.dataSite || '-',
+      dataComercial: '-', dataFinal: '',
+      previsao: collection.dataSite || todayISO(),
+      launched: collection.launched, progresso: 0,
+      colecaoId: collection.id,
+    }
+    setCampaigns(arr => [...arr, newCamp])
+    setCollections(arr => arr.map(c => c.id === collection.id ? { ...c, campaignId: id } : c))
+    return newCamp
+  }
+
+  const createCollectionFromCampaign = (campaign: Campaign): Collection => {
+    const id = collections.reduce((m, c) => Math.max(m, c.id), 0) + 1
+    const newCol: Collection = {
+      id, nome: campaign.nome, tipo: 'autoral',
+      mes: campaign.mes || '',
+      dataSite: campaign.dataSite && campaign.dataSite !== '-' ? campaign.dataSite : campaign.previsao || todayISO(),
+      dataMarketing: campaign.dataInsta || todayISO(),
+      confirmado: 'ok', launched: campaign.launched,
+      ilustra: { status: 'naoIniciada', criacao: false, adaptacao: false, aprovEnabled: false, aprov: false, cadastro: false },
+      marketing: { status: 'naoIniciada', pack: campaign.pack, dono: campaign.dono,
+        banner: false,
+        pedidoEnabled: false, pedido: false, loadingEnabled: false, loading: false,
+        postEnabled: false, post: false, carrosselEnabled: false, carrossel: false,
+        reelsEnabled: false, reels: false, trincaEnabled: false, trinca: false,
+        shootingEnabled: false, shooting: false, storiesEnabled: false, stories: false,
+        influsEnabled: false, influs: false },
+      campaignId: campaign.id,
+    }
+    setCollections(arr => [...arr, newCol])
+    setCampaigns(arr => arr.map(c => c.id === campaign.id ? { ...c, colecaoId: id } : c))
+    return newCol
+  }
+
+  const setCollectionLaunched = (collectionId: number, launched: boolean) => {
+    const col = collections.find(c => c.id === collectionId)
+    setCollections(arr => arr.map(c => c.id === collectionId ? { ...c, launched } : c))
+    if (col?.campaignId != null) {
+      setCampaigns(arr => arr.map(c => c.id === col.campaignId ? { ...c, launched } : c))
+    }
+  }
+
+  const setCampaignLaunched = (campaignId: number, launched: boolean) => {
+    const cmp = campaigns.find(c => c.id === campaignId)
+    setCampaigns(arr => arr.map(c => c.id === campaignId ? { ...c, launched } : c))
+    if (cmp?.colecaoId != null) {
+      setCollections(arr => arr.map(c => c.id === cmp.colecaoId ? { ...c, launched } : c))
+    }
+  }
+
+  const linking: Linking = {
+    collections, campaigns, setCollections, setCampaigns,
+    linkColCamp, unlinkColCamp,
+    createCampaignFromCollection, createCollectionFromCampaign,
+    setCollectionLaunched, setCampaignLaunched,
+  }
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     window.location.href = '/login'
@@ -166,12 +260,14 @@ export default function SocialHubApp({ initialPosts, userEmail, userName }: Prop
 
   // ─── View titles ──────────────────────────────────────────────
   const viewTitles: Record<AppView, { title: string; sub: string }> = {
-    calendar:      { title: 'Calendário',          sub: 'Todos os canais'           },
-    branding:      { title: 'Branding',             sub: 'Posts com tag Branding'    },
-    mh:            { title: 'Máquina de Hits',      sub: 'Posts MH'                  },
-    comemorativas: { title: 'Datas comemorativas',  sub: 'Pauta anual'               },
-    futebol:       { title: 'Futebol 2026',         sub: 'Calendário esportivo'      },
-    campaigns:     { title: 'Campanhas',            sub: 'Controle e cronograma'     },
+    calendar:      { title: 'Calendário',          sub: 'Todos os canais'                        },
+    stories:       { title: 'Stories',             sub: 'Calendário · Lista · Performance'       },
+    branding:      { title: 'Branding',             sub: 'Posts com tag Branding'                },
+    mh:            { title: 'Máquina de Hits',      sub: 'Posts MH'                              },
+    comemorativas: { title: 'Datas comemorativas',  sub: 'Pauta anual'                           },
+    futebol:       { title: 'Futebol 2026',         sub: 'Calendário esportivo'                  },
+    campaigns:     { title: 'Campanhas',            sub: 'Controle e cronograma'                 },
+    collections:   { title: 'Coleções',             sub: 'Ilustra · Marketing'                   },
     profile:       { title: 'Perfil',               sub: profileId === meId ? 'Seu perfil' : 'Equipe' },
   }
   const { title, sub } = viewTitles[view]
@@ -193,7 +289,8 @@ export default function SocialHubApp({ initialPosts, userEmail, userName }: Prop
         <div className="sb-section">
           <div className="sb-label">Calendários</div>
           {([
-            { id: 'calendar', label: 'Calendário do mês', icon: <Icon.cal />, count: monthPosts.length },
+            { id: 'calendar', label: 'Calendário do mês', icon: <Icon.cal />,      count: monthPosts.length },
+            { id: 'stories',  label: 'Stories',           icon: <Icon.stories />,  count: undefined },
             { id: 'branding', label: 'Branding',          icon: <Icon.branding />, count: posts.filter(p => p.tags?.includes('branding')).length },
             { id: 'mh',       label: 'Máquina de Hits',  icon: <Icon.mh />,       count: posts.filter(p => p.tags?.includes('mh')).length },
           ] as const).map(item => (
@@ -209,7 +306,8 @@ export default function SocialHubApp({ initialPosts, userEmail, userName }: Prop
           {([
             { id: 'comemorativas', label: 'Datas comemorativas', icon: <Icon.events /> },
             { id: 'futebol',       label: 'Futebol 2026',        icon: <Icon.ball />   },
-            { id: 'campaigns',     label: 'Campanhas',           icon: <Icon.campaign />, count: CAMPAIGNS_LIST.length },
+            { id: 'campaigns',     label: 'Campanhas',           icon: <Icon.campaign />, count: campaigns.length },
+            { id: 'collections',   label: 'Coleções',            icon: <Icon.collections />, count: collections.length },
           ] as const).map(item => (
             <button key={item.id} className={`sb-item ${view === item.id ? 'active' : ''}`} onClick={() => setView(item.id)}>
               {item.icon} <span>{item.label}</span>
@@ -268,8 +366,22 @@ export default function SocialHubApp({ initialPosts, userEmail, userName }: Prop
             </div>
           )}
 
-          <button className="btn btn-accent" onClick={() => createPost({})}>
-            <Icon.plus /> Novo post
+          {view !== 'stories' && (
+            <button className="btn btn-accent" onClick={() => createPost({})}>
+              <Icon.plus /> Novo post
+            </button>
+          )}
+
+          <button
+            className="btn btn-ghost"
+            onClick={() => setShowExport(true)}
+            title="Exportar para Metricool"
+            style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3v13M7 12l5 5 5-5"/><path d="M4 19h16"/>
+            </svg>
+            CSV
           </button>
 
           <button className="btn btn-ghost" onClick={handleLogout} title="Sair" style={{ padding: '9px 12px' }}>
@@ -336,9 +448,29 @@ export default function SocialHubApp({ initialPosts, userEmail, userName }: Prop
           </div>
         )}
 
+        {view === 'stories'       && <StoriesView />}
         {view === 'comemorativas' && <ComemorativasView />}
         {view === 'futebol'       && <FutebolView />}
-        {view === 'campaigns'     && <CampaignsView posts={posts} onPostClick={setActivePost} />}
+        {view === 'campaigns'     && (
+          <CampaignsView
+            posts={posts}
+            onPostClick={setActivePost}
+            linking={linking}
+            onNavigateCollection={id => {
+              setView('collections')
+              setTimeout(() => window.dispatchEvent(new CustomEvent('focusCollection', { detail: id })), 0)
+            }}
+          />
+        )}
+        {view === 'collections'   && (
+          <CollectionsView
+            linking={linking}
+            onNavigateCampaign={id => {
+              setView('campaigns')
+              setTimeout(() => window.dispatchEvent(new CustomEvent('focusCampaign', { detail: id })), 0)
+            }}
+          />
+        )}
         {view === 'profile'       && (
           <ProfileView
             posts={posts}
@@ -351,6 +483,9 @@ export default function SocialHubApp({ initialPosts, userEmail, userName }: Prop
           />
         )}
       </main>
+
+      {/* Export modal */}
+      {showExport && <ExportModal onClose={() => setShowExport(false)} />}
 
       {/* Post modal */}
       {activePost && (

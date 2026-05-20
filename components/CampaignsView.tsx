@@ -320,6 +320,7 @@ export default function CampaignsView({ posts, onPostClick }: CampaignsProps) {
   const [expanded, setExpanded] = useState<number | null>(null)
   const [linkedCampaign, setLinkedCampaign] = useState<Campaign | null>(null)
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
+  const [deletingCampaign, setDeletingCampaign] = useState<Campaign | null>(null)
   const [items, setItems] = useState<Campaign[]>(CAMPAIGNS_LIST)
   const [showForm, setShowForm] = useState(false)
 
@@ -330,6 +331,18 @@ export default function CampaignsView({ posts, onPostClick }: CampaignsProps) {
   const addCampaign = (data: any) => {
     const id = items.reduce((m, c) => Math.max(m, c.id), 0) + 1
     setItems(arr => [...arr, { id, ...data } as Campaign])
+  }
+
+  const deleteCampaign = (id: number) => {
+    setItems(arr => arr.filter(c => c.id !== id))
+    setExpanded(null)
+    setDeletingCampaign(null)
+  }
+
+  const archiveCampaign = (id: number) => {
+    setItems(arr => arr.map(c => c.id === id ? { ...c, archived: true } : c))
+    setExpanded(null)
+    setDeletingCampaign(null)
   }
 
   const filtered = filter === 'all' ? items
@@ -366,7 +379,7 @@ export default function CampaignsView({ posts, onPostClick }: CampaignsProps) {
 
       <div className="list-wrap">
         <div className="list">
-          <div className="list-row list-head" style={{ gridTemplateColumns: '40px 3fr 80px 1.5fr 2fr 1fr 1.5fr 160px 110px' }}>
+          <div className="list-row list-head" style={{ gridTemplateColumns: '32px 2.4fr 90px 1.2fr 1.5fr 0.85fr 1.2fr 1.5fr 1.1fr' }}>
             <div className="cell" />
             <div className="cell">Campanha</div>
             <div className="cell">Pacote</div>
@@ -384,7 +397,7 @@ export default function CampaignsView({ posts, onPostClick }: CampaignsProps) {
               <div key={c.id}>
                 <div
                   className={`list-row expandable ${isOpen ? 'expanded' : ''}`}
-                  style={{ gridTemplateColumns: '40px 3fr 80px 1.5fr 2fr 1fr 1.5fr 160px 110px' }}
+                  style={{ gridTemplateColumns: '32px 2.4fr 90px 1.2fr 1.5fr 0.85fr 1.2fr 1.5fr 1.1fr' }}
                   onClick={() => setExpanded(isOpen ? null : c.id)}
                 >
                   <div className="cell" style={{ padding: '14px 0 14px 16px' }}>
@@ -485,7 +498,7 @@ export default function CampaignsView({ posts, onPostClick }: CampaignsProps) {
                         Editar campanha
                       </button>
                       <div style={{ flex: 1 }} />
-                      <button className="btn btn-ghost" style={{ color: 'var(--ink-3)' }}>
+                      <button className="btn btn-ghost" style={{ color: 'var(--ink-3)' }} onClick={e => { e.stopPropagation(); setDeletingCampaign(c) }}>
                         <Icon.trash /> Excluir
                       </button>
                     </div>
@@ -511,11 +524,60 @@ export default function CampaignsView({ posts, onPostClick }: CampaignsProps) {
       )}
 
       {editingCampaign && (
-        <CampaignFormModal 
-          initial={editingCampaign} 
-          onClose={() => setEditingCampaign(null)} 
-          onSave={(c) => updateCampaign(c.id, c)} 
+        <CampaignFormModal
+          initial={editingCampaign}
+          onClose={() => setEditingCampaign(null)}
+          onSave={(c) => updateCampaign(c.id, c)}
         />
+      )}
+
+      {deletingCampaign && (
+        <div className="modal-backdrop" onClick={() => setDeletingCampaign(null)}>
+          <div className="modal" style={{ width: 'min(440px, calc(100vw - 40px))', maxHeight: 'unset' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-head" style={{ borderBottom: 'none', paddingBottom: 8 }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 12, flex: '0 0 44px',
+                background: 'oklch(0.95 0.03 20)', display: 'grid', placeItems: 'center',
+                color: 'oklch(0.52 0.18 22)',
+              }}>
+                <Icon.trash />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.015em' }}>
+                  Excluir campanha?
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 3 }}>
+                  "{deletingCampaign.nome}"
+                </div>
+              </div>
+              <button className="modal-close" onClick={() => setDeletingCampaign(null)}><Icon.x /></button>
+            </div>
+
+            <div style={{ padding: '4px 26px 20px', fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+              Essa ação é permanente e não pode ser desfeita. Todos os dados da campanha serão removidos.
+              <br /><br />
+              Se preferir manter o histórico, você pode <strong>arquivar</strong> a campanha em vez de excluir.
+            </div>
+
+            <div className="modal-foot" style={{ justifyContent: 'flex-end', gap: 10 }}>
+              <button className="btn btn-ghost" onClick={() => setDeletingCampaign(null)}>Cancelar</button>
+              <button
+                className="btn btn-ghost"
+                style={{ color: 'oklch(0.5 0.12 230)', borderColor: 'oklch(0.88 0.04 230)' }}
+                onClick={() => archiveCampaign(deletingCampaign.id)}
+              >
+                Arquivar
+              </button>
+              <button
+                className="btn"
+                style={{ background: 'oklch(0.52 0.18 22)', color: 'white' }}
+                onClick={() => deleteCampaign(deletingCampaign.id)}
+              >
+                <Icon.trash /> Excluir
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

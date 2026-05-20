@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Icon, PlatformIcon } from './Icons'
 import { Popover, GenericSelect } from './FormHelpers'
 import {
@@ -18,8 +18,6 @@ interface Props {
   onDuplicate: (post: Post) => void
   showProduct?: boolean
 }
-
-
 
 // ─── Status select ───────────────────────────────────────────
 function StatusSelect({ value, onChange }: { value: PostStatus; onChange: (v: PostStatus) => void }) {
@@ -54,12 +52,18 @@ function PlatformSelect({ value, onChange }: { value: Platform; onChange: (v: Pl
   const [open, setOpen] = useState(false)
   const cur = PLATFORMS.find(p => p.id === value)!
   return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
-      <button className="field" style={{ display: 'inline-flex', alignItems: 'center', gap: 9, paddingRight: 10, cursor: 'pointer' }} onClick={() => setOpen(o => !o)}>
-        <span style={{ width: 18, height: 18, borderRadius: 5, background: cur.color, display: 'grid', placeItems: 'center' }}>
-          <PlatformIcon platform={cur.id} size={11} color="white" />
+    <div style={{ position: 'relative', width: '100%' }}>
+      <button
+        className="field"
+        style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer', width: '100%', justifyContent: 'space-between' }}
+        onClick={() => setOpen(o => !o)}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          <span style={{ width: 18, height: 18, borderRadius: 5, background: cur.color, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+            <PlatformIcon platform={cur.id} size={11} color="white" />
+          </span>
+          {cur.label}
         </span>
-        {cur.label}
         <Icon.chevD />
       </button>
       <Popover open={open} onClose={() => setOpen(false)}>
@@ -76,8 +80,6 @@ function PlatformSelect({ value, onChange }: { value: Platform; onChange: (v: Pl
     </div>
   )
 }
-
-
 
 // ─── Tags field ──────────────────────────────────────────────
 function TagsField({ tags, onChange }: { tags: string[]; onChange: (v: string[]) => void }) {
@@ -146,9 +148,16 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
   const lineaOptions = LINHAS_ED.map(l => ({ id: l.id, label: l.label }))
   const campOptions = [{ id: '', label: 'Sem campanha' }, ...CAMP_LIST]
 
+  const urls = draft.image_urls ?? []
+  const setUrl = (i: number, val: string) => {
+    const next = [...urls]; next[i] = val; set('image_urls', next)
+  }
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+      <div className="modal modal-post" onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
         <div className="modal-head">
           <div className={`platform-mark plat-${plat.id}`}>
             <PlatformIcon platform={plat.id} size={20} color="white" />
@@ -170,56 +179,131 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
           <button className="modal-close" onClick={onClose}><Icon.x /></button>
         </div>
 
+        {/* Body — 2 columns */}
         <div className="modal-body">
-          <div className="modal-grid">
-            <label>Dono</label>
-            <GenericSelect value={draft.owner} options={teamOptions} onChange={v => set('owner', v)} width={180} />
 
-            <label>Plataforma</label>
-            <PlatformSelect value={draft.platform} onChange={v => set('platform', v)} />
+          {/* LEFT — Detalhes */}
+          <div className="col left">
+            <div className="modal-col-head">
+              <Icon.settings /> Detalhes
+            </div>
+            <div className="modal-grid">
+              <label>Dono</label>
+              <div className="field-wrap">
+                <GenericSelect value={draft.owner} options={teamOptions} onChange={v => set('owner', v)} width="100%" />
+              </div>
 
-            <label>Data e horário</label>
-            <div className="field-inline">
-              <input className="field" type="date" value={draft.date} onChange={e => set('date', e.target.value)} style={{ width: 180 }} />
-              <input className="field" type="time" value={draft.time} onChange={e => set('time', e.target.value)} style={{ width: 120 }} />
+              <label>Plataforma</label>
+              <PlatformSelect value={draft.platform} onChange={v => set('platform', v)} />
+
+              <label>Data e hora</label>
+              <div className="field-inline">
+                <input className="field" type="date" value={draft.date} onChange={e => set('date', e.target.value)} />
+                <input className="field" type="time" value={draft.time} onChange={e => set('time', e.target.value)} />
+              </div>
+
+              <label>Tipo</label>
+              <div className="field-wrap">
+                <GenericSelect value={draft.type} options={types.map(t => ({ id: t, label: t }))} onChange={v => set('type', v)} width="100%" />
+              </div>
+
+              {showProduct && (
+                <>
+                  <label>Produto</label>
+                  <input className="field" placeholder="ex: Carteira Care..." value={draft.product || ''} onChange={e => set('product', e.target.value)} />
+                </>
+              )}
+
+              <label>Linha editorial</label>
+              <div className="field-wrap">
+                <GenericSelect value={draft.linha} options={lineaOptions} onChange={v => set('linha', v)} width="100%" />
+              </div>
+
+              <label>Campanha</label>
+              <div className="field-wrap">
+                <GenericSelect value={draft.campanha || ''} options={campOptions} onChange={v => set('campanha', v || null)} placeholder="Sem campanha" width="100%" />
+              </div>
+
+              <label style={{ alignSelf: 'flex-start', paddingTop: 8 }}>Tags</label>
+              <TagsField tags={draft.tags || []} onChange={v => set('tags', v)} />
+
+              <label>Complexidade</label>
+              <div className="field-inline">
+                <Stars value={draft.complexity} onChange={v => set('complexity', v)} />
+                <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{draft.complexity}/5</span>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT — Conteúdo */}
+          <div className="col right">
+            <div className="modal-col-head">
+              <Icon.branding /> Conteúdo
             </div>
 
-            <label>Tipo de conteúdo</label>
-            <GenericSelect value={draft.type} options={types.map(t => ({ id: t, label: t }))} onChange={v => set('type', v)} />
-
-            <label>Complexidade</label>
-            <div className="field-inline">
-              <Stars value={draft.complexity} onChange={v => set('complexity', v)} />
-              <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{draft.complexity}/5</span>
+            <div className="stacked">
+              <label>Legenda</label>
+              <div style={{ position: 'relative' }}>
+                <textarea
+                  className="field legenda"
+                  placeholder="Escreva aqui a legenda que vai com o post..."
+                  value={draft.caption || ''}
+                  onChange={e => set('caption', e.target.value)}
+                />
+                {draft.caption && (
+                  <span className="caption-count">{draft.caption.length} car.</span>
+                )}
+              </div>
             </div>
 
-            {showProduct && (
-              <>
-                <label>Produto</label>
-                <input className="field" placeholder="ex: Carteira Care..." value={draft.product || ''} onChange={e => set('product', e.target.value)} />
-              </>
+            <div className="stacked">
+              <label>Link da mídia</label>
+              <div className="field link-field">
+                <Icon.media />
+                <input placeholder="https://..." value={urls[0] ?? ''} onChange={e => setUrl(0, e.target.value)} />
+              </div>
+            </div>
+
+            {draft.type === 'Reels' && (
+              <div className="stacked">
+                <label>Link da capa <span className="hint">capa do Reels</span></label>
+                <div className="field link-field">
+                  <Icon.cover />
+                  <input placeholder="https://..." value={urls[1] ?? ''} onChange={e => setUrl(1, e.target.value)} />
+                </div>
+              </div>
             )}
 
-            <label>Tags</label>
-            <TagsField tags={draft.tags || []} onChange={v => set('tags', v)} />
+            <div className="stacked">
+              <label>Link de referência</label>
+              <div className="field link-field">
+                <Icon.ref />
+                <input placeholder="https://..." value={draft.ref || ''} onChange={e => set('ref', e.target.value)} />
+              </div>
+            </div>
 
-            <label>Linha editorial</label>
-            <GenericSelect value={draft.linha} options={lineaOptions} onChange={v => set('linha', v)} />
+            <div className="stacked">
+              <label>Link do Post</label>
+              <div className="field link-field">
+                <Icon.post />
+                <input placeholder="https://..." value={draft.link || ''} onChange={e => set('link', e.target.value)} />
+              </div>
+            </div>
 
-            <label>Campanha</label>
-            <GenericSelect value={draft.campanha || ''} options={campOptions} onChange={v => set('campanha', v || null)} placeholder="Sem campanha" />
-
-            <label>Link do conteúdo</label>
-            <input className="field" placeholder="https://..." value={draft.link} onChange={e => set('link', e.target.value)} />
-
-            <label>Link de referência</label>
-            <input className="field" placeholder="https://..." value={draft.ref} onChange={e => set('ref', e.target.value)} />
-
-            <label style={{ alignSelf: 'flex-start', paddingTop: 10 }}>Observações</label>
-            <textarea className="field" rows={3} placeholder="Comentários internos..." value={draft.notes} onChange={e => set('notes', e.target.value)} />
+            <div className="stacked">
+              <label>Observações</label>
+              <textarea
+                className="field"
+                rows={2}
+                placeholder="Comentários internos..."
+                value={draft.notes || ''}
+                onChange={e => set('notes', e.target.value)}
+              />
+            </div>
           </div>
         </div>
 
+        {/* Footer */}
         <div className="modal-foot">
           <button className="danger" onClick={() => { onDelete(draft); onClose() }}>
             <Icon.trash /> Excluir

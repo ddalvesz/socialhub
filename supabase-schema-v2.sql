@@ -23,6 +23,7 @@ create table posts (
   ref        text        not null default '',
   notes      text        not null default '',
   product    text,
+  image_urls text[]      not null default '{}',
 
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

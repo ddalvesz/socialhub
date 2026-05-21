@@ -282,16 +282,6 @@ function CampaignFormModal({ initial, onClose, onSave }: { initial?: Campaign | 
 
             <div className="modal-section-label">Status</div>
 
-            <label>Progresso</label>
-            <div className="field-inline">
-              <input type="range" min="0" max="100" step="5" value={draft.progresso}
-                onChange={e => set('progresso', Number(e.target.value))}
-                style={{ flex: 1, maxWidth: 280 }} />
-              <span style={{ fontSize: 13, color: 'var(--ink-2)', fontVariantNumeric: 'tabular-nums', minWidth: 40 }}>
-                {draft.progresso}%
-              </span>
-            </div>
-
             <label>Lançada?</label>
             <FieldCheckbox label="Marcar como lançada" value={draft.launched}
               onChange={v => set('launched', v)} />

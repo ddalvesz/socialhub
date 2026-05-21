@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { PlatformIcon } from './Icons'
 import {
   Post, buildMonthGrid, WEEKDAYS, todayISO,
@@ -15,6 +15,7 @@ interface Props {
   events?: (EventDate | FutebolEvent)[]
   onPostClick: (post: Post) => void
   onNewPost?: (date: string) => void
+  onPostDrop?: (postId: number, date: string) => void
   maxPerCell?: number
 }
 
@@ -22,6 +23,8 @@ function PostCard({ post, onClick }: { post: Post; onClick: () => void }) {
   return (
     <button
       className={`post-card plat-${post.platform} status-${post.status}`}
+      draggable
+      onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData('postId', String(post.id)) }}
       onClick={onClick}
       title={post.title}
     >
@@ -80,11 +83,12 @@ function DayPopover({ date, posts, onPostClick, onClose }: {
 }
 
 export default function CalendarGrid({
-  year, month, posts, events = [], onPostClick, onNewPost, maxPerCell = 3,
+  year, month, posts, events = [], onPostClick, onNewPost, onPostDrop, maxPerCell = 3,
 }: Props) {
   const cells = useMemo(() => buildMonthGrid(year, month), [year, month])
   const today = todayISO()
   const [expandedDay, setExpandedDay] = useState<string | null>(null)
+  const [dragOverDay, setDragOverDay] = useState<string | null>(null)
 
   const postsByDay = useMemo(() => {
     const map: Record<string, Post[]> = {}
@@ -130,8 +134,16 @@ export default function CalendarGrid({
           <div
             key={i}
             className={`cal-cell ${c.other ? 'other' : ''} ${isToday ? 'today' : ''}`}
-            style={{ position: 'relative' }}
+            style={{ position: 'relative', outline: dragOverDay === c.iso ? '2px solid var(--accent)' : undefined, outlineOffset: '-2px' }}
             onClick={() => !c.other && onNewPost?.(c.iso)}
+            onDragOver={e => { e.preventDefault(); setDragOverDay(c.iso) }}
+            onDragLeave={() => setDragOverDay(null)}
+            onDrop={e => {
+              e.preventDefault()
+              setDragOverDay(null)
+              const postId = Number(e.dataTransfer.getData('postId'))
+              if (postId && !c.other) onPostDrop?.(postId, c.iso)
+            }}
           >
             <div className="cal-num-row">
               <span className="cal-num-box">{c.day}</span>

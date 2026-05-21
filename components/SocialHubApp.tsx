@@ -182,6 +182,15 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     await supabase.from('posts').update(payload).eq('id', id)
   }
 
+  const movePost = async (postId: number, date: string, time?: string) => {
+    const post = posts.find(p => p.id === postId)
+    if (!post) return
+    const updated = { ...post, date, ...(time !== undefined ? { time } : {}) }
+    setPosts(arr => arr.map(p => p.id === postId ? updated : p))
+    const { id, user_id, ...payload } = updated
+    await supabase.from('posts').update(payload).eq('id', id)
+  }
+
   const deletePost = async (p: Post) => {
     setPosts(arr => arr.filter(x => x.id !== p.id))
     await supabase.from('posts').delete().eq('id', p.id)
@@ -527,12 +536,14 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
                 events={calEvents}
                 onPostClick={setActivePost}
                 onNewPost={date => createPost({ date })}
+                onPostDrop={(postId, date) => movePost(postId, date)}
               />
             ) : (
               <WeekView
                 weekStart={weekStart}
                 posts={shownPosts}
                 onPostClick={setActivePost}
+                onPostDrop={(postId, date, time) => movePost(postId, date, time)}
               />
             )}
           </div>

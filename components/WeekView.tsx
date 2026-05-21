@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { PlatformIcon } from './Icons'
 import { Post, addDaysISO, parseISO, WEEKDAYS_FULL, pad, todayISO } from '@/lib/types'
 
@@ -12,12 +12,15 @@ interface Props {
   weekStart: string
   posts: Post[]
   onPostClick: (post: Post) => void
+  onPostDrop?: (postId: number, date: string, time: string) => void
 }
 
-export default function WeekView({ weekStart, posts, onPostClick }: Props) {
+export default function WeekView({ weekStart, posts, onPostClick, onPostDrop }: Props) {
   const days = Array.from({ length: 7 }, (_, i) => addDaysISO(weekStart, i))
   const hours = Array.from({ length: WEEK_END_HOUR - WEEK_START_HOUR }, (_, i) => WEEK_START_HOUR + i)
   const today = todayISO()
+
+  const [dragOverDay, setDragOverDay] = useState<string | null>(null)
 
   const now = new Date()
   const nowMinutes = now.getHours() * 60 + now.getMinutes()
@@ -60,7 +63,27 @@ export default function WeekView({ weekStart, posts, onPostClick }: Props) {
           const isToday = d === today
           const dayPosts = postsByDay[d] || []
           return (
-            <div key={d} className={`week-day-col ${isToday ? 'today' : ''}`}>
+            <div
+              key={d}
+              className={`week-day-col ${isToday ? 'today' : ''}`}
+              style={{ outline: dragOverDay === d ? '2px solid var(--accent)' : undefined, outlineOffset: '-2px' }}
+              onDragOver={e => { e.preventDefault(); setDragOverDay(d) }}
+              onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverDay(null) }}
+              onDrop={e => {
+                e.preventDefault()
+                setDragOverDay(null)
+                const postId = Number(e.dataTransfer.getData('postId'))
+                if (!postId) return
+                const rect = e.currentTarget.getBoundingClientRect()
+                const relY = e.clientY - rect.top
+                const totalHours = relY / HOUR_HEIGHT + WEEK_START_HOUR
+                const h = Math.min(23, Math.max(0, Math.floor(totalHours)))
+                const rawMin = Math.round(((totalHours - Math.floor(totalHours)) * 60) / 15) * 15
+                const min = rawMin >= 60 ? 0 : rawMin
+                const finalH = rawMin >= 60 ? Math.min(23, h + 1) : h
+                onPostDrop?.(postId, d, `${pad(finalH)}:${pad(min)}`)
+              }}
+            >
               {hours.map(h => (
                 <div key={h} className="week-hour-cell" />
               ))}
@@ -77,6 +100,8 @@ export default function WeekView({ weekStart, posts, onPostClick }: Props) {
                     key={p.id}
                     className={`week-post plat-${p.platform} status-${p.status}`}
                     style={{ top: `${top}px`, height: `${height}px` }}
+                    draggable
+                    onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData('postId', String(p.id)) }}
                     onClick={() => onPostClick(p)}
                     title={p.title}
                   >

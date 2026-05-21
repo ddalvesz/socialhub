@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import "./socialhub.css";
@@ -30,6 +31,7 @@ export default function RootLayout({
     <html lang="pt-BR" className={`${dmSans.variable} ${jetbrainsMono.variable}`}>
       <body style={{ fontFamily: "var(--loaded-sans, var(--font-sans))" }}>
         {children}
+        <Analytics />
       </body>
     </html>
   );

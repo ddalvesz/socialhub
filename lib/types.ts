@@ -47,6 +47,12 @@ export interface Campaign {
   colecaoId?: number | null
 }
 
+export interface ExtraTask {
+  id: string
+  label: string
+  done: boolean
+}
+
 export interface IlustraData {
   status: string
   criacao: boolean
@@ -54,6 +60,7 @@ export interface IlustraData {
   aprovEnabled: boolean
   aprov: boolean
   cadastro: boolean
+  extraTasks?: ExtraTask[]
 }
 
 export interface MarketingData {
@@ -70,6 +77,7 @@ export interface MarketingData {
   shootingEnabled: boolean; shooting: boolean
   storiesEnabled: boolean; stories: boolean
   influsEnabled: boolean; influs: boolean
+  extraTasks?: ExtraTask[]
 }
 
 export interface Collection {

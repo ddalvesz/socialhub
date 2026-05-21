@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Icon } from './Icons'
 import { GenericSelect, PackToggle, FieldCheckbox, DateRangeFilter, DateRange } from './FormHelpers'
 import {
-  Collection, Campaign, Linking,
+  Collection, Campaign, Linking, ExtraTask,
   COLECAO_TIPOS, COL_STATUS, COL_CONFIRMADO,
   ILUSTRA_TASKS, MKT_TASKS, colProgress,
   fmtBR, todayISO,
@@ -162,6 +162,55 @@ function TaskRow({ task, scope, collection, onChange }: {
   )
 }
 
+// ─── ExtraTaskSection ─────────────────────────────────────────
+function ExtraTaskSection({ tasks, onChange }: {
+  tasks: ExtraTask[]
+  onChange: (updated: ExtraTask[]) => void
+}) {
+  const [input, setInput] = useState('')
+
+  const add = () => {
+    const label = input.trim()
+    if (!label) return
+    onChange([...tasks, { id: Date.now().toString(), label, done: false }])
+    setInput('')
+  }
+
+  const toggle = (id: string) =>
+    onChange(tasks.map(t => t.id === id ? { ...t, done: !t.done } : t))
+
+  const remove = (id: string) =>
+    onChange(tasks.filter(t => t.id !== id))
+
+  return (
+    <div className="extra-tasks">
+      {tasks.map(t => (
+        <div key={t.id} className={`task-row extra ${t.done ? 'done' : ''}`} onClick={() => toggle(t.id)}>
+          <span className={`check-cell ${t.done ? 'on' : ''}`}>
+            {t.done && <Icon.check />}
+          </span>
+          <div className="task-label">{t.label}</div>
+          <button
+            className="extra-task-del"
+            onClick={e => { e.stopPropagation(); remove(t.id) }}
+            title="Remover"
+          >×</button>
+        </div>
+      ))}
+      <div className="extra-task-add" onClick={e => e.stopPropagation()}>
+        <input
+          className="extra-task-input"
+          placeholder="Nova tarefa…"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') add() }}
+        />
+        <button className="extra-task-btn" onClick={add} disabled={!input.trim()}>+</button>
+      </div>
+    </div>
+  )
+}
+
 // ─── ScopePanel ───────────────────────────────────────────────
 function ScopePanel({ scope, title, accent, collection, onChange, children, tasks }: {
   scope: 'ilustra' | 'marketing'
@@ -192,6 +241,10 @@ function ScopePanel({ scope, title, accent, collection, onChange, children, task
             onChange={patch => onChange(patch)} />
         ))}
       </div>
+      <ExtraTaskSection
+        tasks={(collection[scope] as any).extraTasks ?? []}
+        onChange={updated => onChange({ extraTasks: updated })}
+      />
     </div>
   )
 }

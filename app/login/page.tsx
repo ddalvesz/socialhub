@@ -99,7 +99,7 @@ export default function LoginPage() {
 
       {/* Top-right help link */}
       <div className="lp-corner-right">
-        Sem acesso? <a href="mailto:socialhub-team@gocase.com">Falar com o time</a>
+        Sem acesso? <a href="https://mail.google.com/chat/u/0/#chat/dm/eduarda.alves@gocase.com" target="_blank" rel="noopener">Falar com o time</a>
       </div>
 
       {/* ── Floating decorations (decorative, hidden on small viewports) ── */}

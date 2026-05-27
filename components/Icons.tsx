@@ -56,10 +56,9 @@ export function PlatformIcon({ platform, size = 12, color = 'white' }: PlatformI
   )
   if (platform === 'canal') return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5.5 8.5a8 8 0 0 1 13 0"/>
-      <path d="M7.5 11a5 5 0 0 1 9 0"/>
-      <path d="M9.5 13.5a2.5 2.5 0 0 1 5 0"/>
-      <circle cx="12" cy="17" r="1" fill={color} stroke="none"/>
+      <path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V7L6 11H4a1 1 0 0 0-1 1z"/>
+      <path d="M15.5 8.5a5 5 0 0 1 0 7"/>
+      <path d="M18 6a8 8 0 0 1 0 12"/>
     </svg>
   )
   if (platform === 'twitter') return (

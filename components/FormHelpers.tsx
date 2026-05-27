@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import { Icon } from './Icons'
-import { todayISO, MONTHS, fmtBR } from '@/lib/types'
+import { todayISO, MONTHS, fmtBR, parseISO, toISO, pad } from '@/lib/types'
 
 export function Popover({ open, onClose, anchor = 'left', children }: {
   open: boolean; onClose: () => void; anchor?: 'left' | 'right'; children: React.ReactNode
@@ -115,6 +115,150 @@ function DateInput({ value, onChange, placeholder = 'dd/mm/aaaa' }: {
       onChange={handleChange}
       style={{ width: '100%', fontSize: 13 }}
     />
+  )
+}
+
+// ─── DatePicker ───────────────────────────────────────────────
+const WEEKDAYS_SHORT = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D']
+
+export function DatePicker({ value, onChange, placeholder = 'dd/mm/aaaa', className = 'field', style }: {
+  value: string
+  onChange: (iso: string) => void
+  placeholder?: string
+  className?: string
+  style?: React.CSSProperties
+}) {
+  const [open, setOpen] = useState(false)
+  const [display, setDisplay] = useState(value ? fmtBR(value) : '')
+  const [nav, setNav] = useState<{ y: number; m: number }>(() => {
+    if (value) { const d = parseISO(value); return { y: d.getFullYear(), m: d.getMonth() } }
+    const t = new Date(); return { y: t.getFullYear(), m: t.getMonth() }
+  })
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setDisplay(value ? fmtBR(value) : '')
+    if (value) { const d = parseISO(value); setNav({ y: d.getFullYear(), m: d.getMonth() }) }
+  }, [value])
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const masked = applyMask(e.target.value)
+    setDisplay(masked)
+    const iso = parseBRtoISO(masked)
+    if (iso) { onChange(iso); const d = parseISO(iso); setNav({ y: d.getFullYear(), m: d.getMonth() }) }
+    else if (masked === '') onChange('')
+  }
+
+  // build calendar grid: weeks starting Monday
+  const firstDay = new Date(nav.y, nav.m, 1)
+  const startOffset = (firstDay.getDay() + 6) % 7 // Mon=0
+  const daysInMonth = new Date(nav.y, nav.m + 1, 0).getDate()
+  const today = todayISO()
+  const cells: (number | null)[] = [
+    ...Array(startOffset).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ]
+
+  const selectDay = (day: number) => {
+    const iso = toISO(nav.y, nav.m, day)
+    onChange(iso)
+    setDisplay(fmtBR(iso))
+    setOpen(false)
+  }
+
+  const clear = () => { onChange(''); setDisplay('') }
+
+  const prevMonth = () => setNav(n => n.m === 0 ? { y: n.y - 1, m: 11 } : { y: n.y, m: n.m - 1 })
+  const nextMonth = () => setNav(n => n.m === 11 ? { y: n.y + 1, m: 0 } : { y: n.y, m: n.m + 1 })
+  const goToday = () => { const t = new Date(); setNav({ y: t.getFullYear(), m: t.getMonth() }) }
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block', width: '100%', ...style }}>
+      <div style={{ position: 'relative' }}>
+        <input
+          className={className}
+          type="text"
+          inputMode="numeric"
+          placeholder={placeholder}
+          value={display}
+          onChange={handleTextChange}
+          onFocus={() => setOpen(true)}
+          style={{ width: '100%', paddingRight: 28, fontSize: 13 }}
+        />
+        <span
+          onClick={() => setOpen(o => !o)}
+          style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'var(--ink-3)', display: 'grid', placeItems: 'center' }}
+        >
+          <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>
+          </svg>
+        </span>
+      </div>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200,
+          background: 'var(--surface)', border: '1px solid var(--line-2)',
+          borderRadius: 12, boxShadow: '0 12px 32px -8px rgba(40,30,70,.2), 0 3px 8px rgba(40,30,70,.07)',
+          padding: '12px 14px 10px', minWidth: 240, userSelect: 'none',
+        }}>
+          {/* header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <button onClick={prevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-2)', padding: 4, borderRadius: 6 }}>
+              <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', cursor: 'pointer' }} onClick={goToday}>
+              {MONTHS[nav.m]} de {nav.y}
+            </span>
+            <button onClick={nextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-2)', padding: 4, borderRadius: 6 }}>
+              <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+
+          {/* weekday headers */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 4 }}>
+            {WEEKDAYS_SHORT.map((d, i) => (
+              <div key={i} style={{ textAlign: 'center', fontSize: 10.5, fontWeight: 700, color: 'var(--ink-3)', padding: '2px 0' }}>{d}</div>
+            ))}
+          </div>
+
+          {/* days */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+            {cells.map((day, i) => {
+              if (!day) return <div key={i} />
+              const iso = toISO(nav.y, nav.m, day)
+              const isSelected = iso === value
+              const isToday = iso === today
+              return (
+                <button
+                  key={i}
+                  onClick={() => selectDay(day)}
+                  style={{
+                    width: '100%', aspectRatio: '1', borderRadius: 6, border: 'none', cursor: 'pointer',
+                    fontSize: 12, fontWeight: isSelected || isToday ? 600 : 400,
+                    background: isSelected ? 'var(--accent)' : 'transparent',
+                    color: isSelected ? 'white' : isToday ? 'var(--accent)' : 'var(--ink)',
+                    outline: isToday && !isSelected ? '1.5px solid var(--accent)' : 'none',
+                  }}
+                >{day}</button>
+              )
+            })}
+          </div>
+
+          {/* footer */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, borderTop: '1px solid var(--line)', paddingTop: 8 }}>
+            <button onClick={clear} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--ink-3)', fontWeight: 500 }}>Limpar</button>
+            <button onClick={() => { selectDay(new Date().getDate()); setNav({ y: new Date().getFullYear(), m: new Date().getMonth() }) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>Hoje</button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 

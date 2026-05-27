@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Icon, PlatformIcon } from './Icons'
-import { Popover, GenericSelect } from './FormHelpers'
+import { Popover, GenericSelect, DatePicker } from './FormHelpers'
 import {
   Post, Platform, PostStatus, Campaign,
   PLATFORMS, STATUSES, LINHAS_ED,
@@ -251,18 +251,7 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
 
               <label>Data e hora</label>
               <div className="field-inline">
-                <input
-                  className="field"
-                  placeholder="dd/mm/aaaa"
-                  value={draft.date ? draft.date.split('-').reverse().join('/') : ''}
-                  onChange={e => {
-                    const v = e.target.value.replace(/\D/g, '')
-                    const fmt = v.length <= 2 ? v : v.length <= 4 ? `${v.slice(0,2)}/${v.slice(2)}` : `${v.slice(0,2)}/${v.slice(2,4)}/${v.slice(4,8)}`
-                    if (v.length === 8) set('date', `${v.slice(4,8)}-${v.slice(2,4)}-${v.slice(0,2)}`)
-                    else set('date', fmt)
-                  }}
-                  maxLength={10}
-                />
+                <DatePicker value={draft.date} onChange={v => set('date', v)} />
                 <input className="field" type="time" value={draft.time} onChange={e => set('time', e.target.value)} />
               </div>
 

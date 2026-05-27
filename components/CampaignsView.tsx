@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Icon, PlatformIcon } from './Icons'
-import { GenericSelect, PackToggle, FieldCheckbox } from './FormHelpers'
+import { GenericSelect, PackToggle, FieldCheckbox, DatePicker } from './FormHelpers'
 import { Post, MONTH_ABBR, fmtBR, PLATFORMS, Campaign, Collection, Linking, PACKAGE_INFO, todayISO, COLECAO_TIPOS, colProgress } from '@/lib/types'
 import { CAMP_TIPOS, TEAM_NAMES } from '@/lib/data'
 import { DateRangeFilter, DateRange } from './FormHelpers'
@@ -108,8 +108,7 @@ function Milestones({ campaign, onChange }: { campaign: Campaign; onChange: (pat
             <div className="ms-body">
               <div className="ms-label">{it.label}</div>
               <div className="ms-date">
-                <input type="date" value={campaign[it.dateKey] as string || ''}
-                  onChange={(e) => onChange({ [it.dateKey]: e.target.value })} />
+                <DatePicker value={campaign[it.dateKey] as string || ''} onChange={v => onChange({ [it.dateKey]: v })} className="ms-date-input" />
               </div>
             </div>
           </div>
@@ -235,47 +234,39 @@ function CampaignFormModal({ initial, onClose, onSave }: { initial?: Campaign | 
             <div className="modal-section-label">Cronograma</div>
 
             <label>Previsão de lançamento</label>
-            <input className="field" type="date" value={draft.previsao}
-              onChange={e => set('previsao', e.target.value)} style={{ maxWidth: 200 }} />
+            <DatePicker value={draft.previsao} onChange={v => set('previsao', v)} style={{ maxWidth: 200 }} />
 
             <label>Data Instagram</label>
-            <input className="field" type="date" value={draft.dataInsta}
-              onChange={e => set('dataInsta', e.target.value)} style={{ maxWidth: 200 }} />
+            <DatePicker value={draft.dataInsta} onChange={v => set('dataInsta', v)} style={{ maxWidth: 200 }} />
 
             <label>Data site</label>
-            <input className="field" type="date" value={draft.dataSite === '-' ? '' : draft.dataSite}
-              onChange={e => set('dataSite', e.target.value || '-')} style={{ maxWidth: 200 }} />
+            <DatePicker value={draft.dataSite === '-' ? '' : draft.dataSite} onChange={v => set('dataSite', v || '-')} style={{ maxWidth: 200 }} />
 
             <label>Data comercial</label>
-            <input className="field" type="date" value={draft.dataComercial === '-' ? '' : draft.dataComercial}
-              onChange={e => set('dataComercial', e.target.value || '-')} style={{ maxWidth: 200 }} />
+            <DatePicker value={draft.dataComercial === '-' ? '' : draft.dataComercial} onChange={v => set('dataComercial', v || '-')} style={{ maxWidth: 200 }} />
 
             <label>Data final</label>
-            <input className="field" type="date" value={draft.dataFinal}
-              onChange={e => set('dataFinal', e.target.value)} style={{ maxWidth: 200 }} />
+            <DatePicker value={draft.dataFinal} onChange={v => set('dataFinal', v)} style={{ maxWidth: 200 }} />
 
             <div className="modal-section-label">Marcos de produção</div>
 
             <label>Brainstorm</label>
             <div className="field-inline">
-              <input className="field" type="date" value={draft.brainstormDate}
-                onChange={e => set('brainstormDate', e.target.value)} style={{ width: 200 }} />
+              <DatePicker value={draft.brainstormDate || ''} onChange={v => set('brainstormDate', v)} style={{ width: 200 }} />
               <FieldCheckbox label="Concluído" value={!!draft.brainstormDone}
                 onChange={v => set('brainstormDone', v)} />
             </div>
 
             <label>Aprov. comercial</label>
             <div className="field-inline">
-              <input className="field" type="date" value={draft.aprovComercialDate}
-                onChange={e => set('aprovComercialDate', e.target.value)} style={{ width: 200 }} />
+              <DatePicker value={draft.aprovComercialDate || ''} onChange={v => set('aprovComercialDate', v)} style={{ width: 200 }} />
               <FieldCheckbox label="Concluído" value={!!draft.aprovComercialDone}
                 onChange={v => set('aprovComercialDone', v)} />
             </div>
 
             <label>Shooting</label>
             <div className="field-inline">
-              <input className="field" type="date" value={draft.shootingDate}
-                onChange={e => set('shootingDate', e.target.value)} style={{ width: 200 }} />
+              <DatePicker value={draft.shootingDate || ''} onChange={v => set('shootingDate', v)} style={{ width: 200 }} />
               <FieldCheckbox label="Concluído" value={!!draft.shootingDone}
                 onChange={v => set('shootingDone', v)} />
             </div>

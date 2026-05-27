@@ -7,6 +7,7 @@ import {
 } from '@/lib/types'
 import { Icon } from './Icons'
 import CalendarGrid from './CalendarGrid'
+import { DatePicker } from './FormHelpers'
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -666,7 +667,7 @@ function BatchPautaModal({ open, onClose, onCreated }: {
                   <div className="batch-field full"><label>Link de referência</label><input className="field" placeholder="https://www.instagram.com/reel/..." value={v.ref} onChange={e => setVideo(i, 'ref', e.target.value)} disabled={step === 'sending'} /></div>
                   <div className="batch-field"><label>Produto foco</label><input className="field" placeholder="Ex: Tote Puffer · Case" value={v.product} onChange={e => setVideo(i, 'product', e.target.value)} disabled={step === 'sending'} /></div>
                   <div className="batch-field"><label>Áudio sugerido</label><input className="field" placeholder="Ex: pop indie, trend BR..." value={v.audio} onChange={e => setVideo(i, 'audio', e.target.value)} disabled={step === 'sending'} /></div>
-                  <div className="batch-field"><label>Prazo de entrega</label><input className="field" type="date" value={v.prazo} onChange={e => setVideo(i, 'prazo', e.target.value)} disabled={step === 'sending'} /></div>
+                  <div className="batch-field"><label>Prazo de entrega</label><DatePicker value={v.prazo} onChange={val => setVideo(i, 'prazo', val)} /></div>
                   <div className="batch-field"><label>Observações</label><input className="field" placeholder="Detalhes, adaptações..." value={v.notes} onChange={e => setVideo(i, 'notes', e.target.value)} disabled={step === 'sending'} /></div>
                 </div>
               </div>

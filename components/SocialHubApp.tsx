@@ -311,6 +311,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
       caption:  '',
       videoLink:'',
       coverLink:'',
+      slideLinks:[],
       ...defaults,
     }
     const { data } = await supabase.from(sourceToTable(source)).insert(postToDb(newPost, source)).select().single()

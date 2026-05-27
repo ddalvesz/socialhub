@@ -349,6 +349,40 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
               </div>
             )}
 
+            {draft.format === 'Carrossel' && (
+              <div className="stacked">
+                <label>
+                  Imagens do carrossel
+                  <span className="hint">{(draft.slideLinks ?? []).filter(Boolean).length}/10</span>
+                </label>
+                {Array.from({ length: Math.min(10, (draft.slideLinks ?? []).filter(Boolean).length + 1) }).map((_, i) => (
+                  <div key={i} className="field link-field" style={{ marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', minWidth: 18, textAlign: 'center' }}>{i + 1}</span>
+                    <input
+                      placeholder={`https://... (slide ${i + 1})`}
+                      value={(draft.slideLinks ?? [])[i] ?? ''}
+                      onChange={e => {
+                        const updated = [...(draft.slideLinks ?? [])]
+                        updated[i] = e.target.value
+                        // remove trailing empty slots
+                        while (updated.length > 0 && !updated[updated.length - 1]) updated.pop()
+                        set('slideLinks', updated)
+                      }}
+                    />
+                  </div>
+                ))}
+                {(draft.slideLinks ?? []).filter(Boolean).length < 10 && (draft.slideLinks ?? []).filter(Boolean).length === (draft.slideLinks ?? []).length && (
+                  <button
+                    className="btn btn-ghost"
+                    style={{ fontSize: 12, padding: '4px 10px', marginTop: 2 }}
+                    onClick={() => set('slideLinks', [...(draft.slideLinks ?? []), ''])}
+                  >
+                    + Adicionar imagem
+                  </button>
+                )}
+              </div>
+            )}
+
             <div className="stacked">
               <label>Link de referência</label>
               <div className="field link-field">

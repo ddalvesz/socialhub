@@ -24,6 +24,7 @@ export function dbToPost(row: Record<string, unknown>, source: PostSource): Post
     caption:           (row.caption as string) ?? '',
     videoLink:         (row.video_link as string) ?? '',
     coverLink:         (row.cover_link as string) ?? '',
+    slideLinks:        (row.slide_links as string[]) ?? [],
     linkedPostId:      row.linked_post_id ? String(row.linked_post_id) : undefined,
     linkedPostSource:  (row.linked_post_source as PostSource) ?? undefined,
     // MH-specific
@@ -56,6 +57,7 @@ export function postToDb(p: Omit<Post, 'id' | 'source'>, source?: PostSource): R
     caption:            p.caption,
     video_link:         p.videoLink,
     cover_link:         p.coverLink,
+    slide_links:        p.slideLinks ?? [],
     linked_post_id:     p.linkedPostId ?? null,
     linked_post_source: p.linkedPostSource ?? null,
   }

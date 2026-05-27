@@ -167,6 +167,8 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
 
   const [platformFilter, setPlatformFilter] = useState<string>('all')
   const [tagFilter, setTagFilter] = useState<'all' | 'mh' | 'branding' | 'futebol' | 'campanha'>('all')
+  const [statusFilter, setStatusFilter] = useState<string[]>([])
+  const [statusDropOpen, setStatusDropOpen] = useState(false)
   const [search, setSearch] = useState('')
 
   const [activePost, setActivePost] = useState<Post | null>(null)
@@ -225,6 +227,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   else if (tagFilter === 'campanha') shownPosts = posts.filter(p => !!p.campaign?.trim())
   else shownPosts = calendarPosts
   if (platformFilter !== 'all') shownPosts = shownPosts.filter(p => p.platform === platformFilter)
+  if (statusFilter.length > 0) shownPosts = shownPosts.filter(p => statusFilter.includes(p.status))
   if (search.trim()) {
     const q = search.toLowerCase()
     shownPosts = shownPosts.filter(p =>
@@ -634,6 +637,57 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
                 <button className={`tag-chip ${tagFilter === 'campanha' ? 'active' : ''}`} onClick={() => setTagFilter('campanha')}>Campanha</button>
               </>
             )}
+
+            {/* Status multi-select filter */}
+            <div style={{ position: 'relative' }}>
+              <button
+                className={`platform-pill ${statusFilter.length > 0 ? 'active' : ''}`}
+                onClick={() => setStatusDropOpen(o => !o)}
+                style={{ gap: 6 }}
+              >
+                Status{statusFilter.length > 0 ? ` (${statusFilter.length})` : ''}
+                {statusFilter.length > 0 && (
+                  <span
+                    onMouseDown={e => { e.stopPropagation(); setStatusFilter([]) }}
+                    style={{ display: 'grid', placeItems: 'center', width: 14, height: 14, borderRadius: '50%', background: 'rgba(255,255,255,.3)' }}
+                  >
+                    <Icon.x />
+                  </span>
+                )}
+              </button>
+              {statusDropOpen && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 55 }} onClick={() => setStatusDropOpen(false)} />
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 60,
+                    background: 'var(--surface)', border: '1px solid var(--line-2)',
+                    borderRadius: 12, boxShadow: '0 12px 32px -8px rgba(40,30,70,.2), 0 3px 8px rgba(40,30,70,.07)',
+                    padding: '8px 6px', minWidth: 180,
+                  }}>
+                    {STATUSES.map(s => {
+                      const on = statusFilter.includes(s.id)
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => setStatusFilter(prev => on ? prev.filter(x => x !== s.id) : [...prev, s.id])}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                            padding: '7px 10px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                            background: on ? 'var(--surface-2)' : 'transparent',
+                            fontSize: 13, fontWeight: on ? 600 : 400, color: 'var(--ink)',
+                          }}
+                        >
+                          <span style={{ width: 14, height: 14, borderRadius: 4, border: `1.5px solid var(--line)`, display: 'grid', placeItems: 'center', background: on ? 'var(--accent)' : 'transparent', borderColor: on ? 'var(--accent)' : undefined, flexShrink: 0 }}>
+                            {on && <Icon.check />}
+                          </span>
+                          <span className={s.className} style={{ fontSize: 11, padding: '2px 7px', borderRadius: 6 }}>{s.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
 
             <div style={{ flex: 1 }} />
             <span className="count-pill">

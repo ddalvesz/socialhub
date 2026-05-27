@@ -282,7 +282,7 @@ export const toISO = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${
 export const parseISO = (s: string) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d) }
 export const fmtBR = (iso: string) => { if (!iso || iso === '-') return '—'; const d = parseISO(iso); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}` }
 export const addDaysISO = (iso: string, n: number) => { const d = parseISO(iso); d.setDate(d.getDate() + n); return toISO(d.getFullYear(), d.getMonth(), d.getDate()) }
-export const startOfWeekISO = (iso: string) => { const d = parseISO(iso); d.setDate(d.getDate() - d.getDay()); return toISO(d.getFullYear(), d.getMonth(), d.getDate()) }
+export const startOfWeekISO = (iso: string) => { const d = parseISO(iso); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return toISO(d.getFullYear(), d.getMonth(), d.getDate()) }
 export const todayISO = () => { const n = new Date(); return toISO(n.getFullYear(), n.getMonth(), n.getDate()) }
 
 export function buildMonthGrid(year: number, month: number) {

@@ -48,13 +48,13 @@ function postToMetricoolRow(post: Post): string[] {
   // Instagram post type mapping
   let igPostType = ''
   if (isIG) {
-    if (post.type === 'Reels') igPostType = 'REEL'
-    else if (post.type === 'Story') igPostType = 'STORY'
+    if (post.format === 'Reels') igPostType = 'REEL'
+    else if (post.format === 'Story') igPostType = 'STORY'
     else igPostType = 'POST'
   }
 
-  // Image URLs — up to 10 slots
-  const urls = post.image_urls ?? []
+  // Image URLs — videoLink as first slot
+  const urls = post.videoLink ? [post.videoLink] : []
   const picUrls  = Array.from({ length: 10 }, (_, i) => urls[i] ?? '')
   const picAlts  = Array.from({ length: 10 }, () => '')
 
@@ -94,7 +94,7 @@ function postToMetricoolRow(post: Post): string[] {
     /* Pinterest Pin Link        */ '',
     /* Pinterest Pin New Format  */ false,
     /* Instagram Post Type       */ igPostType,
-    /* Instagram Show Reel Feed  */ isIG && post.type === 'Reels' ? true : '',
+    /* Instagram Show Reel Feed  */ isIG && post.format === 'Reels' ? true : '',
     /* Youtube Video Title       */ '',
     /* Youtube Video Type        */ '',
     /* Youtube Video Privacy     */ '',

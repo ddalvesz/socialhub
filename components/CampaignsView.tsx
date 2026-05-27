@@ -23,7 +23,7 @@ interface DrawerProps {
 }
 
 export function LinkedPostsDrawer({ campaign, posts, onClose, onPostClick }: DrawerProps) {
-  const linked = [...posts.filter(p => p.campanha === campaign.slug)]
+  const linked = [...posts.filter(p => p.campaign === campaign.slug)]
     .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
 
   return (
@@ -71,7 +71,7 @@ export function LinkedPostsDrawer({ campaign, posts, onClose, onPostClick }: Dra
                   <div className="lp-meta">
                     <span>{p.time}</span>
                     <span>·</span>
-                    <span>{p.type}</span>
+                    <span>{p.format}</span>
                     <span>·</span>
                     <span>{p.owner}</span>
                   </div>
@@ -393,7 +393,7 @@ function CampaignCard({ campaign, posts, collections, effProg, onOpen, onPostsCl
 }) {
   const color = tipoColors[campaign.tipo] ?? '#999'
   const linkedCol = campaign.colecaoId != null ? collections.find(c => c.id === campaign.colecaoId) : null
-  const postCount = posts.filter(p => p.campanha === campaign.slug).length
+  const postCount = posts.filter(p => p.campaign === campaign.slug).length
   const milestones = [
     { label: 'B', done: !!campaign.brainstormDone },
     { label: 'A', done: !!campaign.aprovComercialDone },

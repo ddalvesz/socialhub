@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Icon, PlatformIcon } from './Icons'
 import { Popover, GenericSelect } from './FormHelpers'
 import {
   Post, Platform, PostStatus, Campaign,
-  PLATFORMS, STATUSES, TAGS, LINHAS_ED,
+  PLATFORMS, STATUSES, LINHAS_ED,
   CONTENT_TYPES_IG, CONTENT_TYPES_OTHER,
 } from '@/lib/types'
 import { TEAM_NAMES } from '@/lib/data'
@@ -19,7 +19,72 @@ interface Props {
   showProduct?: boolean
   campaigns?: Campaign[]
   products?: string[]
+  tagOptions?: string[]
   onAddProduct?: (name: string) => Promise<void>
+  allPosts?: Post[]
+  onLinkedPostClick?: (post: Post) => void
+}
+
+// ─── Tags multi-select combo ──────────────────────────────────
+function TagsComboBox({ value, options, onChange }: { value: string[]; options: string[]; onChange: (v: string[]) => void }) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setQ('') }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const available = options.filter(o => !value.includes(o) && o.toLowerCase().includes(q.toLowerCase()))
+  const showNew = q.trim() && !options.some(o => o.toLowerCase() === q.trim().toLowerCase()) && !value.includes(q.trim())
+
+  const add = (tag: string) => { onChange([...value, tag]); setQ('') }
+  const remove = (tag: string) => onChange(value.filter(t => t !== tag))
+
+  return (
+    <div ref={ref} style={{ position: 'relative', width: '100%' }}>
+      <div
+        className="field"
+        style={{ display: 'flex', flexWrap: 'wrap', gap: 4, minHeight: 34, padding: '4px 8px', cursor: 'text' }}
+        onClick={() => setOpen(true)}
+      >
+        {value.map(t => (
+          <span key={t} className="modal-tag" style={{ margin: 0 }}>
+            {t}
+            <span className="x" onMouseDown={e => { e.stopPropagation(); remove(t) }}><Icon.x /></span>
+          </span>
+        ))}
+        <input
+          style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 13, minWidth: 80, flex: 1 }}
+          placeholder={value.length === 0 ? 'Digite ou selecione...' : ''}
+          value={q}
+          onChange={e => { setQ(e.target.value); setOpen(true) }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && q.trim()) { e.preventDefault(); add(q.trim()); }
+            if (e.key === 'Backspace' && !q && value.length > 0) remove(value[value.length - 1])
+          }}
+        />
+      </div>
+      {open && (available.length > 0 || showNew) && (
+        <div className="popover" style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, zIndex: 200, maxHeight: 220, overflowY: 'auto' }}>
+          {available.map(o => (
+            <button key={o} className="po-item" onMouseDown={() => add(o)}>{o}</button>
+          ))}
+          {showNew && (
+            <button className="po-item" style={{ color: 'var(--accent)', fontWeight: 500 }} onMouseDown={() => add(q.trim())}>
+              + Criar "{q.trim()}"
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ─── Status select ───────────────────────────────────────────
@@ -29,6 +94,7 @@ function StatusSelect({ value, onChange }: { value: PostStatus; onChange: (v: Po
   const dotColors: Record<PostStatus, string> = {
     prod: 'oklch(0.62 0.13 75)', sched: 'oklch(0.6 0.13 265)',
     pub: 'oklch(0.6 0.13 150)', cancel: 'oklch(0.6 0.05 25)',
+    pauta: 'oklch(0.62 0.13 200)', entregue: 'oklch(0.62 0.13 130)',
   }
   return (
     <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -84,56 +150,8 @@ function PlatformSelect({ value, onChange }: { value: Platform; onChange: (v: Pl
   )
 }
 
-// ─── Tags field ──────────────────────────────────────────────
-function TagsField({ tags, onChange }: { tags: string[]; onChange: (v: string[]) => void }) {
-  const [open, setOpen] = useState(false)
-  const [q, setQ] = useState('')
-  const filtered = TAGS.filter(t => t.label.toLowerCase().includes(q.toLowerCase()))
-  const toggle = (id: string) => {
-    onChange(tags.includes(id) ? tags.filter(t => t !== id) : [...tags, id])
-  }
-  return (
-    <div className="modal-tags" style={{ position: 'relative' }}>
-      {tags.map(t => {
-        const tag = TAGS.find(x => x.id === t) || { label: t }
-        return (
-          <span key={t} className="modal-tag">
-            {tag.label}
-            <span className="x" onClick={() => onChange(tags.filter(x => x !== t))}><Icon.x /></span>
-          </span>
-        )
-      })}
-      <button className="modal-tag-add" onClick={() => setOpen(true)}>+ Tag</button>
-      <Popover open={open} onClose={() => { setOpen(false); setQ('') }}>
-        <input className="po-input" placeholder="Buscar tag..." value={q} onChange={e => setQ(e.target.value)} autoFocus />
-        <div style={{ marginTop: 4 }}>
-          {filtered.map(t => (
-            <button key={t.id} className="po-item" onClick={() => toggle(t.id)}>
-              {t.label}
-              {tags.includes(t.id) && <span className="check"><Icon.check /></span>}
-            </button>
-          ))}
-        </div>
-      </Popover>
-    </div>
-  )
-}
-
-// ─── Stars ───────────────────────────────────────────────────
-function Stars({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  return (
-    <div className="stars">
-      {[1, 2, 3, 4, 5].map(n => (
-        <button key={n} className={n <= value ? 'on' : ''} onClick={() => onChange(n)}>
-          <Icon.star />
-        </button>
-      ))}
-    </div>
-  )
-}
-
 // ─── Main modal ──────────────────────────────────────────────
-export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate, showProduct, campaigns = [], products = [], onAddProduct }: Props) {
+export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate, showProduct, campaigns = [], products = [], tagOptions = [], onAddProduct, allPosts = [], onLinkedPostClick }: Props) {
   const [draft, setDraft] = useState<Post>(post)
   const [newProduct, setNewProduct] = useState('')
   const [addingProduct, setAddingProduct] = useState(false)
@@ -147,19 +165,21 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
 
   const plat = PLATFORMS.find(p => p.id === draft.platform)!
   const set = <K extends keyof Post>(k: K, v: Post[K]) => setDraft(d => ({ ...d, [k]: v }))
-  const types = draft.platform === 'ig' ? CONTENT_TYPES_IG : CONTENT_TYPES_OTHER
+  const linkedPost = draft.linkedPostId ? allPosts.find(p => p.id === draft.linkedPostId) : undefined
+  const linkedPlat = linkedPost ? PLATFORMS.find(p => p.id === linkedPost.platform) : undefined
+  const formats = draft.platform === 'ig' ? CONTENT_TYPES_IG : CONTENT_TYPES_OTHER
 
-  const teamOptions = TEAM_NAMES.map(t => ({ id: t, label: t }))
-  const lineaOptions = LINHAS_ED.map(l => ({ id: l.id, label: l.label }))
+  const teamOptions    = TEAM_NAMES.map(t => ({ id: t, label: t }))
+  const lineaOptions   = LINHAS_ED.map(l => ({ id: l.id, label: l.label }))
+  const campOptions    = [{ id: '', label: 'Sem campanha' }, ...campaigns.map(c => ({ id: c.slug, label: c.nome }))]
   const DEFAULT_PRODUCTS = [
     'Cases','Garrafas','Garrafa Fresh','Garrafa Magsafe','Garrafa Flip',
     'Tote Daily','Tote Mini','Tote Shopper','Tote Pop','Tote Moon','Tote Care',
     'Bolsa Fitness','Bolsa Move','Bolsa Joy',
     'Mochila Care','Mochila Rodinhas','Lancheiras','Copo Vibe','Taça Termica',
   ]
-  const productList = products.length > 0 ? products : DEFAULT_PRODUCTS
+  const productList    = products.length > 0 ? products : DEFAULT_PRODUCTS
   const productOptions = productList.map(p => ({ id: p, label: p }))
-  const campOptions = [{ id: '', label: 'Sem campanha' }, ...campaigns.map(c => ({ id: c.slug, label: c.nome }))]
 
   const handleAddProduct = async () => {
     const name = newProduct.trim()
@@ -168,11 +188,6 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
     set('product', name)
     setNewProduct('')
     setAddingProduct(false)
-  }
-
-  const urls = draft.image_urls ?? []
-  const setUrl = (i: number, val: string) => {
-    const next = [...urls]; next[i] = val; set('image_urls', next)
   }
 
   return (
@@ -194,8 +209,24 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 6 }}>
               <StatusSelect value={draft.status} onChange={v => set('status', v)} />
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
-                #{String(draft.id).padStart(4, '0')}
+                {draft.source} · {String(draft.id).slice(0, 8)}
               </span>
+              {linkedPost && linkedPlat && (
+                <button
+                  onClick={() => onLinkedPostClick?.(linkedPost)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5, fontSize: 11,
+                    background: 'var(--surface-2)', border: '1px solid var(--line)',
+                    borderRadius: 6, padding: '2px 8px', cursor: 'pointer', color: 'var(--ink-2)',
+                  }}
+                  title="Abrir post vinculado"
+                >
+                  <span style={{ width: 13, height: 13, borderRadius: 3, background: linkedPlat.color, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                    <PlatformIcon platform={linkedPlat.id} size={8} color="white" />
+                  </span>
+                  {linkedPlat.label}
+                </button>
+              )}
             </div>
           </div>
           <button className="modal-close" onClick={onClose}><Icon.x /></button>
@@ -235,9 +266,9 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
                 <input className="field" type="time" value={draft.time} onChange={e => set('time', e.target.value)} />
               </div>
 
-              <label>Tipo</label>
+              <label>Formato</label>
               <div className="field-wrap">
-                <GenericSelect value={draft.type} options={types.map(t => ({ id: t, label: t }))} onChange={v => set('type', v)} width="100%" />
+                <GenericSelect value={draft.format} options={formats.map(t => ({ id: t, label: t }))} onChange={v => set('format', v)} width="100%" />
               </div>
 
               {showProduct && (
@@ -265,23 +296,16 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
                 </>
               )}
 
-              <label>Linha editorial</label>
-              <div className="field-wrap">
-                <GenericSelect value={draft.linha} options={lineaOptions} onChange={v => set('linha', v)} width="100%" />
-              </div>
+              <label>Tags</label>
+              <TagsComboBox
+                value={draft.tags || []}
+                options={[...new Set([...tagOptions, ...LINHAS_ED.map(l => l.label)])].filter(Boolean)}
+                onChange={v => set('tags', v)}
+              />
 
               <label>Campanha</label>
               <div className="field-wrap">
-                <GenericSelect value={draft.campanha || ''} options={campOptions} onChange={v => set('campanha', v || null)} placeholder="Sem campanha" width="100%" />
-              </div>
-
-              <label style={{ alignSelf: 'flex-start', paddingTop: 8 }}>Tags</label>
-              <TagsField tags={draft.tags || []} onChange={v => set('tags', v)} />
-
-              <label>Complexidade</label>
-              <div className="field-inline">
-                <Stars value={draft.complexity} onChange={v => set('complexity', v)} />
-                <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{draft.complexity}/5</span>
+                <GenericSelect value={draft.campaign || ''} options={campOptions} onChange={v => set('campaign', v)} placeholder="Sem campanha" width="100%" />
               </div>
             </div>
           </div>
@@ -307,45 +331,20 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
               </div>
             </div>
 
-            {draft.platform === 'ig' && draft.type === 'Carrossel' ? (
-              <div className="stacked">
-                <label>Links da mídia <span className="hint">até 10 imagens</span></label>
-                {(urls.length === 0 ? [''] : urls).map((url, i) => (
-                  <div key={i} className="field link-field" style={{ marginTop: i > 0 ? 6 : 0 }}>
-                    <Icon.media />
-                    <input placeholder={`Imagem ${i + 1}...`} value={url} onChange={e => setUrl(i, e.target.value)} />
-                    {urls.length > 1 && (
-                      <button
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', padding: '0 4px', flexShrink: 0 }}
-                        onClick={() => set('image_urls', urls.filter((_, j) => j !== i))}
-                      ><Icon.x /></button>
-                    )}
-                  </div>
-                ))}
-                {urls.length < 10 && (
-                  <button
-                    className="modal-tag-add"
-                    style={{ marginTop: 6, alignSelf: 'flex-start' }}
-                    onClick={() => set('image_urls', [...urls, ''])}
-                  >+ Adicionar imagem</button>
-                )}
+            <div className="stacked">
+              <label>Link da mídia <span className="hint">vídeo, drive, dropbox...</span></label>
+              <div className="field link-field">
+                <Icon.media />
+                <input placeholder="https://..." value={draft.videoLink || ''} onChange={e => set('videoLink', e.target.value)} />
               </div>
-            ) : (
-              <div className="stacked">
-                <label>Link da mídia</label>
-                <div className="field link-field">
-                  <Icon.media />
-                  <input placeholder="https://..." value={urls[0] ?? ''} onChange={e => setUrl(0, e.target.value)} />
-                </div>
-              </div>
-            )}
+            </div>
 
-            {draft.type === 'Reels' && (
+            {(draft.format === 'Reels' || draft.format === 'Vídeo') && (
               <div className="stacked">
-                <label>Link da capa <span className="hint">capa do Reels</span></label>
+                <label>Link da capa</label>
                 <div className="field link-field">
                   <Icon.cover />
-                  <input placeholder="https://..." value={urls[1] ?? ''} onChange={e => setUrl(1, e.target.value)} />
+                  <input placeholder="https://..." value={draft.coverLink || ''} onChange={e => set('coverLink', e.target.value)} />
                 </div>
               </div>
             )}
@@ -359,7 +358,7 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
             </div>
 
             <div className="stacked">
-              <label>Link do Post</label>
+              <label>Link do Post publicado</label>
               <div className="field link-field">
                 <Icon.post />
                 <input placeholder="https://..." value={draft.link || ''} onChange={e => set('link', e.target.value)} />
@@ -372,8 +371,8 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
                 className="field"
                 rows={2}
                 placeholder="Comentários internos..."
-                value={draft.notes || ''}
-                onChange={e => set('notes', e.target.value)}
+                value={draft.obs || ''}
+                onChange={e => set('obs', e.target.value)}
               />
             </div>
           </div>

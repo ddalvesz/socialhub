@@ -1,26 +1,57 @@
-export type Platform = 'ig' | 'tiktok' | 'daily' | 'canal' | 'twitter'
-export type PostStatus = 'prod' | 'sched' | 'pub' | 'cancel'
+export type Platform = 'ig' | 'tiktok' | 'canal' | 'twitter'
+export type PostStatus = 'prod' | 'sched' | 'pub' | 'cancel' | 'pauta' | 'entregue'
+export type PostSource = 'mh' | 'branding' | 'tiktok' | 'twitter' | 'canal' | 'copa'
+export type MHCreatorId = 'CARINA' | 'REBECA' | 'THA' | 'MARINA' | 'RECICLADO'
 
 export interface Post {
-  id: number
+  id: string           // uuid
+  source: PostSource
   title: string
   owner: string
   platform: Platform
-  date: string     // YYYY-MM-DD
-  time: string     // HH:mm
+  date: string         // YYYY-MM-DD
+  time: string         // HH:mm
   status: PostStatus
-  complexity: number  // 1-5
-  type: string
-  tags: string[]
-  linha: string
-  campanha: string | null
-  link: string
+  format: string
+  month?: number
+  tags: string[]       // linha editorial / categorias (ex: trends, produtos, campanhas)
+  campaign: string
+  product: string
   ref: string
-  notes: string
-  caption?: string
-  product?: string
-  image_urls?: string[]
-  user_id?: string
+  link: string         // link do post publicado
+  obs: string
+  deadline: string
+  caption: string
+  videoLink: string
+  coverLink: string
+  linkedPostId?: string
+  linkedPostSource?: PostSource
+  // MH-specific (só presente em source === 'mh')
+  semana?: number
+  numVideo?: number
+  audio?: string
+  prazo?: string
+  dropboxLink?: string
+  briefingFile?: string
+}
+
+// Mantido para retrocompatibilidade com o briefing API (MHView usa MHPayload)
+export interface MHRepostTT {
+  date: string
+  time: string
+  status: string
+  type: string
+}
+
+export interface MHPayload {
+  creator: MHCreatorId
+  semanaCreator: number
+  numVideo: number
+  audio: string
+  prazo: string
+  dropboxLink: string
+  briefingFile: string
+  repostTT: MHRepostTT | null
 }
 
 export interface Campaign {
@@ -193,16 +224,17 @@ export interface TeamProfile {
 export const PLATFORMS = [
   { id: 'ig' as Platform,      label: 'Instagram', color: '#E1306C' },
   { id: 'tiktok' as Platform,  label: 'TikTok',    color: '#111111' },
-  { id: 'daily' as Platform,   label: 'Daily',     color: '#2F9ED8' },
   { id: 'canal' as Platform,   label: 'Canal',     color: '#FF0033' },
   { id: 'twitter' as Platform, label: 'Twitter',   color: '#111111' },
 ]
 
 export const STATUSES = [
-  { id: 'prod'   as PostStatus, label: 'Em produção', className: 's-prod'   },
-  { id: 'sched'  as PostStatus, label: 'Agendado',    className: 's-sched'  },
-  { id: 'pub'    as PostStatus, label: 'Publicado',   className: 's-pub'    },
-  { id: 'cancel' as PostStatus, label: 'Cancelado',   className: 's-cancel' },
+  { id: 'prod'     as PostStatus, label: 'Em produção', className: 's-prod'     },
+  { id: 'sched'    as PostStatus, label: 'Agendado',    className: 's-sched'    },
+  { id: 'pub'      as PostStatus, label: 'Publicado',   className: 's-pub'      },
+  { id: 'cancel'   as PostStatus, label: 'Cancelado',   className: 's-cancel'   },
+  { id: 'pauta'    as PostStatus, label: 'Em pauta',    className: 's-pauta'    },
+  { id: 'entregue' as PostStatus, label: 'Entregue',    className: 's-entregue' },
 ]
 
 export const TAGS = [
@@ -242,7 +274,7 @@ export const WEEKDAYS_FULL = ['Dom.','Seg.','Ter.','Qua.','Qui.','Sex.','Sáb.']
 export const MONTH_ABBR = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ']
 
 export type AppView = 'calendar' | 'stories' | 'branding' | 'mh' | 'comemorativas' | 'futebol' | 'campaigns' | 'collections' | 'profile'
-export type CalendarMode = 'month' | 'week'
+export type CalendarMode = 'month' | 'week' | 'list'
 
 export const pad = (n: number) => String(n).padStart(2, '0')
 export const toISO = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`

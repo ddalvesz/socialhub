@@ -3,8 +3,8 @@ import type { Campaign, Collection, EventDate, FutebolEvent, TeamProfile } from 
 export const TEAM_PROFILES: TeamProfile[] = [
   { id: 'Arno',    name: 'Arno',    role: '', email: 'arno@gocase.com',    joined: '2023-01-09', color: 'oklch(0.6 0.16 230)',  initial: 'A' },
   { id: 'Pat',     name: 'Pat',     role: '', email: 'pat@gocase.com',     joined: '2023-04-22', color: 'oklch(0.65 0.16 320)', initial: 'P' },
-  { id: 'Lara',    name: 'Lara',    role: '', email: 'lara@gocase.com',    joined: '2024-02-10', color: 'oklch(0.62 0.15 18)',  initial: 'L' },
-  { id: 'Sâmia',  name: 'Sâmia',  role: '', email: 'samia@gocase.com',   joined: '2024-08-05', color: 'oklch(0.62 0.15 150)', initial: 'S' },
+  { id: 'Lucas',   name: 'Lucas',   role: '', email: 'lucas@gocase.com',   joined: '2026-01-01', color: 'oklch(0.62 0.15 18)',  initial: 'L' },
+  { id: 'Samir',   name: 'Samir',   role: '', email: 'samir@gocase.com',   joined: '2026-01-01', color: 'oklch(0.62 0.15 150)', initial: 'S' },
   { id: 'Thaissa', name: 'Thaissa', role: '', email: 'thaissa@gocase.com', joined: '2024-01-01', color: 'oklch(0.62 0.15 265)', initial: 'T' },
   { id: 'Duda',    name: 'Duda',    role: '', email: 'duda@gocase.com',    joined: '2024-01-01', color: 'oklch(0.72 0.16 55)',  initial: 'D', isMe: true },
   { id: 'Kel',     name: 'Kel',     role: '', email: 'kel@gocase.com',     joined: '2024-01-01', color: 'oklch(0.62 0.13 75)',  initial: 'K' },

@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  Post, Platform, AppView, CalendarMode, Campaign, Collection, Linking,
+  Post, Platform, PostSource, AppView, CalendarMode, Campaign, Collection, Linking,
   EventDate, FutebolEvent,
   MONTHS, PLATFORMS, TAGS, STATUSES,
   addDaysISO, startOfWeekISO, todayISO, parseISO,
@@ -12,7 +12,7 @@ import {
 } from '@/lib/types'
 import { TEAM_PROFILES } from '@/lib/data'
 import {
-  campaignToDb, collectionToDb,
+  campaignToDb, collectionToDb, postToDb, sourceToTable,
 } from '@/lib/supabase/mappers'
 import { Icon, PlatformIcon } from './Icons'
 import CalendarGrid from './CalendarGrid'
@@ -26,6 +26,7 @@ import ComemorativasView from './ComemorativasView'
 import FutebolView from './FutebolView'
 import ProfileView from './ProfileView'
 import ExportModal from './ExportModal'
+import MHView from './MHView'
 
 
 interface Props {
@@ -51,6 +52,100 @@ function getMeId(email: string) {
   return profile?.id ?? getOwnerName(email)
 }
 
+// ─── CalendarListView ─────────────────────────────────────────
+
+function CalendarListView({ posts, year, month, onPostClick }: {
+  posts: Post[]; year: number; month: number; onPostClick: (p: Post) => void
+}) {
+  const today = todayISO()
+  const weekday = (iso: string) => {
+    const d = parseISO(iso)
+    return ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][d.getDay()]
+  }
+
+  const monthPosts = posts
+    .filter(p => { const d = parseISO(p.date); return d.getFullYear() === year && d.getMonth() === month })
+    .sort((a, b) => a.date !== b.date ? a.date.localeCompare(b.date) : a.time.localeCompare(b.time))
+
+  const grouped: [string, Post[]][] = []
+  for (const p of monthPosts) {
+    const last = grouped[grouped.length - 1]
+    if (last && last[0] === p.date) last[1].push(p)
+    else grouped.push([p.date, [p]])
+  }
+
+  if (grouped.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--ink-3)' }}>
+        Nenhum post neste mês.
+      </div>
+    )
+  }
+
+  return (
+    <div className="pautas-view" style={{ paddingTop: 16 }}>
+      {grouped.map(([date, dayPosts]) => {
+        const isToday = date === today
+        const isPast = date < today
+        return (
+          <div key={date} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', paddingBottom: 2 }}>
+            <div style={{
+              width: 64, flexShrink: 0, paddingTop: 10, textAlign: 'right',
+              fontFamily: 'var(--font-mono)', fontSize: 12.5, lineHeight: 1.3,
+              color: isToday ? 'var(--accent)' : isPast ? 'var(--ink-3)' : 'var(--ink-2)',
+              fontWeight: isToday ? 700 : 500,
+            }}>
+              <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1 }}>{date.slice(8)}</div>
+              <div style={{ fontSize: 11, marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{weekday(date)}</div>
+              {isToday && <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 2, fontWeight: 700 }}>hoje</div>}
+            </div>
+            <div style={{ flex: 1, borderLeft: `2px solid ${isToday ? 'var(--accent-soft)' : 'var(--border)'}`, paddingLeft: 16, paddingTop: 8, paddingBottom: 8 }}>
+              {dayPosts.map(p => {
+                const status = STATUSES.find(s => s.id === p.status)
+                const platColors: Record<string, { bg: string; fg: string }> = {
+                  ig: { bg: 'oklch(0.9 0.05 300)', fg: 'oklch(0.45 0.12 300)' },
+                  tiktok: { bg: 'oklch(0.92 0.04 0)', fg: 'oklch(0.4 0.1 0)' },
+                  youtube: { bg: 'oklch(0.93 0.06 20)', fg: 'oklch(0.45 0.16 20)' },
+                }
+                const pc = platColors[p.platform] ?? { bg: 'var(--surface-2)', fg: 'var(--ink-3)' }
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => onPostClick(p)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', marginBottom: 4, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.12s' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-softer)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'var(--surface)')}
+                  >
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)', width: 40, flexShrink: 0 }}>{p.time}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', padding: '2px 6px', borderRadius: 5, background: pc.bg, color: pc.fg, flexShrink: 0 }}>
+                      {p.platform === 'tiktok' ? 'TT' : p.platform?.toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
+                      {(p.product || p.campaign) && (
+                        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {[p.product, p.campaign].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
+                    </div>
+                    {p.format && <div style={{ fontSize: 11, color: 'var(--ink-3)', flexShrink: 0 }}>{p.format}</div>}
+                    {p.owner && <div style={{ fontSize: 11, color: 'var(--ink-3)', flexShrink: 0 }}>{p.owner}</div>}
+                    {status && (
+                      <span className={`pauta-status ${status.className}`} style={{ flexShrink: 0 }}>
+                        {status.label}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function SocialHubApp({ initialPosts, initialCampaigns, initialCollections, initialEventDates, initialFutebolEvents, initialProducts, userEmail, userName }: Props) {
   const supabase = createClient()
   const meId = getMeId(userEmail)
@@ -71,7 +166,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   const [weekStart, setWeekStart] = useState(() => startOfWeekISO(today))
 
   const [platformFilter, setPlatformFilter] = useState<string>('all')
-  const [tagFilter, setTagFilter] = useState<string>('all')
+  const [tagFilter, setTagFilter] = useState<'all' | 'mh' | 'branding' | 'futebol' | 'campanha'>('all')
   const [search, setSearch] = useState('')
 
   const [activePost, setActivePost] = useState<Post | null>(null)
@@ -120,11 +215,16 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   }, [supabase])
 
   // ─── Filtering ────────────────────────────────────────────────
-  let shownPosts = posts
-  if (view === 'branding') shownPosts = posts.filter(p => p.tags?.includes('branding'))
-  if (view === 'mh')       shownPosts = posts.filter(p => p.tags?.includes('mh'))
+  const calendarPosts = posts.filter(p => p.source !== 'mh')
+  let shownPosts: typeof posts
+  if (view === 'branding')      shownPosts = posts.filter(p => p.source === 'branding')
+  else if (view === 'mh')       shownPosts = posts.filter(p => p.source === 'mh')
+  else if (tagFilter === 'mh')       shownPosts = posts.filter(p => p.source === 'mh')
+  else if (tagFilter === 'branding') shownPosts = posts.filter(p => p.source === 'branding')
+  else if (tagFilter === 'futebol')  shownPosts = posts.filter(p => p.tags?.includes('FUTEBOL'))
+  else if (tagFilter === 'campanha') shownPosts = posts.filter(p => !!p.campaign?.trim())
+  else shownPosts = calendarPosts
   if (platformFilter !== 'all') shownPosts = shownPosts.filter(p => p.platform === platformFilter)
-  if (tagFilter !== 'all')      shownPosts = shownPosts.filter(p => p.tags?.includes(tagFilter))
   if (search.trim()) {
     const q = search.toLowerCase()
     shownPosts = shownPosts.filter(p =>
@@ -132,7 +232,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     )
   }
 
-  const monthPosts = posts.filter(p => {
+  const monthPosts = calendarPosts.filter(p => {
     const d = parseISO(p.date)
     return d.getFullYear() === year && d.getMonth() === month
   })
@@ -146,6 +246,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     if (calMode === 'week') { setWeekStart(w => addDaysISO(w, 7)); return }
     if (month === 11) { setMonth(0); setYear(y => y + 1) } else setMonth(m => m + 1)
   }
+  const goTodayMain = () => { setYear(todayDate.getFullYear()); setMonth(todayDate.getMonth()); setWeekStart(startOfWeekISO(today)) }
   const goToday = () => {
     const t = parseISO(today)
     setYear(t.getFullYear()); setMonth(t.getMonth())
@@ -163,75 +264,93 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
 
   // ─── CRUD ─────────────────────────────────────────────────────
   const savePost = async (p: Post) => {
-    const upper = p.title.toUpperCase()
-    const COPA_KEYWORDS = ['WHIND', 'WHINDERSSON', 'KÉFERA', 'KEFERA', 'TACI', 'CAFU', 'MELODY', 'COPA']
-    const isCopa = COPA_KEYWORDS.some(k => upper.includes(k))
-    const isMH = p.title.includes('[MH]')
-
-    let tags = [...(p.tags ?? [])]
-    if (isMH)   tags = Array.from(new Set([...tags, 'mh']))
-    if (isCopa) tags = Array.from(new Set([...tags, 'futebol']))
-
-    const saved = {
-      ...p,
-      tags,
-      linha: isCopa ? 'copa' : p.linha,
-    }
-    setPosts(arr => arr.map(x => x.id === saved.id ? saved : x))
-    const { id, user_id, ...payload } = saved
-    await supabase.from('posts').update(payload).eq('id', id)
+    setPosts(arr => arr.map(x => x.id === p.id ? p : x))
+    const { id, source, ...rest } = p
+    await supabase.from(sourceToTable(source)).update(postToDb(rest, source)).eq('id', id)
   }
 
-  const movePost = async (postId: number, date: string, time?: string) => {
+  const movePost = async (postId: string, date: string, time?: string) => {
     const post = posts.find(p => p.id === postId)
     if (!post) return
     const updated = { ...post, date, ...(time !== undefined ? { time } : {}) }
     setPosts(arr => arr.map(p => p.id === postId ? updated : p))
-    const { id, user_id, ...payload } = updated
-    await supabase.from('posts').update(payload).eq('id', id)
+    const { id, source, ...rest } = updated
+    await supabase.from(sourceToTable(source)).update(postToDb(rest, source)).eq('id', id)
   }
 
   const deletePost = async (p: Post) => {
     setPosts(arr => arr.filter(x => x.id !== p.id))
-    await supabase.from('posts').delete().eq('id', p.id)
+    await supabase.from(sourceToTable(p.source)).delete().eq('id', p.id)
   }
 
-  const createPost = async (defaults: Partial<Post>) => {
-    const newPost: Omit<Post, 'id' | 'user_id'> = {
-      title: '',
-      owner: ownerName,
-      platform: 'ig',
-      date: defaults.date ?? today,
-      time: '12:00',
-      status: 'prod',
-      complexity: 3,
-      type: 'Reels',
-      tags: [],
-      linha: 'produtos',
-      campanha: null,
-      link: '',
-      ref: '',
-      notes: '',
+  const createPost = async (defaults: Partial<Post> & { source?: PostSource }) => {
+    const source: PostSource = defaults.source ?? (
+      view === 'branding' ? 'branding' :
+      view === 'mh' ? 'mh' :
+      tagFilter === 'mh' ? 'mh' :
+      tagFilter === 'branding' ? 'branding' :
+      tagFilter === 'futebol' ? 'copa' :
+      'branding'
+    )
+    const platform = defaults.platform ?? (source === 'tiktok' ? 'tiktok' : source === 'twitter' ? 'twitter' : source === 'canal' ? 'canal' : 'ig')
+    const newPost = {
+      title:    '',
+      owner:    ownerName,
+      platform,
+      date:     defaults.date ?? today,
+      time:     '12:00',
+      status:   'prod' as const,
+      format:   platform === 'ig' ? 'Reels' : 'Vídeo',
+      tags:     [] as string[],
+      campaign: '',
+      product:  '',
+      ref:      '',
+      link:     '',
+      obs:      '',
+      deadline: '',
+      caption:  '',
+      videoLink:'',
+      coverLink:'',
       ...defaults,
     }
-    const { data, error } = await supabase.from('posts').insert(newPost).select().single()
+    const { data } = await supabase.from(sourceToTable(source)).insert(postToDb(newPost, source)).select().single()
     if (data) {
-      setPosts(arr => [...arr, data as Post])
-      setActivePost(data as Post)
+      const created = { ...newPost, id: String(data.id), source } as Post
+      setPosts(arr => [...arr, created])
+      setActivePost(created)
     }
   }
 
   const duplicateToPlatform = async (newPlatform: string) => {
     if (!duplicateFor) return
-    const newPost = { ...duplicateFor, platform: newPlatform as Platform, status: 'prod' as const }
-    if (newPlatform === 'ig' && !CONTENT_TYPES_IG.includes(newPost.type)) newPost.type = 'Reels'
-    if (newPlatform !== 'ig' && !CONTENT_TYPES_OTHER.includes(newPost.type)) newPost.type = 'Vídeo'
-    const { id, user_id, ...payload } = newPost
-    const { data } = await supabase.from('posts').insert(payload).select().single()
+    // Determina a tabela alvo com base na plataforma
+    const targetSource: PostSource = newPlatform === 'tiktok' ? 'tiktok'
+      : newPlatform === 'twitter' ? 'twitter'
+      : duplicateFor.source
+    const newPost = {
+      ...duplicateFor,
+      platform:          newPlatform as Platform,
+      status:            'prod' as const,
+      linkedPostId:      duplicateFor.id,
+      linkedPostSource:  duplicateFor.source,
+    }
+    if (newPlatform === 'ig'     && !CONTENT_TYPES_IG.includes(newPost.format))    newPost.format = 'Reels'
+    if (newPlatform !== 'ig'     && !CONTENT_TYPES_OTHER.includes(newPost.format)) newPost.format = 'Vídeo'
+    const { id, source, ...rest } = newPost
+    const { data } = await supabase.from(sourceToTable(targetSource)).insert(postToDb(rest, targetSource)).select().single()
     if (data) {
-      setPosts(arr => [...arr, data as Post])
+      const created = { ...newPost, id: String(data.id), source: targetSource } as Post
+      // Vincula o post original ao novo
+      await supabase.from(sourceToTable(duplicateFor.source))
+        .update({ linked_post_id: data.id, linked_post_source: targetSource })
+        .eq('id', duplicateFor.id)
+      setPosts(arr => arr.map(p => p.id === duplicateFor.id
+        ? { ...p, linkedPostId: String(data.id), linkedPostSource: targetSource }
+        : p
+      ))
+      setPosts(arr => [...arr, created])
       setDuplicateFor(null)
-      setActivePost(data as Post)
+      setActivePost(created)
     }
   }
 
@@ -362,7 +481,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     profile:       { title: 'Perfil',               sub: profileId === meId ? 'Seu perfil' : 'Equipe' },
   }
   const { title, sub } = viewTitles[view]
-  const isCalView = view === 'calendar' || view === 'branding' || view === 'mh'
+  const isCalView = view === 'calendar' || view === 'branding'
 
   const calEvents = view === 'calendar' ? [
     ...initialEventDates.filter(e => e.start && e.end && e.start !== '-' && e.end !== '-' && e.start === e.end),
@@ -389,9 +508,9 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
           <div className="sb-label">Calendários</div>
           {([
             { id: 'calendar', label: 'Calendário do mês', icon: <Icon.cal />,      count: monthPosts.length },
-            { id: 'stories',  label: 'Stories',           icon: <Icon.stories />,  count: monthPosts.filter(p => p.platform === 'ig' && p.type === 'Story').length },
-            { id: 'branding', label: 'Branding',          icon: <Icon.branding />, count: monthPosts.filter(p => p.tags?.includes('branding')).length },
-            { id: 'mh',       label: 'Máquina de Hits',  icon: <Icon.mh />,       count: monthPosts.filter(p => p.tags?.includes('mh')).length },
+            { id: 'stories',  label: 'Stories',           icon: <Icon.stories />,  count: monthPosts.filter(p => p.platform === 'ig' && p.format === 'Story').length },
+            { id: 'branding', label: 'Branding',          icon: <Icon.branding />, count: posts.filter(p => p.source === 'branding' && parseISO(p.date).getFullYear() === year && parseISO(p.date).getMonth() === month).length },
+            { id: 'mh',       label: 'Máquina de Hits',  icon: <Icon.mh />,       count: posts.filter(p => p.source === 'mh' && parseISO(p.date).getFullYear() === year && parseISO(p.date).getMonth() === month).length },
           ] as const).map(item => (
             <button key={item.id} className={`sb-item ${view === item.id ? 'active' : ''}`} onClick={() => setView(item.id)}>
               {item.icon} <span>{item.label}</span>
@@ -452,6 +571,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
               <div className="view-toggle" style={{ marginLeft: 4 }}>
                 <button className={calMode === 'month' ? 'active' : ''} onClick={() => setCalMode('month')}>Mês</button>
                 <button className={calMode === 'week' ? 'active' : ''} onClick={() => setCalMode('week')}>Semana</button>
+                <button className={calMode === 'list' ? 'active' : ''} onClick={() => setCalMode('list')}>Lista</button>
               </div>
             </>
           )}
@@ -506,12 +626,11 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             {view === 'calendar' && (
               <>
                 <div style={{ width: 1, height: 18, background: 'var(--line)', margin: '0 8px' }} />
-                <button className={`tag-chip ${tagFilter === 'all' ? 'active' : ''}`} onClick={() => setTagFilter('all')}>Todas tags</button>
-                {TAGS.map(t => (
-                  <button key={t.id} className={`tag-chip ${tagFilter === t.id ? 'active' : ''}`} onClick={() => setTagFilter(t.id)}>
-                    {t.label}
-                  </button>
-                ))}
+                <button className={`tag-chip ${tagFilter === 'all' ? 'active' : ''}`} onClick={() => setTagFilter('all')}>Todas</button>
+                <button className={`tag-chip ${tagFilter === 'mh' ? 'active' : ''}`} onClick={() => setTagFilter('mh')}>Máquina de Hits</button>
+                <button className={`tag-chip ${tagFilter === 'branding' ? 'active' : ''}`} onClick={() => setTagFilter('branding')}>Branding</button>
+                <button className={`tag-chip ${tagFilter === 'futebol' ? 'active' : ''}`} onClick={() => setTagFilter('futebol')}>Futebol</button>
+                <button className={`tag-chip ${tagFilter === 'campanha' ? 'active' : ''}`} onClick={() => setTagFilter('campanha')}>Campanha</button>
               </>
             )}
 
@@ -526,7 +645,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
         )}
 
         {/* Calendar views */}
-        {isCalView && (
+        {isCalView && calMode !== 'list' && (
           <div className="cal-wrap">
             {calMode === 'month' ? (
               <CalendarGrid
@@ -542,6 +661,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
               <WeekView
                 weekStart={weekStart}
                 posts={shownPosts}
+                events={calEvents}
                 onPostClick={setActivePost}
                 onPostDrop={(postId, date, time) => movePost(postId, date, time)}
               />
@@ -549,6 +669,22 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
           </div>
         )}
 
+        {isCalView && calMode === 'list' && (
+          <CalendarListView
+            posts={shownPosts}
+            year={year}
+            month={month}
+            onPostClick={setActivePost}
+          />
+        )}
+
+        {view === 'mh'            && <MHView onPostClick={setActivePost} allPosts={posts} onPostsAdded={async (newPosts) => {
+          for (const p of newPosts) {
+            const { id, source, ...rest } = p
+            const { data } = await supabase.from('mh_posts').insert(postToDb(rest, 'mh')).select().single()
+            if (data) setPosts(arr => [...arr, { ...p, id: String(data.id), source: 'mh' as const }])
+          }
+        }} />}
         {view === 'stories'       && <StoriesView />}
         {view === 'comemorativas' && <ComemorativasView initialItems={initialEventDates} />}
         {view === 'futebol'       && <FutebolView initialItems={initialFutebolEvents} />}
@@ -603,6 +739,9 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             await supabase.from('products').insert({ name })
             setProducts(prev => [...prev, name].sort())
           }}
+          tagOptions={[...new Set(posts.flatMap(p => p.tags ?? []).filter(Boolean))].sort()}
+          allPosts={posts}
+          onLinkedPostClick={p => setActivePost(p)}
         />
       )}
 

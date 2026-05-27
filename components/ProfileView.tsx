@@ -121,7 +121,7 @@ function ActivitiesList({ posts, profile, onPostClick }: {
                   <div className="ar-meta">
                     <span>{p.time}</span>
                     <span>·</span>
-                    <span>{p.type}</span>
+                    <span>{p.format}</span>
                   </div>
                 </div>
                 <span className={`status-pill ${status.className}`}>

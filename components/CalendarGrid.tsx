@@ -15,7 +15,7 @@ interface Props {
   events?: (EventDate | FutebolEvent)[]
   onPostClick: (post: Post) => void
   onNewPost?: (date: string) => void
-  onPostDrop?: (postId: number, date: string) => void
+  onPostDrop?: (postId: string, date: string) => void
   maxPerCell?: number
 }
 
@@ -141,7 +141,7 @@ export default function CalendarGrid({
             onDrop={e => {
               e.preventDefault()
               setDragOverDay(null)
-              const postId = Number(e.dataTransfer.getData('postId'))
+              const postId = e.dataTransfer.getData('postId')
               if (postId && !c.other) onPostDrop?.(postId, c.iso)
             }}
           >

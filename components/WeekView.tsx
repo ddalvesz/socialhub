@@ -2,13 +2,14 @@
 
 import { useMemo, useState } from 'react'
 import { PlatformIcon } from './Icons'
-import { Post, addDaysISO, parseISO, WEEKDAYS_FULL, pad, todayISO } from '@/lib/types'
+import { Post, addDaysISO, parseISO, toISO, WEEKDAYS_FULL, pad, todayISO, EventDate, FutebolEvent } from '@/lib/types'
+import { EVENT_TYPES, FUT_TYPES } from '@/lib/data'
 
 const WEEK_START_HOUR = 6
 const POST_DURATION_MIN = 45 // assume cada post dura 45min para cálculo de sobreposição
 
-function assignColumns(posts: Post[]): Map<number, { col: number; total: number }> {
-  const result = new Map<number, { col: number; total: number }>()
+function assignColumns(posts: Post[]): Map<string, { col: number; total: number }> {
+  const result = new Map<string, { col: number; total: number }>()
   // cada post tem top em minutos
   const toMin = (time: string) => {
     const [h, m] = time.split(':').map(Number)
@@ -42,16 +43,32 @@ const HOUR_HEIGHT = 56
 interface Props {
   weekStart: string
   posts: Post[]
+  events?: (EventDate | FutebolEvent)[]
   onPostClick: (post: Post) => void
-  onPostDrop?: (postId: number, date: string, time: string) => void
+  onPostDrop?: (postId: string, date: string, time: string) => void
 }
 
-export default function WeekView({ weekStart, posts, onPostClick, onPostDrop }: Props) {
+export default function WeekView({ weekStart, posts, events = [], onPostClick, onPostDrop }: Props) {
   const days = Array.from({ length: 7 }, (_, i) => addDaysISO(weekStart, i))
   const hours = Array.from({ length: WEEK_END_HOUR - WEEK_START_HOUR }, (_, i) => WEEK_START_HOUR + i)
   const today = todayISO()
 
   const [dragOverDay, setDragOverDay] = useState<string | null>(null)
+
+  const eventsByDay = useMemo(() => {
+    const map: Record<string, (EventDate | FutebolEvent)[]> = {}
+    events.forEach(e => {
+      const start = 'start' in e ? e.start : e.date
+      const end = 'end' in e ? e.end : e.date
+      const s = parseISO(start)
+      const en = parseISO(end)
+      for (const d = new Date(s); d <= en; d.setDate(d.getDate() + 1)) {
+        const iso = toISO(d.getFullYear(), d.getMonth(), d.getDate())
+        ;(map[iso] = map[iso] || []).push(e)
+      }
+    })
+    return map
+  }, [events])
 
   const now = new Date()
   const nowMinutes = now.getHours() * 60 + now.getMinutes()
@@ -72,10 +89,20 @@ export default function WeekView({ weekStart, posts, onPostClick, onPostDrop }: 
         {days.map(d => {
           const dt = parseISO(d)
           const isToday = d === today
+          const dayEvents = eventsByDay[d] || []
           return (
             <div key={d} className={`week-day-head ${isToday ? 'today' : ''}`}>
               <div className="wdh-dow">{WEEKDAYS_FULL[dt.getDay()]}</div>
               <div className="wdh-num">{dt.getDate()}</div>
+              {dayEvents.map((ev, i) => {
+                const color = FUT_TYPES.find(t => t.id === ev.type)?.color ||
+                  EVENT_TYPES.find(t => t.id === ev.type)?.color || '#999'
+                return (
+                  <div key={i} className="cal-event-label" title={ev.name} style={{ borderLeftColor: color }}>
+                    <span className="ev-name">{ev.name}</span>
+                  </div>
+                )
+              })}
             </div>
           )
         })}
@@ -104,7 +131,7 @@ export default function WeekView({ weekStart, posts, onPostClick, onPostDrop }: 
               onDrop={e => {
                 e.preventDefault()
                 setDragOverDay(null)
-                const postId = Number(e.dataTransfer.getData('postId'))
+                const postId = e.dataTransfer.getData('postId')
                 if (!postId) return
                 const rect = e.currentTarget.getBoundingClientRect()
                 const relY = e.clientY - rect.top
@@ -126,7 +153,7 @@ export default function WeekView({ weekStart, posts, onPostClick, onPostDrop }: 
                 const [hh, mm] = p.time.split(':').map(Number)
                 const top = ((hh + mm / 60) - WEEK_START_HOUR) * HOUR_HEIGHT
                 if (top < 0) return null
-                const height = Math.max(50, 40 + (p.complexity || 1) * 6)
+                const height = 66
                 const { col, total } = colMap.get(p.id) ?? { col: 0, total: 1 }
                 const width = `${100 / total}%`
                 const left = `${(col / total) * 100}%`
@@ -147,9 +174,7 @@ export default function WeekView({ weekStart, posts, onPostClick, onPostDrop }: 
                       {p.time}
                     </div>
                     <div className="wp-title">{p.title}</div>
-                    {height >= 70 && (
-                      <div className="wp-meta">{p.type} · {p.owner}</div>
-                    )}
+                    <div className="wp-meta">{p.format} · {p.owner}</div>
                   </button>
                 )
               })}

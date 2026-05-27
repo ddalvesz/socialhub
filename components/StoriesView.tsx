@@ -605,6 +605,98 @@ function StoryModal({ story, isNew, onClose, onSave, onDelete }: {
 }
 
 /* ============================================================
+   StoriesAgenda — timeline list view
+   ============================================================ */
+function StoriesAgenda({ stories, today, onStoryClick }: {
+  stories: Story[]; today: string; onStoryClick: (s: Story) => void
+}) {
+  const weekday = (iso: string) => {
+    const d = parseISO(iso)
+    return ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][d.getDay()]
+  }
+
+  const sorted = [...stories].sort((a, b) => {
+    const av = `${a.date} ${a.time}`; const bv = `${b.date} ${b.time}`
+    return av < bv ? -1 : av > bv ? 1 : 0
+  })
+
+  const grouped: [string, Story[]][] = []
+  for (const s of sorted) {
+    const last = grouped[grouped.length - 1]
+    if (last && last[0] === s.date) last[1].push(s)
+    else grouped.push([s.date, [s]])
+  }
+
+  if (grouped.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--ink-3)' }}>
+        Nenhum story neste mês.
+      </div>
+    )
+  }
+
+  return (
+    <div className="pautas-view" style={{ paddingTop: 16 }}>
+      {grouped.map(([date, dayStories]) => {
+        const isToday = date === today
+        const isPast = date < today
+        return (
+          <div key={date} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', paddingBottom: 2 }}>
+            <div style={{
+              width: 64, flexShrink: 0, paddingTop: 10, textAlign: 'right',
+              fontFamily: 'var(--font-mono)', fontSize: 12.5, lineHeight: 1.3,
+              color: isToday ? 'var(--accent)' : isPast ? 'var(--ink-3)' : 'var(--ink-2)',
+              fontWeight: isToday ? 700 : 500,
+            }}>
+              <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1 }}>{date.slice(8)}</div>
+              <div style={{ fontSize: 11, marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{weekday(date)}</div>
+              {isToday && <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 2, fontWeight: 700 }}>hoje</div>}
+            </div>
+            <div style={{ flex: 1, borderLeft: `2px solid ${isToday ? 'var(--accent-soft)' : 'var(--border)'}`, paddingLeft: 16, paddingTop: 8, paddingBottom: 8 }}>
+              {dayStories.map(s => {
+                const cat = STORY_CATEGORIES.find(c => c.id === s.categoria)
+                const st = STORY_STATUSES.find(x => x.id === s.status)
+                return (
+                  <div
+                    key={s.id}
+                    onClick={() => onStoryClick(s)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', marginBottom: 4, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.12s' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-softer)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'var(--surface)')}
+                  >
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)', width: 40, flexShrink: 0 }}>{s.time}</div>
+                    {cat && (
+                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', padding: '2px 7px', borderRadius: 5, background: cat.color + '22', color: cat.color, flexShrink: 0 }}>
+                        {cat.label}
+                      </span>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.produto}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1, fontFamily: 'var(--font-mono)' }}>{storyCodePretty(s.date, s.time)}</div>
+                    </div>
+                    {s.receita != null && (
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)', flexShrink: 0, textAlign: 'right' }}>
+                        <div style={{ fontWeight: 600, color: 'var(--ink-2)' }}>{fmtBRL(s.receita)}</div>
+                        <div>{fmtInt(s.sessoes)} sess.</div>
+                      </div>
+                    )}
+                    {st && (
+                      <span style={{ fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 6, background: st.color + '20', color: st.color, flexShrink: 0 }}>
+                        {st.label}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/* ============================================================
    StoriesView — main export
    ============================================================ */
 export default function StoriesView() {
@@ -612,7 +704,7 @@ export default function StoriesView() {
   const todayD = parseISO(today)
 
   const [stories, setStories] = useState<Story[]>(() => genMockStories())
-  const [mode, setMode] = useState<'calendar' | 'list'>('calendar')
+  const [mode, setMode] = useState<'calendar' | 'list' | 'agenda'>('calendar')
   const [year, setYear] = useState(todayD.getFullYear())
   const [month, setMonth] = useState(todayD.getMonth())
 
@@ -695,9 +787,13 @@ export default function StoriesView() {
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
             Lista
           </button>
+          <button className={mode === 'agenda' ? 'active' : ''} onClick={() => setMode('agenda')}>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            Agenda
+          </button>
         </div>
 
-        {mode === 'calendar' && (
+        {(mode === 'calendar' || mode === 'agenda') && (
           <>
             <div className="month-nav">
               <button onClick={goPrev}><Icon.chevL /></button>
@@ -721,7 +817,7 @@ export default function StoriesView() {
       </div>
 
       {/* stats strip */}
-      {mode === 'calendar' && (
+      {(mode === 'calendar' || mode === 'agenda') && (
         <div className="stories-stats">
           {[
             { label: 'No mês',      value: stats.total,                         sub: 'stories' },
@@ -764,22 +860,26 @@ export default function StoriesView() {
 
         <div style={{ flex: 1 }} />
         <span className="count-pill">
-          {mode === 'calendar'
+          {mode === 'calendar' || mode === 'agenda'
             ? `${monthFiltered.length} stories neste mês`
             : `${sortedList.length} stories no total`}
         </span>
       </div>
 
       {/* body */}
-      {mode === 'calendar' ? (
+      {mode === 'calendar' && (
         <div className="cal-wrap">
           <StoriesCalendarGrid year={year} month={month} stories={filtered}
             onStoryClick={openExisting} onNewStory={d => openNew({ date: d })} />
         </div>
-      ) : (
+      )}
+      {mode === 'list' && (
         <div className="list-wrap">
           <StoriesList stories={sortedList} onSave={saveStory} onDelete={deleteStory} />
         </div>
+      )}
+      {mode === 'agenda' && (
+        <StoriesAgenda stories={monthFiltered} today={today} onStoryClick={openExisting} />
       )}
 
       {active && (

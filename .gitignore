@@ -7,3 +7,11 @@ tsconfig.tsbuildinfo
 bundle.js
 socialhub-export-claude.jsx
 
+# dados de seed / importação (não pertencem ao repo)
+*_import.sql
+supabase-schema-full.sql
+supabase-seed.sql
+posts.csv
+posts-template.csv
+posts_sync.csv
+

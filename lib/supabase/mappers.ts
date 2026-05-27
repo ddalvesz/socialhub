@@ -1,4 +1,86 @@
-import type { Campaign, Collection, EventDate, FutebolEvent } from '@/lib/types'
+import type { Campaign, Collection, EventDate, FutebolEvent, Post, PostSource, PostStatus, Platform } from '@/lib/types'
+
+// ─── Post ────────────────────────────────────────────────────
+
+export function dbToPost(row: Record<string, unknown>, source: PostSource): Post {
+  return {
+    id:                String(row.id),
+    source,
+    title:             (row.title as string) ?? '',
+    owner:             (row.owner as string) ?? '',
+    platform:          (row.platform as Platform) ?? 'ig',
+    date:              (row.date as string) ?? '',
+    time:              (row.time as string) ?? '12:00',
+    status:            (row.status as PostStatus) ?? 'prod',
+    format:            (row.format as string) ?? '',
+    month:             (row.month as number) ?? undefined,
+    tags:              (row.tags as string[]) ?? [],
+    campaign:          (row.campaign as string) ?? '',
+    product:           (row.product as string) ?? '',
+    ref:               (row.ref as string) ?? '',
+    link:              (row.link as string) ?? '',
+    obs:               (row.obs as string) ?? '',
+    deadline:          (row.deadline as string) ?? '',
+    caption:           (row.caption as string) ?? '',
+    videoLink:         (row.video_link as string) ?? '',
+    coverLink:         (row.cover_link as string) ?? '',
+    linkedPostId:      row.linked_post_id ? String(row.linked_post_id) : undefined,
+    linkedPostSource:  (row.linked_post_source as PostSource) ?? undefined,
+    // MH-specific
+    semana:            (row.semana as number) ?? undefined,
+    numVideo:          (row.num_video as number) ?? undefined,
+    audio:             (row.audio as string) ?? undefined,
+    prazo:             (row.prazo as string) ?? undefined,
+    dropboxLink:       (row.dropbox_link as string) ?? undefined,
+    briefingFile:      (row.briefing_file as string) ?? undefined,
+  }
+}
+
+export function postToDb(p: Omit<Post, 'id' | 'source'>, source?: PostSource): Record<string, unknown> {
+  const base: Record<string, unknown> = {
+    title:              p.title,
+    owner:              p.owner,
+    platform:           p.platform,
+    date:               p.date,
+    time:               p.time,
+    status:             p.status,
+    format:             p.format,
+    month:              p.month ?? null,
+    tags:               p.tags,
+    campaign:           p.campaign,
+    product:            p.product,
+    ref:                p.ref,
+    link:               p.link,
+    obs:                p.obs,
+    deadline:           p.deadline,
+    caption:            p.caption,
+    video_link:         p.videoLink,
+    cover_link:         p.coverLink,
+    linked_post_id:     p.linkedPostId ?? null,
+    linked_post_source: p.linkedPostSource ?? null,
+  }
+  if (source === 'mh') {
+    base.semana       = p.semana ?? null
+    base.num_video    = p.numVideo ?? null
+    base.audio        = p.audio ?? null
+    base.prazo        = p.prazo ?? null
+    base.dropbox_link = p.dropboxLink ?? null
+    base.briefing_file= p.briefingFile ?? null
+  }
+  return base
+}
+
+export function sourceToTable(source: PostSource): string {
+  const map: Record<PostSource, string> = {
+    mh:      'mh_posts',
+    branding:'branding_posts',
+    tiktok:  'tiktok_posts',
+    twitter: 'twitter_posts',
+    canal:   'canal_posts',
+    copa:    'copa_posts',
+  }
+  return map[source]
+}
 
 // ─── Campaign ────────────────────────────────────────────────
 

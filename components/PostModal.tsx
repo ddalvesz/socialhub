@@ -41,9 +41,10 @@ function TagsComboBox({ value, options, onChange }: { value: string[]; options: 
   }, [open])
 
   const available = options.filter(o => !value.includes(o) && o.toLowerCase().includes(q.toLowerCase()))
-  const showNew = q.trim() && !options.some(o => o.toLowerCase() === q.trim().toLowerCase()) && !value.includes(q.trim())
+  const normalized = q.trim().toUpperCase()
+  const showNew = q.trim() && !options.some(o => o.toUpperCase() === normalized) && !value.includes(normalized)
 
-  const add = (tag: string) => { onChange([...value, tag]); setQ('') }
+  const add = (tag: string) => { onChange([...value, tag.toUpperCase()]); setQ('') }
   const remove = (tag: string) => onChange(value.filter(t => t !== tag))
 
   return (
@@ -66,7 +67,7 @@ function TagsComboBox({ value, options, onChange }: { value: string[]; options: 
           onChange={e => { setQ(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
           onKeyDown={e => {
-            if (e.key === 'Enter' && q.trim()) { e.preventDefault(); add(q.trim()); }
+            if (e.key === 'Enter' && q.trim()) { e.preventDefault(); add(normalized); }
             if (e.key === 'Backspace' && !q && value.length > 0) remove(value[value.length - 1])
           }}
         />
@@ -77,8 +78,8 @@ function TagsComboBox({ value, options, onChange }: { value: string[]; options: 
             <button key={o} className="po-item" onMouseDown={() => add(o)}>{o}</button>
           ))}
           {showNew && (
-            <button className="po-item" style={{ color: 'var(--accent)', fontWeight: 500 }} onMouseDown={() => add(q.trim())}>
-              + Criar "{q.trim()}"
+            <button className="po-item" style={{ color: 'var(--accent)', fontWeight: 500 }} onMouseDown={() => add(normalized)}>
+              + Criar "{normalized}"
             </button>
           )}
         </div>

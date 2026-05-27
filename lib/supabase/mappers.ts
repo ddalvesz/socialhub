@@ -1,5 +1,17 @@
 import type { Campaign, Collection, EventDate, FutebolEvent, Post, PostSource, PostStatus, Platform } from '@/lib/types'
 
+// Split comma-separated tags, uppercase, deduplicate
+function normalizeTags(raw: string[]): string[] {
+  const out = new Set<string>()
+  for (const t of raw) {
+    for (const part of t.split(',')) {
+      const v = part.trim().toUpperCase()
+      if (v) out.add(v)
+    }
+  }
+  return [...out]
+}
+
 // ─── Post ────────────────────────────────────────────────────
 
 export function dbToPost(row: Record<string, unknown>, source: PostSource): Post {
@@ -14,7 +26,7 @@ export function dbToPost(row: Record<string, unknown>, source: PostSource): Post
     status:            (row.status as PostStatus) ?? 'prod',
     format:            (row.format as string) ?? '',
     month:             (row.month as number) ?? undefined,
-    tags:              (row.tags as string[]) ?? [],
+    tags:              normalizeTags((row.tags as string[]) ?? []),
     campaign:          (row.campaign as string) ?? '',
     product:           (row.product as string) ?? '',
     ref:               (row.ref as string) ?? '',

@@ -24,7 +24,7 @@ export interface Post {
   caption: string
   videoLink: string
   coverLink: string
-  slideLinks: string[]   // até 10 imagens para posts no formato Carrossel
+  slideLinks?: string[]  // até 10 imagens para posts no formato Carrossel
   linkedPostId?: string
   linkedPostSource?: PostSource
   // MH-specific (só presente em source === 'mh')

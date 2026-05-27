@@ -131,14 +131,14 @@ export function DatePicker({ value, onChange, placeholder = 'dd/mm/aaaa', classN
   const [open, setOpen] = useState(false)
   const [display, setDisplay] = useState(value ? fmtBR(value) : '')
   const [nav, setNav] = useState<{ y: number; m: number }>(() => {
-    if (value) { const d = parseISO(value); return { y: d.getFullYear(), m: d.getMonth() } }
+    if (value) { const d = parseISO(value); if (!isNaN(d.getTime())) return { y: d.getFullYear(), m: d.getMonth() } }
     const t = new Date(); return { y: t.getFullYear(), m: t.getMonth() }
   })
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setDisplay(value ? fmtBR(value) : '')
-    if (value) { const d = parseISO(value); setNav({ y: d.getFullYear(), m: d.getMonth() }) }
+    if (value) { const d = parseISO(value); if (!isNaN(d.getTime())) setNav({ y: d.getFullYear(), m: d.getMonth() }) }
   }, [value])
 
   useEffect(() => {
@@ -156,9 +156,11 @@ export function DatePicker({ value, onChange, placeholder = 'dd/mm/aaaa', classN
   }
 
   // build calendar grid: weeks starting Monday
-  const firstDay = new Date(nav.y, nav.m, 1)
+  const safeY = isNaN(nav.y) ? new Date().getFullYear() : nav.y
+  const safeM = isNaN(nav.m) ? new Date().getMonth() : nav.m
+  const firstDay = new Date(safeY, safeM, 1)
   const startOffset = (firstDay.getDay() + 6) % 7 // Mon=0
-  const daysInMonth = new Date(nav.y, nav.m + 1, 0).getDate()
+  const daysInMonth = new Date(safeY, safeM + 1, 0).getDate()
   const today = todayISO()
   const cells: (number | null)[] = [
     ...Array(startOffset).fill(null),
@@ -166,7 +168,7 @@ export function DatePicker({ value, onChange, placeholder = 'dd/mm/aaaa', classN
   ]
 
   const selectDay = (day: number) => {
-    const iso = toISO(nav.y, nav.m, day)
+    const iso = toISO(safeY, safeM, day)
     onChange(iso)
     setDisplay(fmtBR(iso))
     setOpen(false)
@@ -214,7 +216,7 @@ export function DatePicker({ value, onChange, placeholder = 'dd/mm/aaaa', classN
               <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', cursor: 'pointer' }} onClick={goToday}>
-              {MONTHS[nav.m]} de {nav.y}
+              {MONTHS[safeM]} de {safeY}
             </span>
             <button onClick={nextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-2)', padding: 4, borderRadius: 6 }}>
               <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
@@ -232,7 +234,7 @@ export function DatePicker({ value, onChange, placeholder = 'dd/mm/aaaa', classN
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
             {cells.map((day, i) => {
               if (!day) return <div key={i} />
-              const iso = toISO(nav.y, nav.m, day)
+              const iso = toISO(safeY, safeM, day)
               const isSelected = iso === value
               const isToday = iso === today
               return (

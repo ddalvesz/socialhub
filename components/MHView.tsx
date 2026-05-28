@@ -650,7 +650,7 @@ function BatchPautaModal({ open, onClose, onCreated }: {
         {(step === 'form' || step === 'sending') && (
           <div className="batch-body">
             <div className="batch-helper">
-              A semana <strong>{semanaLabel(nextSemana)}</strong> é a próxima de <strong>{creator.name}</strong> (ela está na {semanaLabel(creator.semanaAtual)} agora). Cada vídeo vira uma linha em Pautas com status <span className="pauta-status s-pauta" style={{ display: 'inline-flex', padding: '1px 7px', fontSize: 10.5, verticalAlign: 'middle' }}><span style={{ width: 5, height: 5, borderRadius: '50%', background: 'oklch(0.55 0.12 280)' }} /> Em pauta</span> e o briefing é adicionado ao Google Doc da creator.
+              Adiciona os vídeos da semana <strong>{semanaLabel(nextSemana)}</strong> para <strong>{creator.name}</strong> e atualiza o Google Docs dela com as pautas. Cada vídeo aparece em Pautas com status <span className="pauta-status s-pauta" style={{ display: 'inline-flex', padding: '1px 7px', fontSize: 10.5, verticalAlign: 'middle' }}><span style={{ width: 5, height: 5, borderRadius: '50%', background: 'oklch(0.55 0.12 280)' }} /> Em pauta</span>.
             </div>
             {videos.map((v, i) => (
               <div className="batch-video" key={v._id} style={{ opacity: step === 'sending' ? 0.5 : 1 }}>

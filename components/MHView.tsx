@@ -45,11 +45,11 @@ interface VideoForm {
 // ─── Constants ────────────────────────────────────────────────
 
 const CREATORS: MHCreator[] = [
-  { id: 'CARINA',    name: 'Carina',    initial: 'C', color: 'oklch(0.65 0.17 18)',  dataEntrada: '2024-10-05', semanaAtual: 88, dropboxPath: '/Creators/Carina' },
-  { id: 'REBECA',    name: 'Rebeca',    initial: 'R', color: 'oklch(0.6 0.16 290)',  dataEntrada: '2025-03-31', semanaAtual: 32, dropboxPath: '/Creators/Rebeca' },
-  { id: 'THA',       name: 'Tha',       initial: 'T', color: 'oklch(0.62 0.15 150)', dataEntrada: '2025-07-14', semanaAtual: 45, dropboxPath: '/Creators/Tha' },
-  { id: 'MARINA',    name: 'Marina',    initial: 'M', color: 'oklch(0.6 0.16 230)',  dataEntrada: '2026-01-19', semanaAtual: 18, dropboxPath: '/Creators/Marina' },
-  { id: 'RECICLADO', name: 'Reciclado', initial: '↻', color: 'oklch(0.55 0.05 280)', dataEntrada: '2025-10-06', semanaAtual: 32, dropboxPath: '/Creators/Reciclado', isVirtual: true },
+  { id: 'CARINA',    name: 'Carina',    initial: 'C', color: 'oklch(0.65 0.17 18)',  dataEntrada: '2024-10-05', semanaAtual: 88, dropboxPath: '/MKT SOCIAL/CREATORS/CARINA' },
+  { id: 'REBECA',    name: 'Rebeca',    initial: 'R', color: 'oklch(0.6 0.16 290)',  dataEntrada: '2025-03-31', semanaAtual: 32, dropboxPath: '/MKT SOCIAL/CREATORS/REBECA' },
+  { id: 'THA',       name: 'Tha',       initial: 'T', color: 'oklch(0.62 0.15 150)', dataEntrada: '2025-07-14', semanaAtual: 45, dropboxPath: '/MKT SOCIAL/CREATORS/THA' },
+  { id: 'MARINA',    name: 'Marina',    initial: 'M', color: 'oklch(0.6 0.16 230)',  dataEntrada: '2026-01-19', semanaAtual: 18, dropboxPath: '/MKT SOCIAL/CREATORS/MARINA' },
+  { id: 'RECICLADO', name: 'Reciclado', initial: '↻', color: 'oklch(0.55 0.05 280)', dataEntrada: '2025-10-06', semanaAtual: 32, dropboxPath: '/MKT SOCIAL/CREATORS/RECICLADO', isVirtual: true },
 ]
 
 const CREATORS_BY_ID = Object.fromEntries(CREATORS.map(c => [c.id, c])) as Record<MHCreatorId, MHCreator>

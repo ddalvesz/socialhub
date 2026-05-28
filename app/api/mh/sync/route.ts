@@ -2,33 +2,38 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 const DROPBOX_TOKEN = process.env.DROPBOX_ACCESS_TOKEN!
+const DROPBOX_NS    = process.env.DROPBOX_NAMESPACE_ID!
 
 // Mapeamento owner (nome no post) → pasta no Dropbox
 const OWNER_TO_DROPBOX: Record<string, string> = {
-  carina:    '/Creators/Carina',
-  rebeca:    '/Creators/Rebeca',
-  tha:       '/Creators/Tha',
-  marina:    '/Creators/Marina',
-  reciclado: '/Creators/Reciclado',
+  carina:    '/MKT SOCIAL/CREATORS/CARINA',
+  rebeca:    '/MKT SOCIAL/CREATORS/REBECA',
+  tha:       '/MKT SOCIAL/CREATORS/THA',
+  marina:    '/MKT SOCIAL/CREATORS/MARINA',
+  reciclado: '/MKT SOCIAL/CREATORS/RECICLADO',
 }
 
 function ownerToPath(owner: string): string | null {
   return OWNER_TO_DROPBOX[owner.toLowerCase()] ?? null
 }
 
+function dropboxHeaders() {
+  return {
+    Authorization: `Bearer ${DROPBOX_TOKEN}`,
+    'Content-Type': 'application/json',
+    'Dropbox-API-Path-Root': JSON.stringify({ '.tag': 'namespace_id', namespace_id: DROPBOX_NS }),
+  }
+}
+
 async function folderHasFiles(path: string): Promise<boolean> {
   try {
     const res = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${DROPBOX_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
+      headers: dropboxHeaders(),
       body: JSON.stringify({ path, limit: 1 }),
     })
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
-      // Pasta não existe → sem entrega
       if ((err as { error_summary?: string }).error_summary?.startsWith('path/not_found')) return false
       return false
     }

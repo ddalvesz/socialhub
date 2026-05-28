@@ -295,9 +295,9 @@ function PautasView({
               </>
             ) : (
               <>
-                <strong>Verificação automática Dropbox</strong> · próxima sync amanhã 09:00
+                <strong>Verificação de entregas no Dropbox</strong>
                 <span style={{ display: 'block', fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>
-                  Olha as pastas SEMANA N de cada creator e vira <em>Em pauta</em> → <em>Entregue</em> automaticamente
+                  Olha as pastas SEMANA N de cada creator e marca como <em>Entregue</em> quando encontrar arquivos
                 </span>
               </>
             )}

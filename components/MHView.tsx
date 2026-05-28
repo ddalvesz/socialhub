@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Post, MHPayload, MHCreatorId,
   fmtBR, todayISO, addDaysISO, parseISO, MONTHS,
@@ -242,7 +243,7 @@ function PautaRow({ post, onClick, allPosts }: { post: Post; onClick: (p: Post) 
 
 function PautasView({
   posts, allPosts, onPostClick, creatorFilter, onCreatorFilterChange,
-  onCreatePauta, onSimulateSync, lastSyncResult, onSelectCreator,
+  onCreatePauta, onSimulateSync, lastSyncResult, syncing = false, onSelectCreator,
 }: {
   posts: Post[]
   allPosts: Post[]
@@ -252,6 +253,7 @@ function PautasView({
   onCreatePauta: () => void
   onSimulateSync: () => void
   lastSyncResult: { found: number } | null
+  syncing?: boolean
   onSelectCreator: (id: MHCreatorId) => void
 }) {
   const today = todayISO()
@@ -301,10 +303,9 @@ function PautasView({
             )}
           </div>
         </div>
-        <span className="dropbox-sync-tag">Backlog · Fase 8</span>
-        <button className="dropbox-sync-btn" onClick={onSimulateSync}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
-          Simular sync agora
+        <button className="dropbox-sync-btn" onClick={onSimulateSync} disabled={syncing} style={{ opacity: syncing ? 0.7 : 1, cursor: syncing ? 'wait' : 'pointer' }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }}><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+          {syncing ? 'Verificando…' : 'Sync agora'}
         </button>
       </div>
 
@@ -939,23 +940,33 @@ interface MHViewProps {
 export default function MHView({ onPostClick, allPosts = [], onPostsAdded }: MHViewProps) {
   const today = todayISO()
   const todayDate = parseISO(today)
+  const router = useRouter()
 
   const [mhMode, setMhMode] = useState<MHMode>('pautas')
   const [creatorFilter, setCreatorFilter] = useState('all')
   const [activeCreator, setActiveCreator] = useState<MHCreatorId | null>(null)
   const [batchOpen, setBatchOpen] = useState(false)
   const [lastSyncResult, setLastSyncResult] = useState<{ found: number } | null>(null)
+  const [syncing, setSyncing] = useState(false)
   const [year, setYear] = useState(todayDate.getFullYear())
   const [month, setMonth] = useState(todayDate.getMonth())
 
   const mhPosts = useMemo(() => allPosts.filter(p => p.source === 'mh'), [allPosts])
 
-  const handleSimulateSync = () => {
-    const tod = todayISO()
-    const found = mhPosts.filter(p => p.status === 'pauta' && p.prazo && p.prazo <= tod).length
-    setLastSyncResult({ found })
-    setTimeout(() => setLastSyncResult(null), 6000)
-  }
+  const handleSync = useCallback(async () => {
+    setSyncing(true)
+    try {
+      const res = await fetch('/api/mh/sync', { method: 'POST' })
+      const data = await res.json() as { updated: number }
+      setLastSyncResult({ found: data.updated })
+      if (data.updated > 0) router.refresh()
+    } catch {
+      setLastSyncResult({ found: 0 })
+    } finally {
+      setSyncing(false)
+      setTimeout(() => setLastSyncResult(null), 6000)
+    }
+  }, [router])
 
   const handleBatchCreated = (newPosts: Post[]) => {
     onPostsAdded?.(newPosts)
@@ -1019,8 +1030,9 @@ export default function MHView({ onPostClick, allPosts = [], onPostsAdded }: MHV
           creatorFilter={creatorFilter}
           onCreatorFilterChange={setCreatorFilter}
           onCreatePauta={() => setBatchOpen(true)}
-          onSimulateSync={handleSimulateSync}
+          onSimulateSync={handleSync}
           lastSyncResult={lastSyncResult}
+          syncing={syncing}
           onSelectCreator={id => setActiveCreator(id)}
         />
       )}

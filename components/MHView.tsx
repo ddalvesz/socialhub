@@ -329,7 +329,7 @@ function PautasView({
       {/* CTA */}
       <div className="pauta-cta">
         <div>
-          Criação em lote por creator: adiciona N vídeos de uma vez e gera o <strong>briefing .txt</strong> na pasta dela no Dropbox.
+          Adiciona N vídeos de uma vez e atualiza o <strong>Google Docs</strong> da creator com as pautas da semana.
         </div>
         <button className="pauta-cta-btn" onClick={onCreatePauta}>
           <Icon.plus /> Nova pauta da semana

@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Post, Platform, PostSource, AppView, CalendarMode, Campaign, Collection, Linking,
-  EventDate, FutebolEvent,
+  EventDate, FutebolEvent, Live, Merchan, LiveStatus,
   MONTHS, PLATFORMS, TAGS, STATUSES,
   addDaysISO, startOfWeekISO, todayISO, parseISO,
   CONTENT_TYPES_IG, CONTENT_TYPES_OTHER,
@@ -13,7 +13,9 @@ import {
 import { TEAM_PROFILES } from '@/lib/data'
 import {
   campaignToDb, collectionToDb, postToDb, sourceToTable,
+  dbToLive, dbToMerchan, liveToDb, merchanToDb,
 } from '@/lib/supabase/mappers'
+import { WEEKDAY_NOMES } from '@/lib/livesUtils'
 import { Icon, PlatformIcon } from './Icons'
 import CalendarGrid from './CalendarGrid'
 import WeekView from './WeekView'
@@ -27,6 +29,9 @@ import FutebolView from './FutebolView'
 import ProfileView from './ProfileView'
 import ExportModal from './ExportModal'
 import MHView from './MHView'
+import LivesView from './LivesView'
+import LiveModal from './LiveModal'
+import MerchansModal from './MerchansModal'
 
 
 interface Props {
@@ -36,6 +41,8 @@ interface Props {
   initialEventDates: EventDate[]
   initialFutebolEvents: FutebolEvent[]
   initialProducts: string[]
+  initialLives: Live[]
+  initialMerchans: Merchan[]
   userEmail: string
   userName: string
 }
@@ -131,8 +138,8 @@ function CalendarListView({ posts, year, month, onPostClick }: {
                     {p.format && <div style={{ fontSize: 11, color: 'var(--ink-3)', flexShrink: 0 }}>{p.format}</div>}
                     {p.owner && <div style={{ fontSize: 11, color: 'var(--ink-3)', flexShrink: 0 }}>{p.owner}</div>}
                     {status && (
-                      <span className={`pauta-status ${status.className}`} style={{ flexShrink: 0 }}>
-                        {status.label}
+                      <span className={`status-pill ${status.className}`} style={{ flexShrink: 0 }}>
+                        <span className="sdot" />{status.label}
                       </span>
                     )}
                   </div>
@@ -146,7 +153,7 @@ function CalendarListView({ posts, year, month, onPostClick }: {
   )
 }
 
-export default function SocialHubApp({ initialPosts, initialCampaigns, initialCollections, initialEventDates, initialFutebolEvents, initialProducts, userEmail, userName }: Props) {
+export default function SocialHubApp({ initialPosts, initialCampaigns, initialCollections, initialEventDates, initialFutebolEvents, initialProducts, initialLives, initialMerchans, userEmail, userName }: Props) {
   const supabase = createClient()
   const meId = getMeId(userEmail)
   const ownerName = getOwnerName(userEmail)
@@ -155,6 +162,11 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   const [collections, setCollectionsRaw] = useState<Collection[]>(initialCollections)
   const [campaigns, setCampaignsRaw] = useState<Campaign[]>(initialCampaigns)
   const [products, setProducts] = useState<string[]>(initialProducts)
+  const [lives, setLives] = useState<Live[]>(initialLives)
+  const [merchans, setMerchans] = useState<Merchan[]>(initialMerchans)
+  const [activeLive, setActiveLive] = useState<Live | null>(null)
+  const [merchansOpen, setMerchansOpen] = useState(false)
+  const [generatingProposta, setGeneratingProposta] = useState(false)
   const [view, setView] = useState<AppView>('calendar')
 
   const today = todayISO()
@@ -358,6 +370,133 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     }
   }
 
+  // ─── Lives handlers ───────────────────────────────────────────
+
+  const saveLive = async (l: Live) => {
+    setLives(arr => arr.map(x => x.id === l.id ? l : x))
+    const { id, ...rest } = l
+    await supabase.from('lives').update(liveToDb(rest)).eq('id', id)
+  }
+
+  const createLive = async (defaults: Partial<Live> = {}) => {
+    const date = defaults.date ?? today
+    const dayIndex = new Date(date + 'T00:00:00').getDay()
+    const diaSemana = WEEKDAY_NOMES[dayIndex]
+    const payload: Omit<Live, 'id'> = {
+      date,
+      diaSemana,
+      cupomLigado: true,
+      criativo: false,
+      merchan1: '',
+      nominal1: '',
+      receita1: 0,
+      merchan2: '',
+      nominal2: '',
+      receita2: 0,
+      cupomExtra: '',
+      receitaExtra: 0,
+      receitaTotal: 0,
+      receitaUtm: 0,
+      alcance: 0,
+      linkUtm: '',
+      utmCampaign: '',
+      status: 'confirmada' as LiveStatus,
+      origem: 'manual',
+      notes: '',
+      ...defaults,
+    }
+    const { data } = await supabase.from('lives').insert(liveToDb(payload)).select().single()
+    if (data) {
+      const created = dbToLive(data as Record<string, unknown>)
+      setLives(arr => [...arr, created].sort((a, b) => a.date.localeCompare(b.date)))
+      setActiveLive(created)
+    }
+  }
+
+  const deleteLive = async (l: Live) => {
+    setLives(arr => arr.filter(x => x.id !== l.id))
+    await supabase.from('lives').delete().eq('id', l.id)
+  }
+
+  const approveLive = (l: Live) => saveLive({ ...l, status: 'confirmada' })
+
+  const approveAllPropostas = async () => {
+    const propostas = lives.filter(l => l.status === 'proposta')
+    setLives(arr => arr.map(l => l.status === 'proposta' ? { ...l, status: 'confirmada' as LiveStatus } : l))
+    await Promise.all(
+      propostas.map(l => supabase.from('lives').update({ status: 'confirmada' }).eq('id', l.id))
+    )
+  }
+
+  const discardProposta = (l: Live) => deleteLive(l)
+
+  const generateProposta = async () => {
+    setGeneratingProposta(true)
+    try {
+      const r = await fetch('/api/lives/gerar-proposta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const json = await r.json()
+      if (!r.ok) {
+        alert(json.error ?? 'Erro ao gerar proposta')
+        return
+      }
+      const novas: Live[] = json.lives ?? []
+      setLives(prev => {
+        const map = new Map(prev.map(l => [l.id, l]))
+        for (const n of novas) map.set(n.id, n)
+        return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date))
+      })
+      const puladas: { date: string; status: string }[] = json.puladas ?? []
+      if (puladas.length > 0) {
+        alert(`${puladas.length} dia(s) não foram alterados (já confirmados ou realizados).`)
+      }
+    } finally {
+      setGeneratingProposta(false)
+    }
+  }
+
+  const onAddMerchan = async (nome: string): Promise<Merchan> => {
+    const existing = merchans.find(m => m.nome === nome)
+    if (existing) return existing
+    const { data } = await supabase
+      .from('merchans')
+      .insert({ nome, ativo: true, forte: false, sempre_sozinho: false })
+      .select()
+      .single()
+    const created = dbToMerchan(data as Record<string, unknown>)
+    setMerchans(prev => [...prev, created])
+    return created
+  }
+
+  const saveMerchan = async (m: Merchan, patch: Partial<Pick<Merchan, 'ativo' | 'forte' | 'sempreSozinho'>>) => {
+    const updated = { ...m, ...patch }
+    setMerchans(arr => arr.map(x => x.id === m.id ? updated : x))
+    await supabase.from('merchans').update(merchanToDb(updated)).eq('id', m.id)
+  }
+
+  const renameMerchan = async (m: Merchan, novoNome: string) => {
+    const updated = dbToMerchan({ ...merchanToDb(m), id: m.id, nome: novoNome })
+    setMerchans(arr => arr.map(x => x.id === m.id ? updated : x))
+    setLives(arr => arr.map(l => ({
+      ...l,
+      merchan1: l.merchan1 === m.nome ? novoNome : l.merchan1,
+      merchan2: l.merchan2 === m.nome ? novoNome : l.merchan2,
+    })))
+    await supabase.from('merchans').update({ nome: novoNome }).eq('id', m.id)
+    await supabase.from('lives').update({ merchan1: novoNome }).eq('merchan1', m.nome)
+    await supabase.from('lives').update({ merchan2: novoNome }).eq('merchan2', m.nome)
+  }
+
+  const deleteMerchan = async (m: Merchan) => {
+    const inUse = lives.some(l => l.merchan1 === m.nome || l.merchan2 === m.nome)
+    if (inUse) return
+    setMerchans(arr => arr.filter(x => x.id !== m.id))
+    await supabase.from('merchans').delete().eq('id', m.id)
+  }
+
   // ─── Linking handlers ─────────────────────────────────────────
   const linkColCamp = (collectionId: number, campaignId: number) => {
     setCollections(arr => arr.map(c => {
@@ -482,6 +621,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     futebol:       { title: 'Futebol 2026',         sub: 'Calendário esportivo'                  },
     campaigns:     { title: 'Campanhas',            sub: 'Controle e cronograma'                 },
     collections:   { title: 'Coleções',             sub: 'Ilustra · Marketing'                   },
+    lives:         { title: 'Lives',                sub: 'Performance · Proposta semanal'        },
     profile:       { title: 'Perfil',               sub: profileId === meId ? 'Seu perfil' : 'Equipe' },
   }
   const { title, sub } = viewTitles[view]
@@ -536,6 +676,14 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
               {'count' in item && <span className="sb-count">{item.count}</span>}
             </button>
           ))}
+        </div>
+
+        <div className="sb-section">
+          <div className="sb-label">Performance</div>
+          <button className={`sb-item ${view === 'lives' ? 'active' : ''}`} onClick={() => setView('lives')}>
+            <Icon.mh /> <span>Lives</span>
+            <span className="sb-count">{lives.filter(l => l.status === 'realizada').length}</span>
+          </button>
         </div>
 
         <div
@@ -680,7 +828,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
                           <span style={{ width: 14, height: 14, borderRadius: 4, border: `1.5px solid var(--line)`, display: 'grid', placeItems: 'center', background: on ? 'var(--accent)' : 'transparent', borderColor: on ? 'var(--accent)' : undefined, flexShrink: 0 }}>
                             {on && <Icon.check />}
                           </span>
-                          <span className={s.className} style={{ fontSize: 11, padding: '2px 7px', borderRadius: 6 }}>{s.label}</span>
+                          <span className={`status-pill ${s.className}`} style={{ cursor: 'default' }}><span className="sdot" />{s.label}</span>
                         </button>
                       )
                     })}
@@ -763,6 +911,20 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             }}
           />
         )}
+        {view === 'lives'         && (
+          <LivesView
+            lives={lives}
+            merchans={merchans}
+            onLiveClick={setActiveLive}
+            onNewLive={createLive}
+            onOpenMerchans={() => setMerchansOpen(true)}
+            onApproveProposta={approveLive}
+            onApproveAll={approveAllPropostas}
+            onDiscardProposta={discardProposta}
+            onGenerateProposta={generateProposta}
+            generatingProposta={generatingProposta}
+          />
+        )}
         {view === 'profile'       && (
           <ProfileView
             posts={posts}
@@ -775,6 +937,31 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
           />
         )}
       </main>
+
+      {/* Live modal */}
+      {activeLive && (
+        <LiveModal
+          live={activeLive}
+          merchans={merchans}
+          onClose={() => setActiveLive(null)}
+          onSave={l => { saveLive(l); setActiveLive(null) }}
+          onDelete={l => { deleteLive(l); setActiveLive(null) }}
+          onAddMerchan={onAddMerchan}
+        />
+      )}
+
+      {/* Merchans modal */}
+      {merchansOpen && (
+        <MerchansModal
+          merchans={merchans}
+          lives={lives}
+          onClose={() => setMerchansOpen(false)}
+          onChange={saveMerchan}
+          onAdd={nome => onAddMerchan(nome)}
+          onRename={renameMerchan}
+          onDelete={deleteMerchan}
+        />
+      )}
 
       {/* Export modal */}
       {showExport && <ExportModal onClose={() => setShowExport(false)} />}

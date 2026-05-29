@@ -1,4 +1,5 @@
-import type { Campaign, Collection, EventDate, FutebolEvent, Post, PostSource, PostStatus, Platform } from '@/lib/types'
+import type { Campaign, Collection, EventDate, FutebolEvent, Post, PostSource, PostStatus, Platform, Live, LiveStatus, Merchan } from '@/lib/types'
+import { colorFromName, shortLabel } from '@/lib/livesUtils'
 
 // Split comma-separated tags, uppercase, deduplicate
 function normalizeTags(raw: string[]): string[] {
@@ -224,4 +225,82 @@ export function dbToFutebolEvent(row: Record<string, unknown>): FutebolEvent {
 
 export function futebolEventToDb(e: FutebolEvent): Record<string, unknown> {
   return { type: e.type, name: e.name, date: e.date }
+}
+
+// ─── Live ─────────────────────────────────────────────────────
+
+export function dbToLive(row: Record<string, unknown>): Live {
+  return {
+    id:           String(row.id),
+    date:         (row.date as string) ?? '',
+    diaSemana:    (row.dia_semana as string) ?? '',
+    cupomLigado:  (row.cupom_ligado as boolean) ?? true,
+    criativo:     (row.criativo as boolean) ?? false,
+    merchan1:     (row.merchan1 as string) ?? '',
+    nominal1:     (row.nominal1 as string) ?? '',
+    receita1:     (row.receita1 as number) ?? 0,
+    merchan2:     (row.merchan2 as string) ?? '',
+    nominal2:     (row.nominal2 as string) ?? '',
+    receita2:     (row.receita2 as number) ?? 0,
+    cupomExtra:   (row.cupom_extra as string) ?? '',
+    receitaExtra: (row.receita_extra as number) ?? 0,
+    receitaTotal: (row.receita_total as number) ?? 0,
+    receitaUtm:   (row.receita_utm as number) ?? 0,
+    alcance:      (row.alcance as number) ?? 0,
+    linkUtm:      (row.link_utm as string) ?? '',
+    utmCampaign:  (row.utm_campaign as string) ?? '',
+    status:       ((row.status as string) ?? 'proposta') as LiveStatus,
+    origem:       (row.origem as string) ?? '',
+    notes:        (row.notes as string) ?? '',
+  }
+}
+
+export function liveToDb(l: Omit<Live, 'id'>): Record<string, unknown> {
+  return {
+    date:          l.date,
+    dia_semana:    l.diaSemana,
+    cupom_ligado:  l.cupomLigado,
+    criativo:      l.criativo,
+    merchan1:      l.merchan1,
+    nominal1:      l.nominal1,
+    receita1:      l.receita1,
+    merchan2:      l.merchan2 || null,
+    nominal2:      l.nominal2 || null,
+    receita2:      l.receita2 || 0,
+    cupom_extra:   l.cupomExtra || null,
+    receita_extra: l.receitaExtra || 0,
+    receita_total: l.receitaTotal,
+    receita_utm:   l.receitaUtm || 0,
+    alcance:       l.alcance || 0,
+    link_utm:      l.linkUtm || null,
+    utm_campaign:  l.utmCampaign || null,
+    status:        l.status,
+    origem:        l.origem || null,
+    notes:         l.notes || null,
+  }
+}
+
+// ─── Merchan ──────────────────────────────────────────────────
+
+export function dbToMerchan(row: Record<string, unknown>): Merchan {
+  const nome = (row.nome as string) ?? ''
+  return {
+    id:            String(row.id),
+    nome,
+    name:          nome,
+    ativo:         (row.ativo as boolean) ?? true,
+    forte:         (row.forte as boolean) ?? false,
+    sempreSozinho: (row.sempre_sozinho as boolean) ?? false,
+    color:         colorFromName(nome),
+    short:         shortLabel(nome),
+  }
+}
+
+export function merchanToDb(m: Merchan): Record<string, unknown> {
+  return {
+    nome:           m.nome,
+    ativo:          m.ativo,
+    forte:          m.forte,
+    sempre_sozinho: m.sempreSozinho,
+  }
 }

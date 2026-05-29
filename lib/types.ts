@@ -274,7 +274,7 @@ export const WEEKDAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 export const WEEKDAYS_FULL = ['Dom.','Seg.','Ter.','Qua.','Qui.','Sex.','Sáb.']
 export const MONTH_ABBR = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ']
 
-export type AppView = 'calendar' | 'stories' | 'branding' | 'mh' | 'comemorativas' | 'futebol' | 'campaigns' | 'collections' | 'profile'
+export type AppView = 'calendar' | 'stories' | 'branding' | 'mh' | 'comemorativas' | 'futebol' | 'campaigns' | 'collections' | 'profile' | 'lives'
 export type CalendarMode = 'month' | 'week' | 'list'
 
 export const pad = (n: number) => String(n).padStart(2, '0')
@@ -393,3 +393,31 @@ export const PACKAGE_INFO = [
 ]
 
 export const FORMATS_LIST = ['Story', 'Estático', 'Coleção', 'Reels', 'Campanha']
+
+// ─── Lives ────────────────────────────────────────────────────
+
+export type LiveStatus = 'realizada' | 'confirmada' | 'proposta'
+
+export interface Live {
+  id: string; date: string; diaSemana: string
+  cupomLigado: boolean; criativo: boolean
+  merchan1: string; nominal1: string; receita1: number
+  merchan2: string; nominal2: string; receita2: number
+  cupomExtra: string; receitaExtra: number; receitaTotal: number
+  receitaUtm: number; alcance: number; linkUtm: string; utmCampaign: string
+  status: LiveStatus; origem: string; notes: string
+}
+
+export interface Merchan {
+  id: string; nome: string; name: string
+  ativo: boolean; forte: boolean; sempreSozinho: boolean
+  color: string; short: string
+}
+
+export const LIVE_STATUSES = [
+  { id: 'proposta'  as LiveStatus, label: 'Proposta',   className: 's-prop', dot: 'oklch(0.72 0.16 55)'  },
+  { id: 'confirmada' as LiveStatus, label: 'Confirmada', className: 's-conf', dot: 'oklch(0.6 0.13 265)'  },
+  { id: 'realizada'  as LiveStatus, label: 'Realizada',  className: 's-pub',  dot: 'oklch(0.6 0.13 150)'  },
+] as const
+
+export const LIVE_STATUS_BY_ID = Object.fromEntries(LIVE_STATUSES.map(s => [s.id, s])) as Record<LiveStatus, typeof LIVE_STATUSES[number]>

@@ -66,5 +66,10 @@ export function PlatformIcon({ platform, size = 12, color = 'white' }: PlatformI
       <path d="M18 3h3l-7 8 8 10h-6l-5-6-5 6H3l8-9L3 3h6l4 5 5-5z"/>
     </svg>
   )
+  if (platform === 'youtube') return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
+      <path d="M22.5 6.5s-.2-1.6-1-2.3c-.9-1-1.9-1-2.4-1C16.7 3 12 3 12 3s-4.7 0-7.1.2c-.5.1-1.5.1-2.4 1C1.7 4.9 1.5 6.5 1.5 6.5S1.3 8.4 1.3 10.3v1.8c0 1.9.2 3.7.2 3.7s.2 1.6 1 2.3c.9 1 2.1.9 2.7 1C7.2 19.3 12 19.3 12 19.3s4.7 0 7.1-.2c.5-.1 1.5-.1 2.4-1 .8-.7 1-2.3 1-2.3s.2-1.9.2-3.7v-1.8c0-1.9-.2-3.8-.2-3.8zM9.8 13.8V8.3l6.4 2.8-6.4 2.7z"/>
+    </svg>
+  )
   return null
 }

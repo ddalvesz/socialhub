@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Icon, PlatformIcon } from './Icons'
+import DeleteConfirmModal from './DeleteConfirmModal'
 import { GenericSelect, PackToggle, FieldCheckbox, DatePicker } from './FormHelpers'
 import { Post, MONTH_ABBR, fmtBR, PLATFORMS, Campaign, Collection, Linking, PACKAGE_INFO, todayISO, COLECAO_TIPOS, colProgress } from '@/lib/types'
 import { CAMP_TIPOS, TEAM_NAMES } from '@/lib/data'
@@ -479,9 +480,11 @@ interface CampaignsProps {
   onPostClick: (post: Post) => void
   linking: Linking
   onNavigateCollection: (id: number) => void
+  onDeleteCampaign: (id: number) => void
+  onArchiveCampaign: (id: number) => void
 }
 
-export default function CampaignsView({ posts, onPostClick, linking, onNavigateCollection }: CampaignsProps) {
+export default function CampaignsView({ posts, onPostClick, linking, onNavigateCollection, onDeleteCampaign, onArchiveCampaign }: CampaignsProps) {
   const { collections, campaigns: items, setCampaigns: setItems,
     linkColCamp, unlinkColCamp, createCollectionFromCampaign,
     setCampaignLaunched } = linking
@@ -520,13 +523,15 @@ export default function CampaignsView({ posts, onPostClick, linking, onNavigateC
   }
 
   const deleteCampaign = (id: number) => {
+    onDeleteCampaign(id)
     setItems(arr => arr.filter(c => c.id !== id))
     setExpanded(null)
     setDeletingCampaign(null)
   }
 
   const archiveCampaign = (id: number) => {
-    setItems(arr => arr.map(c => c.id === id ? { ...c, archived: true } : c))
+    onArchiveCampaign(id)
+    setItems(arr => arr.filter(c => c.id !== id))
     setExpanded(null)
     setDeletingCampaign(null)
   }
@@ -781,54 +786,14 @@ export default function CampaignsView({ posts, onPostClick, linking, onNavigateC
         />
       )}
 
-      {deletingCampaign && (
-        <div className="modal-backdrop" onClick={() => setDeletingCampaign(null)}>
-          <div className="modal" style={{ width: 'min(440px, calc(100vw - 40px))', maxHeight: 'unset' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-head" style={{ borderBottom: 'none', paddingBottom: 8 }}>
-              <div style={{
-                width: 44, height: 44, borderRadius: 12, flex: '0 0 44px',
-                background: 'oklch(0.95 0.03 20)', display: 'grid', placeItems: 'center',
-                color: 'oklch(0.52 0.18 22)',
-              }}>
-                <Icon.trash />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.015em' }}>
-                  Excluir campanha?
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 3 }}>
-                  "{deletingCampaign.nome}"
-                </div>
-              </div>
-              <button className="modal-close" onClick={() => setDeletingCampaign(null)}><Icon.x /></button>
-            </div>
-
-            <div style={{ padding: '4px 26px 20px', fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.6 }}>
-              Essa ação é permanente e não pode ser desfeita. Todos os dados da campanha serão removidos.
-              <br /><br />
-              Se preferir manter o histórico, você pode <strong>arquivar</strong> a campanha em vez de excluir.
-            </div>
-
-            <div className="modal-foot" style={{ justifyContent: 'flex-end', gap: 10 }}>
-              <button className="btn btn-ghost" onClick={() => setDeletingCampaign(null)}>Cancelar</button>
-              <button
-                className="btn btn-ghost"
-                style={{ color: 'oklch(0.5 0.12 230)', borderColor: 'oklch(0.88 0.04 230)' }}
-                onClick={() => archiveCampaign(deletingCampaign.id)}
-              >
-                Arquivar
-              </button>
-              <button
-                className="btn"
-                style={{ background: 'oklch(0.52 0.18 22)', color: 'white' }}
-                onClick={() => deleteCampaign(deletingCampaign.id)}
-              >
-                <Icon.trash /> Excluir
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal
+        open={!!deletingCampaign}
+        title="Excluir campanha?"
+        subtitle={deletingCampaign?.nome}
+        onCancel={() => setDeletingCampaign(null)}
+        onDelete={() => deletingCampaign && deleteCampaign(deletingCampaign.id)}
+        onArchive={() => deletingCampaign && archiveCampaign(deletingCampaign.id)}
+      />
     </>
   )
 }

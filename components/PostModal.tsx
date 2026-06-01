@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Icon, PlatformIcon } from './Icons'
+import DeleteConfirmModal from './DeleteConfirmModal'
 import { Popover, GenericSelect, DatePicker } from './FormHelpers'
 import {
   Post, Platform, PostStatus, Campaign,
   PLATFORMS, STATUSES, LINHAS_ED,
-  CONTENT_TYPES_IG, CONTENT_TYPES_OTHER,
+  CONTENT_TYPES_IG, CONTENT_TYPES_OTHER, CONTENT_TYPES_YOUTUBE,
 } from '@/lib/types'
 import { TEAM_NAMES } from '@/lib/data'
 
@@ -15,6 +16,7 @@ interface Props {
   onClose: () => void
   onSave: (post: Post) => void
   onDelete: (post: Post) => void
+  onArchive: (post: Post) => void
   onDuplicate: (post: Post) => void
   showProduct?: boolean
   campaigns?: Campaign[]
@@ -152,10 +154,11 @@ function PlatformSelect({ value, onChange }: { value: Platform; onChange: (v: Pl
 }
 
 // ─── Main modal ──────────────────────────────────────────────
-export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate, showProduct, campaigns = [], products = [], tagOptions = [], onAddProduct, allPosts = [], onLinkedPostClick }: Props) {
+export default function PostModal({ post, onClose, onSave, onDelete, onArchive, onDuplicate, showProduct, campaigns = [], products = [], tagOptions = [], onAddProduct, allPosts = [], onLinkedPostClick }: Props) {
   const [draft, setDraft] = useState<Post>(post)
   const [newProduct, setNewProduct] = useState('')
   const [addingProduct, setAddingProduct] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => { setDraft(post) }, [post.id])
   useEffect(() => {
@@ -168,7 +171,7 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
   const set = <K extends keyof Post>(k: K, v: Post[K]) => setDraft(d => ({ ...d, [k]: v }))
   const linkedPost = draft.linkedPostId ? allPosts.find(p => p.id === draft.linkedPostId) : undefined
   const linkedPlat = linkedPost ? PLATFORMS.find(p => p.id === linkedPost.platform) : undefined
-  const formats = draft.platform === 'ig' ? CONTENT_TYPES_IG : CONTENT_TYPES_OTHER
+  const formats = draft.platform === 'ig' ? CONTENT_TYPES_IG : draft.platform === 'youtube' ? CONTENT_TYPES_YOUTUBE : CONTENT_TYPES_OTHER
 
   const teamOptions    = TEAM_NAMES.map(t => ({ id: t, label: t }))
   const lineaOptions   = LINHAS_ED.map(l => ({ id: l.id, label: l.label }))
@@ -192,6 +195,7 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
   }
 
   return (
+    <>
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal modal-post" onClick={e => e.stopPropagation()}>
 
@@ -404,7 +408,7 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
 
         {/* Footer */}
         <div className="modal-foot">
-          <button className="danger" onClick={() => { onDelete(draft); onClose() }}>
+          <button className="danger" onClick={() => setConfirmDelete(true)}>
             <Icon.trash /> Excluir
           </button>
           <button className="btn btn-ghost" onClick={() => onDuplicate(draft)}>
@@ -416,5 +420,14 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
         </div>
       </div>
     </div>
+    <DeleteConfirmModal
+      open={confirmDelete}
+      title="Excluir post?"
+      subtitle={draft.title}
+      onCancel={() => setConfirmDelete(false)}
+      onDelete={() => { onDelete(draft); onClose() }}
+      onArchive={() => { onArchive(draft); onClose() }}
+    />
+    </>
   )
 }

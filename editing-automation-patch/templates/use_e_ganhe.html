@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1080">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1080px;
+    height: 1920px;
+    overflow: hidden;
+    font-family: 'Montserrat', sans-serif;
+    background: transparent;
+  }
+
+  .wrapper {
+    position: relative;
+    width: 1080px;
+    height: 1920px;
+    overflow: hidden;
+  }
+
+  /* Vídeo ocupa fundo inteiro */
+  .video-bg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 1080px;
+    height: 1920px;
+    background: transparent;
+  }
+
+  /* Conteúdo centralizado no topo */
+  .overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 1080px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 60px;
+    gap: 0;
+  }
+
+  .label {
+    font-size: 48px;
+    font-weight: 600;
+    letter-spacing: 8px;
+    color: #000000;
+    text-transform: uppercase;
+    text-align: center;
+    text-shadow: 0 2px 6px rgba(255,255,255,0.6);
+  }
+
+  .coupon-box {
+    background: #FFFFFF;
+    border-radius: 24px;
+    padding: 20px 60px;
+    margin-top: 16px;
+    min-width: 880px;
+    text-align: center;
+  }
+
+  .coupon-text {
+    font-size: 120px;
+    font-weight: 800;
+    color: #005BBB;
+    line-height: 1;
+  }
+
+  .label-garanta {
+    font-size: 48px;
+    font-weight: 600;
+    letter-spacing: 8px;
+    color: #000000;
+    text-transform: uppercase;
+    text-align: center;
+    margin-top: 24px;
+    text-shadow: 0 2px 6px rgba(255,255,255,0.6);
+  }
+
+  .merchan-box {
+    background: #FFFFFF;
+    border-radius: 24px;
+    padding: 20px 48px;
+    margin-top: 16px;
+    min-width: 880px;
+    text-align: center;
+  }
+
+  .merchan-text {
+    font-size: 90px;
+    font-weight: 800;
+    color: #005BBB;
+    line-height: 1.1;
+  }
+
+  .plus-icon {
+    margin-top: 12px;
+    width: 80px;
+    height: 80px;
+    background: #005BBB;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .plus-icon svg {
+    width: 44px;
+    height: 44px;
+  }
+
+
+  /* Disclaimer */
+  .disclaimer {
+    position: absolute;
+    bottom: 28px;
+    left: 60px;
+    right: 60px;
+    font-size: 22px;
+    line-height: 1.45;
+    color: #FFFFFF;
+    text-align: center;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <div class="video-bg"></div>
+
+  <div class="overlay">
+    <span class="label">USE O CUPOM</span>
+
+    <div class="coupon-box">
+      <span class="coupon-text">{{ cupom }}</span>
+    </div>
+
+    <span class="label-garanta">E GARANTA</span>
+
+    <div class="merchan-box">
+      <span class="merchan-text">{{ merch_1 }}</span>
+    </div>
+
+    <div class="plus-icon">
+      <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22 6V38M6 22H38" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <div class="merchan-box">
+      <span class="merchan-text">{{ merch_2 }}</span>
+    </div>
+
+    <div class="plus-icon">
+      <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22 6V38M6 22H38" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <div class="merchan-box">
+      <span class="merchan-text">{{ merch_3 }}</span>
+    </div>
+  </div>
+
+  <div class="disclaimer">*Promoção válida em pedidos acima de R$99/ Não elegível para Mala de Bordo Trip, Mochila de Rodinha Play, Mochila Casual, Copo Daily, Necessaire Double Makeup, bolsa térmica Play, Carregador Portátil, Capa para Notebook / Frete grátis não elegível para as regiões Norte e Nordeste e em pedidos com Mala de Bordo Trip ou Mochila de Rodinhas Fun / Cupons não acumulativos com promoções de: Capinha Compre 1, Leve 2</div>
+
+</div>
+</body>
+</html>

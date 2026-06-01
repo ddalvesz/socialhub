@@ -1,4 +1,4 @@
-import type { Campaign, Collection, EventDate, FutebolEvent, Post, PostSource, PostStatus, Platform, Live, LiveStatus, Merchan } from '@/lib/types'
+import type { Campaign, Collection, EventDate, FutebolEvent, Post, PostSource, PostStatus, Platform, Live, LiveStatus, Merchan, RenderJob, RenderJobStatus } from '@/lib/types'
 import { colorFromName, shortLabel } from '@/lib/livesUtils'
 
 // Split comma-separated tags, uppercase, deduplicate
@@ -40,6 +40,7 @@ export function dbToPost(row: Record<string, unknown>, source: PostSource): Post
     slideLinks:        (row.slide_links as string[]) ?? [],
     linkedPostId:      row.linked_post_id ? String(row.linked_post_id) : undefined,
     linkedPostSource:  (row.linked_post_source as PostSource) ?? undefined,
+    archived:          (row.archived as boolean) ?? false,
     // MH-specific
     semana:            (row.semana as number) ?? undefined,
     numVideo:          (row.num_video as number) ?? undefined,
@@ -73,6 +74,7 @@ export function postToDb(p: Omit<Post, 'id' | 'source'>, source?: PostSource): R
     slide_links:        p.slideLinks ?? [],
     linked_post_id:     p.linkedPostId ?? null,
     linked_post_source: p.linkedPostSource ?? null,
+    archived:           p.archived ?? false,
   }
   if (source === 'mh') {
     base.semana       = p.semana ?? null
@@ -122,6 +124,7 @@ export function dbToCampaign(row: Record<string, unknown>): Campaign {
     aprovComercialDone:  (row.aprov_comercial_done as boolean) ?? false,
     shootingDate:        row.shooting_date as string | undefined,
     shootingDone:        (row.shooting_done as boolean) ?? false,
+    archived:            (row.archived as boolean) ?? false,
   }
 }
 
@@ -147,6 +150,7 @@ export function campaignToDb(c: Campaign): Record<string, unknown> {
     aprov_comercial_done: c.aprovComercialDone ?? false,
     shooting_date:       c.shootingDate ?? null,
     shooting_done:       c.shootingDone ?? false,
+    archived:            c.archived ?? false,
   }
 }
 
@@ -293,6 +297,25 @@ export function dbToMerchan(row: Record<string, unknown>): Merchan {
     sempreSozinho: (row.sempre_sozinho as boolean) ?? false,
     color:         colorFromName(nome),
     short:         shortLabel(nome),
+  }
+}
+
+// ─── RenderJob ────────────────────────────────────────────────
+
+export function dbToRenderJob(row: Record<string, unknown>): RenderJob {
+  return {
+    id:                 String(row.id),
+    semanaInicio:       (row.semana_inicio as string) ?? '',
+    triggeredBy:        row.triggered_by ? String(row.triggered_by) : null,
+    status:             ((row.status as string) ?? 'queued') as RenderJobStatus,
+    videosProcessados:  Number(row.videos_processados ?? 0),
+    videosFalhos:       Number(row.videos_falhos ?? 0),
+    dropboxUrl:         (row.dropbox_url as string) ?? null,
+    errorMessage:       (row.error_message as string) ?? null,
+    startedAt:          (row.started_at as string) ?? null,
+    endedAt:            (row.ended_at as string) ?? null,
+    createdAt:          (row.created_at as string) ?? '',
+    updatedAt:          (row.updated_at as string) ?? '',
   }
 }
 

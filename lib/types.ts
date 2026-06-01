@@ -1,4 +1,4 @@
-export type Platform = 'ig' | 'tiktok' | 'canal' | 'twitter'
+export type Platform = 'ig' | 'tiktok' | 'canal' | 'twitter' | 'youtube'
 export type PostStatus = 'prod' | 'sched' | 'pub' | 'cancel' | 'pauta' | 'entregue'
 export type PostSource = 'mh' | 'branding' | 'tiktok' | 'twitter' | 'canal' | 'copa'
 export type MHCreatorId = 'CARINA' | 'REBECA' | 'THA' | 'MARINA' | 'RECICLADO'
@@ -27,6 +27,7 @@ export interface Post {
   slideLinks?: string[]  // até 10 imagens para posts no formato Carrossel
   linkedPostId?: string
   linkedPostSource?: PostSource
+  archived?: boolean
   // MH-specific (só presente em source === 'mh')
   semana?: number
   numVideo?: number
@@ -77,6 +78,7 @@ export interface Campaign {
   shootingDate?: string
   shootingDone?: boolean
   colecaoId?: number | null
+  archived?: boolean
 }
 
 export interface ExtraTask {
@@ -226,7 +228,8 @@ export const PLATFORMS = [
   { id: 'ig' as Platform,      label: 'Instagram', color: '#E1306C' },
   { id: 'tiktok' as Platform,  label: 'TikTok',    color: '#111111' },
   { id: 'canal' as Platform,   label: 'Canal',     color: '#FF0033' },
-  { id: 'twitter' as Platform, label: 'Twitter',   color: '#111111' },
+  { id: 'twitter' as Platform,  label: 'Twitter',   color: '#111111' },
+  { id: 'youtube' as Platform,  label: 'YouTube',   color: '#FF0000' },
 ]
 
 export const STATUSES = [
@@ -266,15 +269,16 @@ export const CAMP_LIST = [
   { id: 'maes',      label: 'Dia das Mães'      },
 ]
 
-export const CONTENT_TYPES_IG    = ['Reels', 'Carrossel', 'Imagem', 'Story']
-export const CONTENT_TYPES_OTHER = ['Vídeo', 'Imagem', 'Texto']
+export const CONTENT_TYPES_IG      = ['Reels', 'Carrossel', 'Imagem', 'Story']
+export const CONTENT_TYPES_OTHER   = ['Vídeo', 'Imagem', 'Texto']
+export const CONTENT_TYPES_YOUTUBE = ['Vídeo', 'Shorts']
 
 export const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 export const WEEKDAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 export const WEEKDAYS_FULL = ['Dom.','Seg.','Ter.','Qua.','Qui.','Sex.','Sáb.']
 export const MONTH_ABBR = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ']
 
-export type AppView = 'calendar' | 'stories' | 'branding' | 'mh' | 'comemorativas' | 'futebol' | 'campaigns' | 'collections' | 'profile' | 'lives'
+export type AppView = 'calendar' | 'stories' | 'branding' | 'mh' | 'comemorativas' | 'futebol' | 'campaigns' | 'collections' | 'profile' | 'lives' | 'archived'
 export type CalendarMode = 'month' | 'week' | 'list'
 
 export const pad = (n: number) => String(n).padStart(2, '0')
@@ -421,3 +425,20 @@ export const LIVE_STATUSES = [
 ] as const
 
 export const LIVE_STATUS_BY_ID = Object.fromEntries(LIVE_STATUSES.map(s => [s.id, s])) as Record<LiveStatus, typeof LIVE_STATUSES[number]>
+
+export type RenderJobStatus = 'queued' | 'running' | 'done' | 'error'
+
+export interface RenderJob {
+  id: string
+  semanaInicio: string
+  triggeredBy: string | null
+  status: RenderJobStatus
+  videosProcessados: number
+  videosFalhos: number
+  dropboxUrl: string | null
+  errorMessage: string | null
+  startedAt: string | null
+  endedAt: string | null
+  createdAt: string
+  updatedAt: string
+}

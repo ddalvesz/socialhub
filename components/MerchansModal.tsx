@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import type { Live, Merchan } from '@/lib/types'
 import { Icon } from './Icons'
+import DeleteConfirmModal from './DeleteConfirmModal'
 
 // ─── MerchanRow ──────────────────────────────────────────────
 
@@ -15,6 +16,7 @@ function MerchanRow({ m, livesCount, onChange, onRename, onDelete }: {
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(m.nome)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const submitRename = () => {
     const nm = draft.trim()
@@ -63,11 +65,18 @@ function MerchanRow({ m, livesCount, onChange, onRename, onDelete }: {
       </div>
       <button
         className="icon-btn danger-btn"
-        onClick={() => onDelete(m)}
+        onClick={() => setConfirmDelete(true)}
         title="Excluir merchan (só se não tiver lives associadas)"
         disabled={livesCount > 0}>
         <Icon.trash />
       </button>
+      <DeleteConfirmModal
+        open={confirmDelete}
+        title="Excluir merchan?"
+        subtitle={m.nome}
+        onCancel={() => setConfirmDelete(false)}
+        onDelete={() => { onDelete(m); setConfirmDelete(false) }}
+      />
     </div>
   )
 }

@@ -1,13 +1,15 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer, LabelList,
   ScatterChart, Scatter, ZAxis, ReferenceLine,
   ComposedChart, Area, Line,
 } from 'recharts'
-import type { Live, Merchan } from '@/lib/types'
-import { LIVE_STATUSES, LIVE_STATUS_BY_ID } from '@/lib/types'
+import type { Live, Merchan, RenderJob } from '@/lib/types'
+import { LIVE_STATUSES, LIVE_STATUS_BY_ID, addDaysISO, startOfWeekISO } from '@/lib/types'
+import { createClient } from '@/lib/supabase/client'
+import { dbToRenderJob } from '@/lib/supabase/mappers'
 import {
   fmtBRL, fmtBRLk, fmtPct, inPeriod,
   liveKpis, perMerchanMetrics, weeklyTrend, heatmapMatrix, monthVsPrev,
@@ -137,7 +139,7 @@ function CmpBadge({ delta }: { delta: number | null }) {
 
 // ─── PropostaPanel ───────────────────────────────────────────
 
-function PropostaPanel({ propostas, merchans, onApprove, onApproveAll, onDiscard, onEdit, onGenerate, generating }: {
+function PropostaPanel({ propostas, merchans, onApprove, onApproveAll, onDiscard, onEdit, onGenerate, generating, renderButton }: {
   propostas: Live[]
   merchans: Merchan[]
   onApprove: (l: Live) => void
@@ -146,6 +148,7 @@ function PropostaPanel({ propostas, merchans, onApprove, onApproveAll, onDiscard
   onEdit: (l: Live) => void
   onGenerate: () => void
   generating: boolean
+  renderButton?: React.ReactNode
 }) {
   const byDate    = [...propostas].sort((a, b) => a.date.localeCompare(b.date))
   const pendentes = byDate.filter(p => p.status === 'proposta').length
@@ -183,7 +186,7 @@ function PropostaPanel({ propostas, merchans, onApprove, onApproveAll, onDiscard
               : 'Todos os dias confirmados.'}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button className="btn btn-ghost" onClick={onGenerate} disabled={generating}>
             {generating ? 'Gerando…' : '↺ Regerar'}
           </button>
@@ -192,6 +195,7 @@ function PropostaPanel({ propostas, merchans, onApprove, onApproveAll, onDiscard
               <Icon.check /> Aprovar tudo
             </button>
           )}
+          {renderButton}
         </div>
       </div>
       <div className="proposta-grid">
@@ -507,12 +511,117 @@ export default function LivesView({
   onGenerateProposta, generatingProposta,
 }: Props) {
   const today = todayISO()
+  const [renderJob, setRenderJob]   = useState<RenderJob | null>(null)
+  const [isTriggering, setIsTriggering] = useState(false)
   const [period, setPeriod]         = useState<PeriodId>(90)
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo]     = useState(today)
   const [search, setSearch]         = useState('')
   const [merchanFilter, setMerchanFilter] = useState('all')
   const [statusFilter, setStatusFilter]   = useState('all')
+
+  const semanaIso = useMemo(() => {
+    const confirmadas = lives
+      .filter(l => l.status === 'confirmada')
+      .map(l => l.date)
+      .sort()
+    if (!confirmadas[0]) return null
+    return startOfWeekISO(confirmadas[0])
+  }, [lives])
+
+  useEffect(() => {
+    if (!semanaIso) return
+    const supabase = createClient()
+    supabase
+      .from('render_jobs')
+      .select('*')
+      .eq('semana_inicio', semanaIso)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setRenderJob(dbToRenderJob(data as Record<string, unknown>))
+      })
+    const channel = supabase
+      .channel(`render_jobs:semana=${semanaIso}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'render_jobs',
+        filter: `semana_inicio=eq.${semanaIso}`,
+      }, payload => {
+        if (payload.new) setRenderJob(dbToRenderJob(payload.new as Record<string, unknown>))
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [semanaIso])
+
+  const semanaTemTodasConfirmadas = semanaIso
+    ? lives
+        .filter(l => l.date >= semanaIso && l.date <= addDaysISO(semanaIso, 6))
+        .filter(l => l.status === 'confirmada').length === 7
+    : false
+
+  const mostrarBotaoRender = semanaTemTodasConfirmadas || renderJob != null
+
+  const handleGerarVideos = async () => {
+    if (!semanaIso) return
+    setIsTriggering(true)
+    try {
+      const res = await fetch('/api/lives/trigger-render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ semana: semanaIso }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(`Falha: ${data.error ?? 'erro desconhecido'}`)
+      }
+    } catch (e) {
+      alert(`Erro de rede: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setIsTriggering(false)
+    }
+  }
+
+  function BotaoGerarVideos() {
+    if (!mostrarBotaoRender) return null
+    if (renderJob && (renderJob.status === 'queued' || renderJob.status === 'running')) {
+      return (
+        <button className="btn btn-ghost" disabled>
+          <span className="spinner" />
+          {renderJob.status === 'queued' ? 'Na fila…' : 'Gerando vídeos…'}
+          {renderJob.videosProcessados > 0 && ` (${renderJob.videosProcessados})`}
+        </button>
+      )
+    }
+    if (renderJob?.status === 'done' && renderJob.dropboxUrl) {
+      return (
+        <a className="btn btn-accent"
+           href={`https://www.dropbox.com/home${encodeURI(renderJob.dropboxUrl)}`}
+           target="_blank" rel="noreferrer">
+          <Icon.check /> Vídeos prontos · ver pasta
+        </a>
+      )
+    }
+    if (renderJob?.status === 'error') {
+      return (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span style={{ color: 'oklch(0.5 0.15 25)', fontSize: 12 }}>
+            ❌ {renderJob.errorMessage?.slice(0, 60) || 'Erro'}
+          </span>
+          <button className="btn btn-ghost" onClick={handleGerarVideos} disabled={isTriggering}>
+            Tentar de novo
+          </button>
+        </div>
+      )
+    }
+    return (
+      <button className="btn btn-accent" onClick={handleGerarVideos} disabled={isTriggering}>
+        🎬 Gerar vídeos da semana
+      </button>
+    )
+  }
 
   const propostas = useMemo(
     () => lives.filter(l => l.status === 'proposta' || l.status === 'confirmada'),
@@ -573,7 +682,8 @@ export default function LivesView({
         onDiscard={onDiscardProposta}
         onEdit={onLiveClick}
         onGenerate={onGenerateProposta}
-        generating={generatingProposta} />
+        generating={generatingProposta}
+        renderButton={<BotaoGerarVideos />} />
 
       {/* Period bar */}
       <div className="lives-period-bar">

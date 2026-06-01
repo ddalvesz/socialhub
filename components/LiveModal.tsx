@@ -5,6 +5,7 @@ import type { Live, Merchan } from '@/lib/types'
 import { LIVE_STATUSES, LIVE_STATUS_BY_ID } from '@/lib/types'
 import { fmtBRL, fmtPct } from '@/lib/livesUtils'
 import { Icon } from './Icons'
+import DeleteConfirmModal from './DeleteConfirmModal'
 import { Popover } from './FormHelpers'
 
 // ─── LiveStatusSelect ────────────────────────────────────────
@@ -136,6 +137,7 @@ interface Props {
 
 export default function LiveModal({ live, merchans, onClose, onSave, onDelete, onAddMerchan }: Props) {
   const [draft, setDraft] = useState<Live>(live)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => { setDraft(live) }, [live.id])
 
@@ -163,6 +165,7 @@ export default function LiveModal({ live, merchans, onClose, onSave, onDelete, o
   const diaSemanaLabel = WEEKDAY_NOMES_LOCAL[dateObj.getDay()]
 
   return (
+    <>
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal modal-post" onClick={e => e.stopPropagation()}>
         <div className="modal-head">
@@ -407,7 +410,7 @@ export default function LiveModal({ live, merchans, onClose, onSave, onDelete, o
         </div>
 
         <div className="modal-foot">
-          <button className="danger" onClick={() => { onDelete(draft); onClose() }}>
+          <button className="danger" onClick={() => setConfirmDelete(true)}>
             <Icon.trash /> Excluir
           </button>
           <div style={{ flex: 1 }} />
@@ -418,5 +421,12 @@ export default function LiveModal({ live, merchans, onClose, onSave, onDelete, o
         </div>
       </div>
     </div>
+    <DeleteConfirmModal
+      open={confirmDelete}
+      title="Excluir live?"
+      onCancel={() => setConfirmDelete(false)}
+      onDelete={() => { onDelete(draft); onClose() }}
+    />
+    </>
   )
 }

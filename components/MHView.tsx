@@ -522,6 +522,8 @@ function BatchPautaModal({ open, onClose, onCreated }: {
   const [creatorId, setCreatorId] = useState<MHCreatorId>('CARINA')
   const creator = CREATORS_BY_ID[creatorId]
   const nextSemana = creator.semanaAtual + 1
+  const [semanaInput, setSemanaInput] = useState<string>(String(nextSemana))
+  const semana = parseInt(semanaInput, 10) || nextSemana
   const defaultPrazo = addDaysISO(todayISO(), 7)
   const [videos, setVideos] = useState<VideoForm[]>([emptyVideo(defaultPrazo)])
   const [step, setStep] = useState<'form' | 'sending' | 'done' | 'error'>('form')
@@ -546,7 +548,7 @@ function BatchPautaModal({ open, onClose, onCreated }: {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           creator: creatorId,
-          semana: nextSemana,
+          semana: semana,
           videos: filled.map(v => ({
             hook: v.hook, referencia: v.ref, produto: v.product,
             audio: v.audio, obs: v.notes, prazo: v.prazo,
@@ -580,7 +582,7 @@ function BatchPautaModal({ open, onClose, onCreated }: {
         videoLink: '',
         coverLink: '',
         slideLinks: [],
-        semana: nextSemana,
+        semana: semana,
         numVideo: i + 1,
         audio: v.audio || '',
         prazo: v.prazo,
@@ -623,7 +625,7 @@ function BatchPautaModal({ open, onClose, onCreated }: {
                         <div style={{ position: 'fixed', inset: 0, zIndex: 55 }} onClick={() => setCreatorOpen(false)} />
                         <div className="popover" style={{ top: '100%', marginTop: 4, left: 0, minWidth: 200, zIndex: 56 }}>
                           {CREATORS.map(cc => (
-                            <button key={cc.id} className="po-item" onClick={() => { setCreatorId(cc.id); setCreatorOpen(false) }}>
+                            <button key={cc.id} className="po-item" onClick={() => { setCreatorId(cc.id); setSemanaInput(String(cc.semanaAtual + 1)); setCreatorOpen(false) }}>
                               <span style={{ width: 20, height: 20, borderRadius: '50%', background: cc.color, color: 'white', display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 700, marginRight: 4 }}>{cc.initial}</span>
                               {cc.name}
                               <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>{semanaLabel(cc.semanaAtual + 1)}</span>
@@ -635,7 +637,16 @@ function BatchPautaModal({ open, onClose, onCreated }: {
                     )}
                   </div>
                   <span style={{ color: 'var(--ink)' }}>· semana</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', background: 'var(--accent-soft)', color: 'var(--accent-deep)', padding: '2px 12px', borderRadius: 7, fontSize: 16 }}>{semanaLabel(nextSemana)}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', fontFamily: 'var(--font-mono)', background: 'var(--accent-soft)', color: 'var(--accent-deep)', padding: '2px 8px', borderRadius: 7, fontSize: 16, gap: 2 }}>
+                    S<input
+                      type="number"
+                      min={1}
+                      value={semanaInput}
+                      onChange={e => setSemanaInput(e.target.value)}
+                      disabled={step === 'sending'}
+                      style={{ width: 40, background: 'transparent', border: 'none', outline: 'none', fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: 'var(--accent-deep)', padding: 0, textAlign: 'left' }}
+                    />
+                  </span>
                 </>
               )}
               {step === 'done' && <span>✓ {videos.filter(v => v.hook.trim()).length} vídeos adicionados às pautas de {creator.name}</span>}
@@ -650,7 +661,7 @@ function BatchPautaModal({ open, onClose, onCreated }: {
         {(step === 'form' || step === 'sending') && (
           <div className="batch-body">
             <div className="batch-helper">
-              Adiciona os vídeos da semana <strong>{semanaLabel(nextSemana)}</strong> para <strong>{creator.name}</strong> e atualiza o Google Docs dela com as pautas. Cada vídeo aparece em Pautas com status <span className="pauta-status s-pauta" style={{ display: 'inline-flex', padding: '1px 7px', fontSize: 10.5, verticalAlign: 'middle' }}><span style={{ width: 5, height: 5, borderRadius: '50%', background: 'oklch(0.55 0.12 280)' }} /> Em pauta</span>.
+              Adiciona os vídeos da semana <strong>{semanaLabel(semana)}</strong> para <strong>{creator.name}</strong> e atualiza o Google Docs dela com as pautas. Cada vídeo aparece em Pautas com status <span className="pauta-status s-pauta" style={{ display: 'inline-flex', padding: '1px 7px', fontSize: 10.5, verticalAlign: 'middle' }}><span style={{ width: 5, height: 5, borderRadius: '50%', background: 'oklch(0.55 0.12 280)' }} /> Em pauta</span>.
             </div>
             {videos.map((v, i) => (
               <div className="batch-video" key={v._id} style={{ opacity: step === 'sending' ? 0.5 : 1 }}>

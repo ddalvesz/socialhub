@@ -43,11 +43,11 @@ interface VideoForm {
 // ─── Constants ────────────────────────────────────────────────
 
 const CREATORS: MHCreator[] = [
-  { id: 'CARINA',    name: 'Carina',    initial: 'C', color: 'oklch(0.65 0.17 18)',  dataEntrada: '2024-10-05', semanaAtual: 88, dropboxPath: '/Creators/Carina' },
-  { id: 'REBECA',    name: 'Rebeca',    initial: 'R', color: 'oklch(0.6 0.16 290)',  dataEntrada: '2025-03-31', semanaAtual: 32, dropboxPath: '/Creators/Rebeca' },
-  { id: 'THA',       name: 'Tha',       initial: 'T', color: 'oklch(0.62 0.15 150)', dataEntrada: '2025-07-14', semanaAtual: 45, dropboxPath: '/Creators/Tha' },
-  { id: 'MARINA',    name: 'Marina',    initial: 'M', color: 'oklch(0.6 0.16 230)',  dataEntrada: '2026-01-19', semanaAtual: 18, dropboxPath: '/Creators/Marina' },
-  { id: 'RECICLADO', name: 'Reciclado', initial: '↻', color: 'oklch(0.55 0.05 280)', dataEntrada: '2025-10-06', semanaAtual: 32, dropboxPath: '/Creators/Reciclado', isVirtual: true },
+  { id: 'CARINA',    name: 'Carina',    initial: 'C', color: 'oklch(0.65 0.17 18)',  dataEntrada: '2024-10-05', semanaAtual: 88, dropboxPath: '/MKT SOCIAL/CREATORS/CARINA' },
+  { id: 'REBECA',    name: 'Rebeca',    initial: 'R', color: 'oklch(0.6 0.16 290)',  dataEntrada: '2025-03-31', semanaAtual: 32, dropboxPath: '/MKT SOCIAL/CREATORS/REBECA' },
+  { id: 'THA',       name: 'Tha',       initial: 'T', color: 'oklch(0.62 0.15 150)', dataEntrada: '2025-07-14', semanaAtual: 45, dropboxPath: '/MKT SOCIAL/CREATORS/THA' },
+  { id: 'MARINA',    name: 'Marina',    initial: 'M', color: 'oklch(0.6 0.16 230)',  dataEntrada: '2026-01-19', semanaAtual: 18, dropboxPath: '/MKT SOCIAL/CREATORS/MARINA' },
+  { id: 'RECICLADO', name: 'Reciclado', initial: '↻', color: 'oklch(0.55 0.05 280)', dataEntrada: '2025-10-06', semanaAtual: 32, dropboxPath: '/MKT SOCIAL/CREATORS/RECICLADO', isVirtual: true },
 ]
 
 const CREATORS_BY_ID = Object.fromEntries(CREATORS.map(c => [c.id, c])) as Record<MHCreatorId, MHCreator>
@@ -240,7 +240,7 @@ function PautaRow({ post, onClick, allPosts }: { post: Post; onClick: (p: Post) 
 
 function PautasView({
   posts, allPosts, onPostClick, creatorFilter, onCreatorFilterChange,
-  onCreatePauta, onSimulateSync, lastSyncResult, onSelectCreator,
+  onCreatePauta, onSimulateSync, syncing, lastSyncResult, onSelectCreator,
 }: {
   posts: Post[]
   allPosts: Post[]
@@ -249,6 +249,7 @@ function PautasView({
   onCreatorFilterChange: (id: string) => void
   onCreatePauta: () => void
   onSimulateSync: () => void
+  syncing?: boolean
   lastSyncResult: { found: number } | null
   onSelectCreator: (id: MHCreatorId) => void
 }) {
@@ -279,7 +280,7 @@ function PautasView({
 
   return (
     <div className="pautas-view">
-      {/* Dropbox sync banner (Fase 8 stub) */}
+      {/* Dropbox sync banner */}
       <div className="dropbox-sync-banner">
         <div className="left">
           <div className="dropbox-sync-icon">☰</div>
@@ -287,22 +288,21 @@ function PautasView({
             {lastSyncResult ? (
               <>
                 <strong>{lastSyncResult.found} entrega{lastSyncResult.found === 1 ? '' : 's'} detectada{lastSyncResult.found === 1 ? '' : 's'} no Dropbox</strong>
-                {' · última sincronização agora'}
+                {' · sincronizado agora'}
               </>
             ) : (
               <>
-                <strong>Verificação automática Dropbox</strong> · próxima sync amanhã 09:00
+                <strong>Verificação de entregas no Dropbox</strong>
                 <span style={{ display: 'block', fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>
-                  Olha as pastas SEMANA N de cada creator e vira <em>Em pauta</em> → <em>Entregue</em> automaticamente
+                  Olha as pastas SEMANA N de cada creator e marca como <em>Entregue</em> quando encontrar arquivos
                 </span>
               </>
             )}
           </div>
         </div>
-        <span className="dropbox-sync-tag">Backlog · Fase 8</span>
-        <button className="dropbox-sync-btn" onClick={onSimulateSync}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
-          Simular sync agora
+        <button className="dropbox-sync-btn" onClick={onSimulateSync} disabled={syncing}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={syncing ? { animation: 'spin 1s linear infinite' } : undefined}><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+          {syncing ? 'Sincronizando…' : 'Sync agora'}
         </button>
       </div>
 
@@ -931,9 +931,10 @@ interface MHViewProps {
   onPostClick: (p: Post) => void
   allPosts?: Post[]
   onPostsAdded?: (posts: Post[]) => Promise<void>
+  onPostsUpdated?: (posts: Post[]) => void
 }
 
-export default function MHView({ onPostClick, allPosts = [], onPostsAdded }: MHViewProps) {
+export default function MHView({ onPostClick, allPosts = [], onPostsAdded, onPostsUpdated }: MHViewProps) {
   const today = todayISO()
   const todayDate = parseISO(today)
 
@@ -942,16 +943,32 @@ export default function MHView({ onPostClick, allPosts = [], onPostsAdded }: MHV
   const [activeCreator, setActiveCreator] = useState<MHCreatorId | null>(null)
   const [batchOpen, setBatchOpen] = useState(false)
   const [lastSyncResult, setLastSyncResult] = useState<{ found: number } | null>(null)
+  const [syncing, setSyncing] = useState(false)
   const [year, setYear] = useState(todayDate.getFullYear())
   const [month, setMonth] = useState(todayDate.getMonth())
 
   const mhPosts = useMemo(() => allPosts.filter(p => p.source === 'mh'), [allPosts])
 
-  const handleSimulateSync = () => {
-    const tod = todayISO()
-    const found = mhPosts.filter(p => p.status === 'pauta' && p.prazo && p.prazo <= tod).length
-    setLastSyncResult({ found })
-    setTimeout(() => setLastSyncResult(null), 6000)
+  const handleSync = async () => {
+    setSyncing(true)
+    try {
+      const res = await fetch('/api/mh/dropbox-sync', { method: 'POST' })
+      const data = await res.json() as { updated?: string[]; error?: string }
+      if (data.error) { setLastSyncResult({ found: 0 }); return }
+      const ids: string[] = data.updated ?? []
+      setLastSyncResult({ found: ids.length })
+      if (ids.length > 0) {
+        const updated = mhPosts
+          .filter(p => ids.includes(p.id))
+          .map(p => ({ ...p, status: 'entregue' as const, dropboxLink: `/MKT SOCIAL/CREATORS/${(p.owner ?? '').toUpperCase()}/Semana ${p.semana}` }))
+        onPostsUpdated?.(updated)
+      }
+    } catch {
+      setLastSyncResult({ found: 0 })
+    } finally {
+      setSyncing(false)
+      setTimeout(() => setLastSyncResult(null), 6000)
+    }
   }
 
   const handleBatchCreated = (newPosts: Post[]) => {
@@ -1016,7 +1033,8 @@ export default function MHView({ onPostClick, allPosts = [], onPostsAdded }: MHV
           creatorFilter={creatorFilter}
           onCreatorFilterChange={setCreatorFilter}
           onCreatePauta={() => setBatchOpen(true)}
-          onSimulateSync={handleSimulateSync}
+          onSimulateSync={handleSync}
+          syncing={syncing}
           lastSyncResult={lastSyncResult}
           onSelectCreator={id => setActiveCreator(id)}
         />

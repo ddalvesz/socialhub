@@ -2333,4 +2333,5 @@ textarea.field { resize: vertical; min-height: 80px; font-family: inherit; line-
 .dropbox-sync-btn { background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); font-size: 12px; padding: 6px 12px; border-radius: 7px; cursor: pointer; font-weight: 500; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
 .dropbox-sync-btn:hover { background: white; color: var(--ink); border-color: var(--accent-soft) }
 .dropbox-sync-btn:disabled { opacity: 0.5; cursor: not-allowed }
+@keyframes spin { to { transform: rotate(360deg); } }
 .extra-task-btn:disabled { opacity: 0.35; cursor: default; }

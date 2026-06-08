@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1080">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1080px;
+    height: 1920px;
+    overflow: hidden;
+    font-family: 'Montserrat', sans-serif;
+    background: transparent;
+  }
+
+  .wrapper {
+    position: relative;
+    width: 1080px;
+    height: 1920px;
+    overflow: hidden;
+  }
+
+  /* Fundo sólido azul cobrindo topo */
+  .top-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1080px;
+    height: 980px;
+    background: #4FA0D8;
+  }
+
+  /* Área de vídeo — transparente, vídeo renderiza por baixo */
+  .video-area {
+    position: absolute;
+    top: 980px;
+    left: 0;
+    width: 1080px;
+    height: 940px;
+    background: transparent;
+    border-radius: 80px 80px 0 0;
+    overflow: hidden;
+  }
+
+  /* Decoração de ondas no rodapé */
+  .hills {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 1080px;
+    height: 260px;
+    pointer-events: none;
+  }
+
+  /* Conteúdo overlay */
+  .overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1080px;
+    height: 1920px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .label {
+    margin-top: 110px;
+    font-size: 48px;
+    font-weight: 500;
+    letter-spacing: 8px;
+    color: #000000;
+    text-transform: uppercase;
+    text-align: center;
+  }
+
+  .coupon-box {
+    margin-top: 20px;
+    border: 6px dashed #FFFFFF;
+    padding: 20px 60px;
+    text-align: center;
+  }
+
+  .coupon-text {
+    font-size: 120px;
+    font-weight: 800;
+    color: #FFFFFF;
+    line-height: 1;
+    letter-spacing: 2px;
+  }
+
+  .label-garanta {
+    margin-top: 28px;
+    font-size: 48px;
+    font-weight: 500;
+    letter-spacing: 8px;
+    color: #000000;
+    text-transform: uppercase;
+    text-align: center;
+  }
+
+  .merchan-box {
+    margin-top: 20px;
+    background: #FFFFFF;
+    border-radius: 24px;
+    padding: 28px 48px;
+    min-width: 880px;
+    text-align: center;
+  }
+
+  .merchan-text {
+    font-size: 92px;
+    font-weight: 800;
+    color: #000000;
+    line-height: 1.1;
+  }
+
+  .plus-icon {
+    margin-top: 14px;
+    width: 90px;
+    height: 90px;
+    background: #005BBB;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .plus-icon svg {
+    width: 48px;
+    height: 48px;
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- Fundo sólido topo -->
+  <div class="top-bg"></div>
+
+  <!-- Área de vídeo (transparente — FFmpeg renderiza por baixo) -->
+  <div class="video-area"></div>
+
+  <!-- Conteúdo -->
+  <div class="overlay">
+    <span class="label">USE O CUPOM</span>
+
+    <div class="coupon-box">
+      <span class="coupon-text">{{ cupom }}</span>
+    </div>
+
+    <span class="label-garanta">E GARANTA</span>
+
+    <div class="merchan-box">
+      <span class="merchan-text">{{ merchan_1 }}</span>
+    </div>
+
+    <div class="plus-icon">
+      <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M24 8V40M8 24H40" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <div class="merchan-box">
+      <span class="merchan-text">{{ merchan_2 }}</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

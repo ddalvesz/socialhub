@@ -58,16 +58,17 @@ function getLast30Range() {
 }
 
 const STATUS_OPTIONS = [
-  { id: 'sched',  label: 'Agendado',    dot: 'oklch(0.6 0.13 265)'  },
-  { id: 'pub',    label: 'Publicado',   dot: 'oklch(0.6 0.13 150)'  },
-  { id: 'prod',   label: 'Em produção', dot: 'oklch(0.62 0.13 75)'  },
+  { id: 'entregue', label: 'Entregue',    dot: 'oklch(0.55 0.14 165)'  },
+  { id: 'sched',    label: 'Agendado',    dot: 'oklch(0.52 0.14 220)'  },
+  { id: 'prod',     label: 'Em produção', dot: 'oklch(0.55 0 0)'        },
 ]
 
 const PLATFORM_OPTIONS = [
-  { id: 'all',     label: 'Todas',     icon: <ArrowIcon />,                              color: null       },
-  { id: 'ig',      label: 'Instagram', icon: <PlatformIcon platform="ig" size={13} />,     color: '#E1306C'  },
-  { id: 'tiktok',  label: 'TikTok',    icon: <PlatformIcon platform="tiktok" size={13} />, color: '#111111'  },
-  { id: 'twitter', label: 'Twitter',   icon: <PlatformIcon platform="twitter" size={13} />,color: '#111111'  },
+  { id: 'all',     label: 'Todas',     icon: <ArrowIcon />,                                 color: null       },
+  { id: 'ig',      label: 'Instagram', icon: <PlatformIcon platform="ig" size={13} />,       color: '#E1306C'  },
+  { id: 'tiktok',  label: 'TikTok',    icon: <PlatformIcon platform="tiktok" size={13} />,   color: '#111111'  },
+  { id: 'twitter', label: 'Twitter',   icon: <PlatformIcon platform="twitter" size={13} />,  color: '#111111'  },
+  { id: 'youtube', label: 'YouTube',   icon: <PlatformIcon platform="youtube" size={13} />,  color: '#FF0000'  },
 ]
 
 export default function ExportModal({ onClose }: Props) {

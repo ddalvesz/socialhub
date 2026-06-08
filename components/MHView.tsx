@@ -1,12 +1,14 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Post, MHPayload, MHCreatorId,
   fmtBR, todayISO, addDaysISO, parseISO, MONTHS,
 } from '@/lib/types'
 import { Icon } from './Icons'
 import CalendarGrid from './CalendarGrid'
+import { DatePicker } from './FormHelpers'
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -148,6 +150,7 @@ function buildMHPosts(): Post[] {
     obs: r.notes || '',
     deadline: r.prazo || '',
     videoLink: '',
+    slideLinks: [],
     semana: r.semanaCreator,
     numVideo: r.numVideo,
     audio: r.audio || '',
@@ -251,6 +254,7 @@ function PautasView({
   onSimulateSync: () => void
   syncing?: boolean
   lastSyncResult: { found: number } | null
+  syncing?: boolean
   onSelectCreator: (id: MHCreatorId) => void
 }) {
   const today = todayISO()
@@ -326,7 +330,7 @@ function PautasView({
       {/* CTA */}
       <div className="pauta-cta">
         <div>
-          Criação em lote por creator: adiciona N vídeos de uma vez e gera o <strong>briefing .txt</strong> na pasta dela no Dropbox.
+          Adiciona N vídeos de uma vez e atualiza o <strong>Google Docs</strong> da creator com as pautas da semana.
         </div>
         <button className="pauta-cta-btn" onClick={onCreatePauta}>
           <Icon.plus /> Nova pauta da semana
@@ -519,6 +523,8 @@ function BatchPautaModal({ open, onClose, onCreated }: {
   const [creatorId, setCreatorId] = useState<MHCreatorId>('CARINA')
   const creator = CREATORS_BY_ID[creatorId]
   const nextSemana = creator.semanaAtual + 1
+  const [semanaInput, setSemanaInput] = useState<string>(String(nextSemana))
+  const semana = parseInt(semanaInput, 10) || nextSemana
   const defaultPrazo = addDaysISO(todayISO(), 7)
   const [videos, setVideos] = useState<VideoForm[]>([emptyVideo(defaultPrazo)])
   const [step, setStep] = useState<'form' | 'sending' | 'done' | 'error'>('form')
@@ -543,7 +549,7 @@ function BatchPautaModal({ open, onClose, onCreated }: {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           creator: creatorId,
-          semana: nextSemana,
+          semana: semana,
           videos: filled.map(v => ({
             hook: v.hook, referencia: v.ref, produto: v.product,
             audio: v.audio, obs: v.notes, prazo: v.prazo,
@@ -576,7 +582,8 @@ function BatchPautaModal({ open, onClose, onCreated }: {
         deadline: v.prazo,
         videoLink: '',
         coverLink: '',
-        semana: nextSemana,
+        slideLinks: [],
+        semana: semana,
         numVideo: i + 1,
         audio: v.audio || '',
         prazo: v.prazo,
@@ -619,7 +626,7 @@ function BatchPautaModal({ open, onClose, onCreated }: {
                         <div style={{ position: 'fixed', inset: 0, zIndex: 55 }} onClick={() => setCreatorOpen(false)} />
                         <div className="popover" style={{ top: '100%', marginTop: 4, left: 0, minWidth: 200, zIndex: 56 }}>
                           {CREATORS.map(cc => (
-                            <button key={cc.id} className="po-item" onClick={() => { setCreatorId(cc.id); setCreatorOpen(false) }}>
+                            <button key={cc.id} className="po-item" onClick={() => { setCreatorId(cc.id); setSemanaInput(String(cc.semanaAtual + 1)); setCreatorOpen(false) }}>
                               <span style={{ width: 20, height: 20, borderRadius: '50%', background: cc.color, color: 'white', display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 700, marginRight: 4 }}>{cc.initial}</span>
                               {cc.name}
                               <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>{semanaLabel(cc.semanaAtual + 1)}</span>
@@ -631,7 +638,16 @@ function BatchPautaModal({ open, onClose, onCreated }: {
                     )}
                   </div>
                   <span style={{ color: 'var(--ink)' }}>· semana</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', background: 'var(--accent-soft)', color: 'var(--accent-deep)', padding: '2px 12px', borderRadius: 7, fontSize: 16 }}>{semanaLabel(nextSemana)}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', fontFamily: 'var(--font-mono)', background: 'var(--accent-soft)', color: 'var(--accent-deep)', padding: '2px 8px', borderRadius: 7, fontSize: 16, gap: 2 }}>
+                    S<input
+                      type="number"
+                      min={1}
+                      value={semanaInput}
+                      onChange={e => setSemanaInput(e.target.value)}
+                      disabled={step === 'sending'}
+                      style={{ width: 40, background: 'transparent', border: 'none', outline: 'none', fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: 'var(--accent-deep)', padding: 0, textAlign: 'left' }}
+                    />
+                  </span>
                 </>
               )}
               {step === 'done' && <span>✓ {videos.filter(v => v.hook.trim()).length} vídeos adicionados às pautas de {creator.name}</span>}
@@ -646,7 +662,7 @@ function BatchPautaModal({ open, onClose, onCreated }: {
         {(step === 'form' || step === 'sending') && (
           <div className="batch-body">
             <div className="batch-helper">
-              A semana <strong>{semanaLabel(nextSemana)}</strong> é a próxima de <strong>{creator.name}</strong> (ela está na {semanaLabel(creator.semanaAtual)} agora). Cada vídeo vira uma linha em Pautas com status <span className="pauta-status s-pauta" style={{ display: 'inline-flex', padding: '1px 7px', fontSize: 10.5, verticalAlign: 'middle' }}><span style={{ width: 5, height: 5, borderRadius: '50%', background: 'oklch(0.55 0.12 280)' }} /> Em pauta</span> e o briefing é adicionado ao Google Doc da creator.
+              Adiciona os vídeos da semana <strong>{semanaLabel(semana)}</strong> para <strong>{creator.name}</strong> e atualiza o Google Docs dela com as pautas. Cada vídeo aparece em Pautas com status <span className="pauta-status s-pauta" style={{ display: 'inline-flex', padding: '1px 7px', fontSize: 10.5, verticalAlign: 'middle' }}><span style={{ width: 5, height: 5, borderRadius: '50%', background: 'oklch(0.55 0.12 280)' }} /> Em pauta</span>.
             </div>
             {videos.map((v, i) => (
               <div className="batch-video" key={v._id} style={{ opacity: step === 'sending' ? 0.5 : 1 }}>
@@ -664,7 +680,7 @@ function BatchPautaModal({ open, onClose, onCreated }: {
                   <div className="batch-field full"><label>Link de referência</label><input className="field" placeholder="https://www.instagram.com/reel/..." value={v.ref} onChange={e => setVideo(i, 'ref', e.target.value)} disabled={step === 'sending'} /></div>
                   <div className="batch-field"><label>Produto foco</label><input className="field" placeholder="Ex: Tote Puffer · Case" value={v.product} onChange={e => setVideo(i, 'product', e.target.value)} disabled={step === 'sending'} /></div>
                   <div className="batch-field"><label>Áudio sugerido</label><input className="field" placeholder="Ex: pop indie, trend BR..." value={v.audio} onChange={e => setVideo(i, 'audio', e.target.value)} disabled={step === 'sending'} /></div>
-                  <div className="batch-field"><label>Prazo de entrega</label><input className="field" type="date" value={v.prazo} onChange={e => setVideo(i, 'prazo', e.target.value)} disabled={step === 'sending'} /></div>
+                  <div className="batch-field"><label>Prazo de entrega</label><DatePicker value={v.prazo} onChange={val => setVideo(i, 'prazo', val)} /></div>
                   <div className="batch-field"><label>Observações</label><input className="field" placeholder="Detalhes, adaptações..." value={v.notes} onChange={e => setVideo(i, 'notes', e.target.value)} disabled={step === 'sending'} /></div>
                 </div>
               </div>
@@ -937,6 +953,7 @@ interface MHViewProps {
 export default function MHView({ onPostClick, allPosts = [], onPostsAdded, onPostsUpdated }: MHViewProps) {
   const today = todayISO()
   const todayDate = parseISO(today)
+  const router = useRouter()
 
   const [mhMode, setMhMode] = useState<MHMode>('pautas')
   const [creatorFilter, setCreatorFilter] = useState('all')
@@ -1036,6 +1053,7 @@ export default function MHView({ onPostClick, allPosts = [], onPostsAdded, onPos
           onSimulateSync={handleSync}
           syncing={syncing}
           lastSyncResult={lastSyncResult}
+          syncing={syncing}
           onSelectCreator={id => setActiveCreator(id)}
         />
       )}

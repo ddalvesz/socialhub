@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { Icon, PlatformIcon } from './Icons'
-import { GenericSelect, PackToggle, FieldCheckbox } from './FormHelpers'
+import DeleteConfirmModal from './DeleteConfirmModal'
+import { GenericSelect, PackToggle, FieldCheckbox, DatePicker } from './FormHelpers'
 import { Post, MONTH_ABBR, fmtBR, PLATFORMS, Campaign, Collection, Linking, PACKAGE_INFO, todayISO, COLECAO_TIPOS, colProgress } from '@/lib/types'
 import { CAMP_TIPOS, TEAM_NAMES } from '@/lib/data'
 import { DateRangeFilter, DateRange } from './FormHelpers'
@@ -108,8 +109,7 @@ function Milestones({ campaign, onChange }: { campaign: Campaign; onChange: (pat
             <div className="ms-body">
               <div className="ms-label">{it.label}</div>
               <div className="ms-date">
-                <input type="date" value={campaign[it.dateKey] as string || ''}
-                  onChange={(e) => onChange({ [it.dateKey]: e.target.value })} />
+                <DatePicker value={campaign[it.dateKey] as string || ''} onChange={v => onChange({ [it.dateKey]: v })} className="ms-date-input" />
               </div>
             </div>
           </div>
@@ -235,47 +235,39 @@ function CampaignFormModal({ initial, onClose, onSave }: { initial?: Campaign | 
             <div className="modal-section-label">Cronograma</div>
 
             <label>Previsão de lançamento</label>
-            <input className="field" type="date" value={draft.previsao}
-              onChange={e => set('previsao', e.target.value)} style={{ maxWidth: 200 }} />
+            <DatePicker value={draft.previsao} onChange={v => set('previsao', v)} style={{ maxWidth: 200 }} />
 
             <label>Data Instagram</label>
-            <input className="field" type="date" value={draft.dataInsta}
-              onChange={e => set('dataInsta', e.target.value)} style={{ maxWidth: 200 }} />
+            <DatePicker value={draft.dataInsta} onChange={v => set('dataInsta', v)} style={{ maxWidth: 200 }} />
 
             <label>Data site</label>
-            <input className="field" type="date" value={draft.dataSite === '-' ? '' : draft.dataSite}
-              onChange={e => set('dataSite', e.target.value || '-')} style={{ maxWidth: 200 }} />
+            <DatePicker value={draft.dataSite === '-' ? '' : draft.dataSite} onChange={v => set('dataSite', v || '-')} style={{ maxWidth: 200 }} />
 
             <label>Data comercial</label>
-            <input className="field" type="date" value={draft.dataComercial === '-' ? '' : draft.dataComercial}
-              onChange={e => set('dataComercial', e.target.value || '-')} style={{ maxWidth: 200 }} />
+            <DatePicker value={draft.dataComercial === '-' ? '' : draft.dataComercial} onChange={v => set('dataComercial', v || '-')} style={{ maxWidth: 200 }} />
 
             <label>Data final</label>
-            <input className="field" type="date" value={draft.dataFinal}
-              onChange={e => set('dataFinal', e.target.value)} style={{ maxWidth: 200 }} />
+            <DatePicker value={draft.dataFinal} onChange={v => set('dataFinal', v)} style={{ maxWidth: 200 }} />
 
             <div className="modal-section-label">Marcos de produção</div>
 
             <label>Brainstorm</label>
             <div className="field-inline">
-              <input className="field" type="date" value={draft.brainstormDate}
-                onChange={e => set('brainstormDate', e.target.value)} style={{ width: 200 }} />
+              <DatePicker value={draft.brainstormDate || ''} onChange={v => set('brainstormDate', v)} style={{ width: 200 }} />
               <FieldCheckbox label="Concluído" value={!!draft.brainstormDone}
                 onChange={v => set('brainstormDone', v)} />
             </div>
 
             <label>Aprov. comercial</label>
             <div className="field-inline">
-              <input className="field" type="date" value={draft.aprovComercialDate}
-                onChange={e => set('aprovComercialDate', e.target.value)} style={{ width: 200 }} />
+              <DatePicker value={draft.aprovComercialDate || ''} onChange={v => set('aprovComercialDate', v)} style={{ width: 200 }} />
               <FieldCheckbox label="Concluído" value={!!draft.aprovComercialDone}
                 onChange={v => set('aprovComercialDone', v)} />
             </div>
 
             <label>Shooting</label>
             <div className="field-inline">
-              <input className="field" type="date" value={draft.shootingDate}
-                onChange={e => set('shootingDate', e.target.value)} style={{ width: 200 }} />
+              <DatePicker value={draft.shootingDate || ''} onChange={v => set('shootingDate', v)} style={{ width: 200 }} />
               <FieldCheckbox label="Concluído" value={!!draft.shootingDone}
                 onChange={v => set('shootingDone', v)} />
             </div>
@@ -488,9 +480,11 @@ interface CampaignsProps {
   onPostClick: (post: Post) => void
   linking: Linking
   onNavigateCollection: (id: number) => void
+  onDeleteCampaign: (id: number) => void
+  onArchiveCampaign: (id: number) => void
 }
 
-export default function CampaignsView({ posts, onPostClick, linking, onNavigateCollection }: CampaignsProps) {
+export default function CampaignsView({ posts, onPostClick, linking, onNavigateCollection, onDeleteCampaign, onArchiveCampaign }: CampaignsProps) {
   const { collections, campaigns: items, setCampaigns: setItems,
     linkColCamp, unlinkColCamp, createCollectionFromCampaign,
     setCampaignLaunched } = linking
@@ -529,13 +523,15 @@ export default function CampaignsView({ posts, onPostClick, linking, onNavigateC
   }
 
   const deleteCampaign = (id: number) => {
+    onDeleteCampaign(id)
     setItems(arr => arr.filter(c => c.id !== id))
     setExpanded(null)
     setDeletingCampaign(null)
   }
 
   const archiveCampaign = (id: number) => {
-    setItems(arr => arr.map(c => c.id === id ? { ...c, archived: true } : c))
+    onArchiveCampaign(id)
+    setItems(arr => arr.filter(c => c.id !== id))
     setExpanded(null)
     setDeletingCampaign(null)
   }
@@ -790,54 +786,14 @@ export default function CampaignsView({ posts, onPostClick, linking, onNavigateC
         />
       )}
 
-      {deletingCampaign && (
-        <div className="modal-backdrop" onClick={() => setDeletingCampaign(null)}>
-          <div className="modal" style={{ width: 'min(440px, calc(100vw - 40px))', maxHeight: 'unset' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-head" style={{ borderBottom: 'none', paddingBottom: 8 }}>
-              <div style={{
-                width: 44, height: 44, borderRadius: 12, flex: '0 0 44px',
-                background: 'oklch(0.95 0.03 20)', display: 'grid', placeItems: 'center',
-                color: 'oklch(0.52 0.18 22)',
-              }}>
-                <Icon.trash />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.015em' }}>
-                  Excluir campanha?
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 3 }}>
-                  "{deletingCampaign.nome}"
-                </div>
-              </div>
-              <button className="modal-close" onClick={() => setDeletingCampaign(null)}><Icon.x /></button>
-            </div>
-
-            <div style={{ padding: '4px 26px 20px', fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.6 }}>
-              Essa ação é permanente e não pode ser desfeita. Todos os dados da campanha serão removidos.
-              <br /><br />
-              Se preferir manter o histórico, você pode <strong>arquivar</strong> a campanha em vez de excluir.
-            </div>
-
-            <div className="modal-foot" style={{ justifyContent: 'flex-end', gap: 10 }}>
-              <button className="btn btn-ghost" onClick={() => setDeletingCampaign(null)}>Cancelar</button>
-              <button
-                className="btn btn-ghost"
-                style={{ color: 'oklch(0.5 0.12 230)', borderColor: 'oklch(0.88 0.04 230)' }}
-                onClick={() => archiveCampaign(deletingCampaign.id)}
-              >
-                Arquivar
-              </button>
-              <button
-                className="btn"
-                style={{ background: 'oklch(0.52 0.18 22)', color: 'white' }}
-                onClick={() => deleteCampaign(deletingCampaign.id)}
-              >
-                <Icon.trash /> Excluir
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal
+        open={!!deletingCampaign}
+        title="Excluir campanha?"
+        subtitle={deletingCampaign?.nome}
+        onCancel={() => setDeletingCampaign(null)}
+        onDelete={() => deletingCampaign && deleteCampaign(deletingCampaign.id)}
+        onArchive={() => deletingCampaign && archiveCampaign(deletingCampaign.id)}
+      />
     </>
   )
 }

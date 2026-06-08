@@ -1,4 +1,4 @@
-export type Platform = 'ig' | 'tiktok' | 'canal' | 'twitter'
+export type Platform = 'ig' | 'tiktok' | 'canal' | 'twitter' | 'youtube'
 export type PostStatus = 'prod' | 'sched' | 'pub' | 'cancel' | 'pauta' | 'entregue'
 export type PostSource = 'mh' | 'branding' | 'tiktok' | 'twitter' | 'canal' | 'copa'
 export type MHCreatorId = 'CARINA' | 'REBECA' | 'THA' | 'MARINA' | 'RECICLADO'
@@ -24,8 +24,10 @@ export interface Post {
   caption: string
   videoLink: string
   coverLink: string
+  slideLinks?: string[]  // até 10 imagens para posts no formato Carrossel
   linkedPostId?: string
   linkedPostSource?: PostSource
+  archived?: boolean
   // MH-specific (só presente em source === 'mh')
   semana?: number
   numVideo?: number
@@ -76,6 +78,7 @@ export interface Campaign {
   shootingDate?: string
   shootingDone?: boolean
   colecaoId?: number | null
+  archived?: boolean
 }
 
 export interface ExtraTask {
@@ -225,7 +228,8 @@ export const PLATFORMS = [
   { id: 'ig' as Platform,      label: 'Instagram', color: '#E1306C' },
   { id: 'tiktok' as Platform,  label: 'TikTok',    color: '#111111' },
   { id: 'canal' as Platform,   label: 'Canal',     color: '#FF0033' },
-  { id: 'twitter' as Platform, label: 'Twitter',   color: '#111111' },
+  { id: 'twitter' as Platform,  label: 'Twitter',   color: '#111111' },
+  { id: 'youtube' as Platform,  label: 'YouTube',   color: '#FF0000' },
 ]
 
 export const STATUSES = [
@@ -265,8 +269,9 @@ export const CAMP_LIST = [
   { id: 'maes',      label: 'Dia das Mães'      },
 ]
 
-export const CONTENT_TYPES_IG    = ['Reels', 'Carrossel', 'Imagem', 'Story']
-export const CONTENT_TYPES_OTHER = ['Vídeo', 'Imagem', 'Texto']
+export const CONTENT_TYPES_IG      = ['Reels', 'Carrossel', 'Imagem', 'Story']
+export const CONTENT_TYPES_OTHER   = ['Vídeo', 'Imagem', 'Texto']
+export const CONTENT_TYPES_YOUTUBE = ['Vídeo', 'Shorts']
 
 export const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 export const WEEKDAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
@@ -328,7 +333,7 @@ export const toISO = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${
 export const parseISO = (s: string) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d) }
 export const fmtBR = (iso: string) => { if (!iso || iso === '-') return '—'; const d = parseISO(iso); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}` }
 export const addDaysISO = (iso: string, n: number) => { const d = parseISO(iso); d.setDate(d.getDate() + n); return toISO(d.getFullYear(), d.getMonth(), d.getDate()) }
-export const startOfWeekISO = (iso: string) => { const d = parseISO(iso); d.setDate(d.getDate() - d.getDay()); return toISO(d.getFullYear(), d.getMonth(), d.getDate()) }
+export const startOfWeekISO = (iso: string) => { const d = parseISO(iso); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return toISO(d.getFullYear(), d.getMonth(), d.getDate()) }
 export const todayISO = () => { const n = new Date(); return toISO(n.getFullYear(), n.getMonth(), n.getDate()) }
 
 export function buildMonthGrid(year: number, month: number) {
@@ -439,3 +444,48 @@ export const PACKAGE_INFO = [
 ]
 
 export const FORMATS_LIST = ['Story', 'Estático', 'Coleção', 'Reels', 'Campanha']
+
+// ─── Lives ────────────────────────────────────────────────────
+
+export type LiveStatus = 'realizada' | 'confirmada' | 'proposta'
+
+export interface Live {
+  id: string; date: string; diaSemana: string
+  cupomLigado: boolean; criativo: boolean
+  merchan1: string; nominal1: string; receita1: number
+  merchan2: string; nominal2: string; receita2: number
+  cupomExtra: string; receitaExtra: number; receitaTotal: number
+  receitaUtm: number; alcance: number; linkUtm: string; utmCampaign: string
+  status: LiveStatus; origem: string; notes: string
+}
+
+export interface Merchan {
+  id: string; nome: string; name: string
+  ativo: boolean; forte: boolean; sempreSozinho: boolean
+  color: string; short: string
+}
+
+export const LIVE_STATUSES = [
+  { id: 'proposta'  as LiveStatus, label: 'Proposta',   className: 's-prop', dot: 'oklch(0.72 0.16 55)'  },
+  { id: 'confirmada' as LiveStatus, label: 'Confirmada', className: 's-conf', dot: 'oklch(0.6 0.13 265)'  },
+  { id: 'realizada'  as LiveStatus, label: 'Realizada',  className: 's-pub',  dot: 'oklch(0.6 0.13 150)'  },
+] as const
+
+export const LIVE_STATUS_BY_ID = Object.fromEntries(LIVE_STATUSES.map(s => [s.id, s])) as Record<LiveStatus, typeof LIVE_STATUSES[number]>
+
+export type RenderJobStatus = 'queued' | 'running' | 'done' | 'error'
+
+export interface RenderJob {
+  id: string
+  semanaInicio: string
+  triggeredBy: string | null
+  status: RenderJobStatus
+  videosProcessados: number
+  videosFalhos: number
+  dropboxUrl: string | null
+  errorMessage: string | null
+  startedAt: string | null
+  endedAt: string | null
+  createdAt: string
+  updatedAt: string
+}

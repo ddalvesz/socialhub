@@ -851,14 +851,14 @@ textarea.field { resize: vertical; min-height: 80px; font-family: inherit; line-
 }
 .status-pill .sdot { width: 7px; height: 7px; border-radius: 50% }
 .status-pill svg { width: 12px; height: 12px; flex: 0 0 12px }
-.status-pill.s-prod   { color: var(--s-prod);   border-color: color-mix(in oklab, var(--s-prod), white 75%);   background: color-mix(in oklab, var(--s-prod), white 93%) }
-.status-pill.s-sched  { color: var(--s-sched);  border-color: color-mix(in oklab, var(--s-sched), white 75%);  background: color-mix(in oklab, var(--s-sched), white 93%) }
-.status-pill.s-pub    { color: var(--s-pub);    border-color: color-mix(in oklab, var(--s-pub), white 75%);    background: color-mix(in oklab, var(--s-pub), white 93%) }
-.status-pill.s-cancel { color: var(--s-cancel); border-color: var(--line); background: var(--surface-3) }
-.status-pill.s-prod  .sdot  { background: var(--s-prod) }
-.status-pill.s-sched .sdot  { background: var(--s-sched) }
-.status-pill.s-pub   .sdot  { background: var(--s-pub) }
-.status-pill.s-cancel .sdot { background: var(--s-cancel) }
+.status-pill.s-prod   { background: oklch(0.95 0 0);       color: oklch(0.42 0 0);        border-color: transparent; }
+.status-pill.s-sched  { background: oklch(0.94 0.04 220);  color: oklch(0.40 0.13 220);   border-color: transparent; }
+.status-pill.s-pub    { background: oklch(0.90 0.08 150);  color: oklch(0.33 0.16 150);   border-color: transparent; }
+.status-pill.s-cancel { background: oklch(0.95 0.03 15);   color: oklch(0.44 0.17 15);    border-color: transparent; }
+.status-pill.s-prod  .sdot  { background: oklch(0.55 0 0) }
+.status-pill.s-sched .sdot  { background: oklch(0.52 0.14 220) }
+.status-pill.s-pub   .sdot  { background: oklch(0.45 0.18 150) }
+.status-pill.s-cancel .sdot { background: oklch(0.55 0.18 15) }
 
 .modal-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center }
 .modal-tag {

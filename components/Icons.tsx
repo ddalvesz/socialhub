@@ -55,13 +55,20 @@ export function PlatformIcon({ platform, size = 12, color = 'white' }: PlatformI
     </svg>
   )
   if (platform === 'canal') return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
-      <path d="M21.6 7.2a2.6 2.6 0 0 0-1.8-1.9C18.2 5 12 5 12 5s-6.2 0-7.8.3A2.6 2.6 0 0 0 2.4 7.2 27 27 0 0 0 2 12a27 27 0 0 0 .4 4.8 2.6 2.6 0 0 0 1.8 1.9C5.8 19 12 19 12 19s6.2 0 7.8-.3a2.6 2.6 0 0 0 1.8-1.9c.3-1.6.4-3.2.4-4.8s-.1-3.2-.4-4.8zM10 15V9l5.2 3-5.2 3z"/>
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V7L6 11H4a1 1 0 0 0-1 1z"/>
+      <path d="M15.5 8.5a5 5 0 0 1 0 7"/>
+      <path d="M18 6a8 8 0 0 1 0 12"/>
     </svg>
   )
   if (platform === 'twitter') return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
       <path d="M18 3h3l-7 8 8 10h-6l-5-6-5 6H3l8-9L3 3h6l4 5 5-5z"/>
+    </svg>
+  )
+  if (platform === 'youtube') return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
+      <path d="M22.5 6.5s-.2-1.6-1-2.3c-.9-1-1.9-1-2.4-1C16.7 3 12 3 12 3s-4.7 0-7.1.2c-.5.1-1.5.1-2.4 1C1.7 4.9 1.5 6.5 1.5 6.5S1.3 8.4 1.3 10.3v1.8c0 1.9.2 3.7.2 3.7s.2 1.6 1 2.3c.9 1 2.1.9 2.7 1C7.2 19.3 12 19.3 12 19.3s4.7 0 7.1-.2c.5-.1 1.5-.1 2.4-1 .8-.7 1-2.3 1-2.3s.2-1.9.2-3.7v-1.8c0-1.9-.2-3.8-.2-3.8zM9.8 13.8V8.3l6.4 2.8-6.4 2.7z"/>
     </svg>
   )
   return null

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Post, Platform, PostSource, AppView, CalendarMode, Campaign, Collection, Linking,
@@ -125,7 +125,7 @@ function CalendarListView({ posts, year, month, onPostClick }: {
                   >
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)', width: 40, flexShrink: 0 }}>{p.time}</div>
                     <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', padding: '2px 6px', borderRadius: 5, background: pc.bg, color: pc.fg, flexShrink: 0 }}>
-                      {p.platform === 'tiktok' ? 'TT' : p.platform?.toUpperCase()}
+                      {p.platform === 'tiktok' ? 'TT' : p.platform === 'youtube' ? 'YT' : p.platform?.toUpperCase()}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
@@ -138,8 +138,8 @@ function CalendarListView({ posts, year, month, onPostClick }: {
                     {p.format && <div style={{ fontSize: 11, color: 'var(--ink-3)', flexShrink: 0 }}>{p.format}</div>}
                     {p.owner && <div style={{ fontSize: 11, color: 'var(--ink-3)', flexShrink: 0 }}>{p.owner}</div>}
                     {status && (
-                      <span className={`pauta-status ${status.className}`} style={{ flexShrink: 0 }}>
-                        {status.label}
+                      <span className={`status-pill ${status.className}`} style={{ flexShrink: 0 }}>
+                        <span className="sdot" />{status.label}
                       </span>
                     )}
                   </div>
@@ -179,6 +179,8 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
 
   const [platformFilter, setPlatformFilter] = useState<string>('all')
   const [tagFilter, setTagFilter] = useState<'all' | 'mh' | 'branding' | 'futebol' | 'campanha'>('all')
+  const [statusFilter, setStatusFilter] = useState<string[]>([])
+  const [statusDropOpen, setStatusDropOpen] = useState(false)
   const [search, setSearch] = useState('')
 
   const [activePost, setActivePost] = useState<Post | null>(null)
@@ -186,6 +188,90 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   const [showExport, setShowExport] = useState(false)
   const [profileId, setProfileId] = useState(meId)
   const [photos, setPhotos] = useState<Record<string, string>>({})
+
+  // ─── Realtime subscriptions ──────────────────────────────────
+  useEffect(() => {
+    const POST_TABLES: { table: string; source: PostSource }[] = [
+      { table: 'mh_posts',       source: 'mh'       },
+      { table: 'branding_posts', source: 'branding' },
+      { table: 'tiktok_posts',   source: 'tiktok'   },
+      { table: 'twitter_posts',  source: 'twitter'  },
+      { table: 'canal_posts',    source: 'canal'    },
+      { table: 'copa_posts',     source: 'copa'     },
+    ]
+
+    let ch = supabase.channel('rt-socialhub')
+
+    for (const { table, source } of POST_TABLES) {
+      ch = ch
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table }, ({ new: row }) => {
+          const p = dbToPost(row as Record<string, unknown>, source)
+          if (p.archived) return
+          setPosts(arr => arr.some(x => x.id === p.id) ? arr : [...arr, p].sort((a, b) => a.date.localeCompare(b.date)))
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table }, ({ new: row }) => {
+          const p = dbToPost(row as Record<string, unknown>, source)
+          if (p.archived) setPosts(arr => arr.filter(x => x.id !== p.id))
+          else setPosts(arr => arr.map(x => x.id === p.id ? p : x))
+        })
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table }, ({ old: row }) => {
+          const id = String((row as Record<string, unknown>).id)
+          setPosts(arr => arr.filter(x => x.id !== id))
+        })
+    }
+
+    ch = ch
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'campaigns' }, ({ new: row }) => {
+        const c = dbToCampaign(row as Record<string, unknown>)
+        if (c.archived) return
+        setCampaignsRaw(arr => arr.some(x => x.id === c.id) ? arr : [...arr, c])
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'campaigns' }, ({ new: row }) => {
+        const c = dbToCampaign(row as Record<string, unknown>)
+        if (c.archived) setCampaignsRaw(arr => arr.filter(x => x.id !== c.id))
+        else setCampaignsRaw(arr => arr.map(x => x.id === c.id ? c : x))
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'campaigns' }, ({ old: row }) => {
+        setCampaignsRaw(arr => arr.filter(x => x.id !== (row as Record<string, unknown>).id))
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'collections' }, ({ new: row }) => {
+        const c = dbToCollection(row as Record<string, unknown>)
+        setCollectionsRaw(arr => arr.some(x => x.id === c.id) ? arr : [...arr, c])
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'collections' }, ({ new: row }) => {
+        const c = dbToCollection(row as Record<string, unknown>)
+        setCollectionsRaw(arr => arr.map(x => x.id === c.id ? c : x))
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'collections' }, ({ old: row }) => {
+        setCollectionsRaw(arr => arr.filter(x => x.id !== (row as Record<string, unknown>).id))
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lives' }, ({ new: row }) => {
+        const l = dbToLive(row as Record<string, unknown>)
+        setLives(arr => arr.some(x => x.id === l.id) ? arr : [...arr, l].sort((a, b) => a.date.localeCompare(b.date)))
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lives' }, ({ new: row }) => {
+        const l = dbToLive(row as Record<string, unknown>)
+        setLives(arr => arr.map(x => x.id === l.id ? l : x))
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'lives' }, ({ old: row }) => {
+        setLives(arr => arr.filter(x => x.id !== String((row as Record<string, unknown>).id)))
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'merchans' }, ({ new: row }) => {
+        const m = dbToMerchan(row as Record<string, unknown>)
+        setMerchans(arr => arr.some(x => x.id === m.id) ? arr : [...arr, m])
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'merchans' }, ({ new: row }) => {
+        const m = dbToMerchan(row as Record<string, unknown>)
+        setMerchans(arr => arr.map(x => x.id === m.id ? m : x))
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'merchans' }, ({ old: row }) => {
+        setMerchans(arr => arr.filter(x => x.id !== String((row as Record<string, unknown>).id)))
+      })
+
+    ch.subscribe()
+    return () => { supabase.removeChannel(ch) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ─── Persistent state setters ────────────────────────────────
   const setCollections = useCallback((fn: (arr: Collection[]) => Collection[]) => {
@@ -237,6 +323,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   else if (tagFilter === 'campanha') shownPosts = posts.filter(p => !!p.campaign?.trim())
   else shownPosts = calendarPosts
   if (platformFilter !== 'all') shownPosts = shownPosts.filter(p => p.platform === platformFilter)
+  if (statusFilter.length > 0) shownPosts = shownPosts.filter(p => statusFilter.includes(p.status))
   if (search.trim()) {
     const q = search.toLowerCase()
     shownPosts = shownPosts.filter(p =>
@@ -295,6 +382,11 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     await supabase.from(sourceToTable(p.source)).delete().eq('id', p.id)
   }
 
+  const archivePost = async (p: Post) => {
+    setPosts(arr => arr.filter(x => x.id !== p.id))
+    await supabase.from(sourceToTable(p.source)).update({ archived: true }).eq('id', p.id)
+  }
+
   const createPost = async (defaults: Partial<Post> & { source?: PostSource }) => {
     const source: PostSource = defaults.source ?? (
       view === 'branding' ? 'branding' :
@@ -323,6 +415,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
       caption:  '',
       videoLink:'',
       coverLink:'',
+      slideLinks:[],
       ...defaults,
     }
     const { data } = await supabase.from(sourceToTable(source)).insert(postToDb(newPost, source)).select().single()
@@ -619,6 +712,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     collections:   { title: 'Coleções',             sub: 'Ilustra · Marketing'                   },
     lives:         { title: 'Lives',                sub: 'Performance · Proposta semanal'        },
     profile:       { title: 'Perfil',               sub: profileId === meId ? 'Seu perfil' : 'Equipe' },
+    archived:      { title: 'Arquivados',           sub: 'Itens arquivados'                      },
   }
   const { title, sub } = viewTitles[view]
   const isCalView = view === 'calendar' || view === 'branding'
@@ -666,6 +760,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             { id: 'futebol',       label: 'Futebol 2026',        icon: <Icon.ball />   },
             { id: 'campaigns',     label: 'Campanhas',           icon: <Icon.campaign />, count: campaigns.length },
             { id: 'collections',   label: 'Coleções',            icon: <Icon.collections />, count: collections.length },
+            { id: 'archived',      label: 'Arquivados',          icon: <Icon.trash /> },
           ] as const).map(item => (
             <button key={item.id} className={`sb-item ${view === item.id ? 'active' : ''}`} onClick={() => setView(item.id)}>
               {item.icon} <span>{item.label}</span>
@@ -782,6 +877,57 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
               </>
             )}
 
+            {/* Status multi-select filter */}
+            <div style={{ position: 'relative' }}>
+              <button
+                className={`platform-pill ${statusFilter.length > 0 ? 'active' : ''}`}
+                onClick={() => setStatusDropOpen(o => !o)}
+                style={{ gap: 6 }}
+              >
+                Status{statusFilter.length > 0 ? ` (${statusFilter.length})` : ''}
+                {statusFilter.length > 0 && (
+                  <span
+                    onMouseDown={e => { e.stopPropagation(); setStatusFilter([]) }}
+                    style={{ display: 'grid', placeItems: 'center', width: 14, height: 14, borderRadius: '50%', background: 'rgba(255,255,255,.3)' }}
+                  >
+                    <Icon.x />
+                  </span>
+                )}
+              </button>
+              {statusDropOpen && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 55 }} onClick={() => setStatusDropOpen(false)} />
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 60,
+                    background: 'var(--surface)', border: '1px solid var(--line-2)',
+                    borderRadius: 12, boxShadow: '0 12px 32px -8px rgba(40,30,70,.2), 0 3px 8px rgba(40,30,70,.07)',
+                    padding: '8px 6px', minWidth: 180,
+                  }}>
+                    {STATUSES.map(s => {
+                      const on = statusFilter.includes(s.id)
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => setStatusFilter(prev => on ? prev.filter(x => x !== s.id) : [...prev, s.id])}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                            padding: '7px 10px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                            background: on ? 'var(--surface-2)' : 'transparent',
+                            fontSize: 13, fontWeight: on ? 600 : 400, color: 'var(--ink)',
+                          }}
+                        >
+                          <span style={{ width: 14, height: 14, borderRadius: 4, border: `1.5px solid var(--line)`, display: 'grid', placeItems: 'center', background: on ? 'var(--accent)' : 'transparent', borderColor: on ? 'var(--accent)' : undefined, flexShrink: 0 }}>
+                            {on && <Icon.check />}
+                          </span>
+                          <span className={`status-pill ${s.className}`} style={{ cursor: 'default' }}><span className="sdot" />{s.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+
             <div style={{ flex: 1 }} />
             <span className="count-pill">
               {shownPosts.filter(p => {
@@ -850,6 +996,8 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
               setView('collections')
               setTimeout(() => window.dispatchEvent(new CustomEvent('focusCollection', { detail: id })), 0)
             }}
+            onDeleteCampaign={id => supabase.from('campaigns').delete().eq('id', id).then(() => {})}
+            onArchiveCampaign={id => supabase.from('campaigns').update({ archived: true }).eq('id', id).then(() => {})}
           />
         )}
         {view === 'collections'   && (
@@ -886,6 +1034,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             onSetPhoto={(id, url) => setPhotos(p => ({ ...p, [id]: url }))}
           />
         )}
+        {view === 'archived' && <ArchivedView />}
       </main>
 
       {/* Live modal */}
@@ -923,6 +1072,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
           onClose={() => setActivePost(null)}
           onSave={savePost}
           onDelete={deletePost}
+          onArchive={archivePost}
           onDuplicate={p => setDuplicateFor(p)}
           showProduct={view === 'mh' || activePost.product !== undefined}
           campaigns={campaigns}

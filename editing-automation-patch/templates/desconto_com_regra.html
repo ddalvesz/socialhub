@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1080">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1080px;
+    height: 1920px;
+    overflow: hidden;
+    font-family: 'Montserrat', sans-serif;
+    background: transparent;
+  }
+
+  .wrapper {
+    position: relative;
+    width: 1080px;
+    height: 1920px;
+    overflow: hidden;
+  }
+
+  /* Fundo sólido rosa cobrindo topo */
+  .top-bg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 1080px;
+    height: 960px;
+    background: #F3C4D6;
+  }
+
+  /* Área de vídeo — retângulo com bordas arredondadas no topo */
+  .video-area {
+    position: absolute;
+    top: 960px;
+    left: 0;
+    width: 1080px;
+    height: 960px;
+    background: transparent;
+    border-radius: 80px 80px 0 0;
+    overflow: hidden;
+  }
+
+  /* Ondas */
+  .hills {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 1080px;
+    height: 280px;
+    pointer-events: none;
+  }
+
+  /* Conteúdo overlay */
+  .overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 1080px;
+    height: 960px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 80px;
+  }
+
+  .label {
+    font-size: 48px;
+    font-weight: 500;
+    letter-spacing: 8px;
+    color: #000000;
+    text-transform: uppercase;
+    text-align: center;
+  }
+
+  .desconto-text {
+    font-size: 160px;
+    font-weight: 900;
+    color: #000000;
+    line-height: 1;
+    text-align: center;
+    text-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    margin-top: 8px;
+  }
+
+  .regra-text {
+    font-size: 42px;
+    font-weight: 700;
+    color: #000000;
+    text-align: center;
+    margin-top: 20px;
+    padding: 0 60px;
+    line-height: 1.3;
+  }
+
+  .label-cupom {
+    font-size: 48px;
+    font-weight: 700;
+    letter-spacing: 6px;
+    color: #FFFFFF;
+    text-transform: uppercase;
+    text-align: center;
+    margin-top: 28px;
+  }
+
+  .coupon-box {
+    background: #FFFFFF;
+    border-radius: 24px;
+    padding: 20px 60px;
+    margin-top: 16px;
+    min-width: 800px;
+    text-align: center;
+  }
+
+  .coupon-text {
+    font-size: 110px;
+    font-weight: 800;
+    color: #000000;
+    line-height: 1;
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- Fundo rosa topo -->
+  <div class="top-bg"></div>
+
+  <!-- Área de vídeo (transparente) -->
+  <div class="video-area"></div>
+
+  <!-- Conteúdo topo -->
+  <div class="overlay">
+    <span class="label">GANHE DESCONTO DE</span>
+    <span class="desconto-text">{{ desconto }}</span>
+    <span class="regra-text">{{ regra }}</span>
+    <span class="label-cupom">USE O CUPOM</span>
+    <div class="coupon-box">
+      <span class="coupon-text">{{ cupom }}</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

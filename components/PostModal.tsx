@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Icon, PlatformIcon } from './Icons'
-import { Popover, GenericSelect } from './FormHelpers'
+import DeleteConfirmModal from './DeleteConfirmModal'
+import { Popover, GenericSelect, DatePicker } from './FormHelpers'
 import {
   Post, Platform, PostStatus, Campaign,
   PLATFORMS, STATUSES, LINHAS_ED,
-  CONTENT_TYPES_IG, CONTENT_TYPES_OTHER,
+  CONTENT_TYPES_IG, CONTENT_TYPES_OTHER, CONTENT_TYPES_YOUTUBE,
 } from '@/lib/types'
 import { TEAM_NAMES } from '@/lib/data'
 
@@ -15,6 +16,7 @@ interface Props {
   onClose: () => void
   onSave: (post: Post) => void
   onDelete: (post: Post) => void
+  onArchive: (post: Post) => void
   onDuplicate: (post: Post) => void
   showProduct?: boolean
   campaigns?: Campaign[]
@@ -41,9 +43,10 @@ function TagsComboBox({ value, options, onChange }: { value: string[]; options: 
   }, [open])
 
   const available = options.filter(o => !value.includes(o) && o.toLowerCase().includes(q.toLowerCase()))
-  const showNew = q.trim() && !options.some(o => o.toLowerCase() === q.trim().toLowerCase()) && !value.includes(q.trim())
+  const normalized = q.trim().toUpperCase()
+  const showNew = q.trim() && !options.some(o => o.toUpperCase() === normalized) && !value.includes(normalized)
 
-  const add = (tag: string) => { onChange([...value, tag]); setQ('') }
+  const add = (tag: string) => { onChange([...value, tag.toUpperCase()]); setQ('') }
   const remove = (tag: string) => onChange(value.filter(t => t !== tag))
 
   return (
@@ -66,7 +69,7 @@ function TagsComboBox({ value, options, onChange }: { value: string[]; options: 
           onChange={e => { setQ(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
           onKeyDown={e => {
-            if (e.key === 'Enter' && q.trim()) { e.preventDefault(); add(q.trim()); }
+            if (e.key === 'Enter' && q.trim()) { e.preventDefault(); add(normalized); }
             if (e.key === 'Backspace' && !q && value.length > 0) remove(value[value.length - 1])
           }}
         />
@@ -77,8 +80,8 @@ function TagsComboBox({ value, options, onChange }: { value: string[]; options: 
             <button key={o} className="po-item" onMouseDown={() => add(o)}>{o}</button>
           ))}
           {showNew && (
-            <button className="po-item" style={{ color: 'var(--accent)', fontWeight: 500 }} onMouseDown={() => add(q.trim())}>
-              + Criar "{q.trim()}"
+            <button className="po-item" style={{ color: 'var(--accent)', fontWeight: 500 }} onMouseDown={() => add(normalized)}>
+              + Criar "{normalized}"
             </button>
           )}
         </div>
@@ -151,10 +154,11 @@ function PlatformSelect({ value, onChange }: { value: Platform; onChange: (v: Pl
 }
 
 // ─── Main modal ──────────────────────────────────────────────
-export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate, showProduct, campaigns = [], products = [], tagOptions = [], onAddProduct, allPosts = [], onLinkedPostClick }: Props) {
+export default function PostModal({ post, onClose, onSave, onDelete, onArchive, onDuplicate, showProduct, campaigns = [], products = [], tagOptions = [], onAddProduct, allPosts = [], onLinkedPostClick }: Props) {
   const [draft, setDraft] = useState<Post>(post)
   const [newProduct, setNewProduct] = useState('')
   const [addingProduct, setAddingProduct] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => { setDraft(post) }, [post.id])
   useEffect(() => {
@@ -167,7 +171,7 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
   const set = <K extends keyof Post>(k: K, v: Post[K]) => setDraft(d => ({ ...d, [k]: v }))
   const linkedPost = draft.linkedPostId ? allPosts.find(p => p.id === draft.linkedPostId) : undefined
   const linkedPlat = linkedPost ? PLATFORMS.find(p => p.id === linkedPost.platform) : undefined
-  const formats = draft.platform === 'ig' ? CONTENT_TYPES_IG : CONTENT_TYPES_OTHER
+  const formats = draft.platform === 'ig' ? CONTENT_TYPES_IG : draft.platform === 'youtube' ? CONTENT_TYPES_YOUTUBE : CONTENT_TYPES_OTHER
 
   const teamOptions    = TEAM_NAMES.map(t => ({ id: t, label: t }))
   const lineaOptions   = LINHAS_ED.map(l => ({ id: l.id, label: l.label }))
@@ -191,6 +195,7 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
   }
 
   return (
+    <>
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal modal-post" onClick={e => e.stopPropagation()}>
 
@@ -251,18 +256,7 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
 
               <label>Data e hora</label>
               <div className="field-inline">
-                <input
-                  className="field"
-                  placeholder="dd/mm/aaaa"
-                  value={draft.date ? draft.date.split('-').reverse().join('/') : ''}
-                  onChange={e => {
-                    const v = e.target.value.replace(/\D/g, '')
-                    const fmt = v.length <= 2 ? v : v.length <= 4 ? `${v.slice(0,2)}/${v.slice(2)}` : `${v.slice(0,2)}/${v.slice(2,4)}/${v.slice(4,8)}`
-                    if (v.length === 8) set('date', `${v.slice(4,8)}-${v.slice(2,4)}-${v.slice(0,2)}`)
-                    else set('date', fmt)
-                  }}
-                  maxLength={10}
-                />
+                <DatePicker value={draft.date} onChange={v => set('date', v)} />
                 <input className="field" type="time" value={draft.time} onChange={e => set('time', e.target.value)} />
               </div>
 
@@ -349,6 +343,40 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
               </div>
             )}
 
+            {draft.format === 'Carrossel' && (
+              <div className="stacked">
+                <label>
+                  Imagens do carrossel
+                  <span className="hint">{(draft.slideLinks ?? []).filter(Boolean).length}/10</span>
+                </label>
+                {Array.from({ length: Math.min(10, (draft.slideLinks ?? []).filter(Boolean).length + 1) }).map((_, i) => (
+                  <div key={i} className="field link-field" style={{ marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', minWidth: 18, textAlign: 'center' }}>{i + 1}</span>
+                    <input
+                      placeholder={`https://... (slide ${i + 1})`}
+                      value={(draft.slideLinks ?? [])[i] ?? ''}
+                      onChange={e => {
+                        const updated = [...(draft.slideLinks ?? [])]
+                        updated[i] = e.target.value
+                        // remove trailing empty slots
+                        while (updated.length > 0 && !updated[updated.length - 1]) updated.pop()
+                        set('slideLinks', updated)
+                      }}
+                    />
+                  </div>
+                ))}
+                {(draft.slideLinks ?? []).filter(Boolean).length < 10 && (draft.slideLinks ?? []).filter(Boolean).length === (draft.slideLinks ?? []).length && (
+                  <button
+                    className="btn btn-ghost"
+                    style={{ fontSize: 12, padding: '4px 10px', marginTop: 2 }}
+                    onClick={() => set('slideLinks', [...(draft.slideLinks ?? []), ''])}
+                  >
+                    + Adicionar imagem
+                  </button>
+                )}
+              </div>
+            )}
+
             <div className="stacked">
               <label>Link de referência</label>
               <div className="field link-field">
@@ -380,7 +408,7 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
 
         {/* Footer */}
         <div className="modal-foot">
-          <button className="danger" onClick={() => { onDelete(draft); onClose() }}>
+          <button className="danger" onClick={() => setConfirmDelete(true)}>
             <Icon.trash /> Excluir
           </button>
           <button className="btn btn-ghost" onClick={() => onDuplicate(draft)}>
@@ -392,5 +420,14 @@ export default function PostModal({ post, onClose, onSave, onDelete, onDuplicate
         </div>
       </div>
     </div>
+    <DeleteConfirmModal
+      open={confirmDelete}
+      title="Excluir post?"
+      subtitle={draft.title}
+      onCancel={() => setConfirmDelete(false)}
+      onDelete={() => { onDelete(draft); onClose() }}
+      onArchive={() => { onArchive(draft); onClose() }}
+    />
+    </>
   )
 }

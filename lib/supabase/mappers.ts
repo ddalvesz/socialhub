@@ -15,7 +15,7 @@ export function dbToPost(row: Record<string, unknown>, source: PostSource): Post
     status:            (row.status as PostStatus) ?? 'prod',
     format:            (row.format as string) ?? '',
     month:             (row.month as number) ?? undefined,
-    tags:              (row.tags as string[]) ?? [],
+    tags:              normalizeTags((row.tags as string[]) ?? []),
     campaign:          (row.campaign as string) ?? '',
     product:           (row.product as string) ?? '',
     ref:               (row.ref as string) ?? '',
@@ -25,8 +25,10 @@ export function dbToPost(row: Record<string, unknown>, source: PostSource): Post
     caption:           (row.caption as string) ?? '',
     videoLink:         (row.video_link as string) ?? '',
     coverLink:         (row.cover_link as string) ?? '',
+    slideLinks:        (row.slide_links as string[]) ?? [],
     linkedPostId:      row.linked_post_id ? String(row.linked_post_id) : undefined,
     linkedPostSource:  (row.linked_post_source as PostSource) ?? undefined,
+    archived:          (row.archived as boolean) ?? false,
     // MH-specific
     semana:            (row.semana as number) ?? undefined,
     numVideo:          (row.num_video as number) ?? undefined,
@@ -57,8 +59,10 @@ export function postToDb(p: Omit<Post, 'id' | 'source'>, source?: PostSource): R
     caption:            p.caption,
     video_link:         p.videoLink,
     cover_link:         p.coverLink,
+    slide_links:        p.slideLinks ?? [],
     linked_post_id:     p.linkedPostId ?? null,
     linked_post_source: p.linkedPostSource ?? null,
+    archived:           p.archived ?? false,
   }
   if (source === 'mh') {
     base.semana       = p.semana ?? null
@@ -108,6 +112,7 @@ export function dbToCampaign(row: Record<string, unknown>): Campaign {
     aprovComercialDone:  (row.aprov_comercial_done as boolean) ?? false,
     shootingDate:        row.shooting_date as string | undefined,
     shootingDone:        (row.shooting_done as boolean) ?? false,
+    archived:            (row.archived as boolean) ?? false,
   }
 }
 
@@ -133,6 +138,7 @@ export function campaignToDb(c: Campaign): Record<string, unknown> {
     aprov_comercial_done: c.aprovComercialDone ?? false,
     shooting_date:       c.shootingDate ?? null,
     shooting_done:       c.shootingDone ?? false,
+    archived:            c.archived ?? false,
   }
 }
 

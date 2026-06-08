@@ -44,6 +44,7 @@ function postToMetricoolRow(post: Post): string[] {
   const isIG      = post.platform === 'ig'
   const isTikTok  = post.platform === 'tiktok'
   const isTwitter = post.platform === 'twitter'
+  const isYoutube = post.platform === 'youtube'
 
   // Instagram post type mapping
   let igPostType = ''
@@ -53,8 +54,24 @@ function postToMetricoolRow(post: Post): string[] {
     else igPostType = 'POST'
   }
 
-  // Image URLs — videoLink as first slot
-  const urls = post.videoLink ? [post.videoLink] : []
+  // YouTube video type mapping
+  const ytVideoType = isYoutube ? (post.format === 'Shorts' ? 'SHORT' : 'VIDEO') : ''
+
+  // Image URL mapping
+  // - Video/Reels/TikTok/YouTube: videoLink in slot 1; coverLink as thumbnail
+  // - Carousel: slideLinks fill slots 1-10; coverLink as fallback for slot 1
+  // - Static/other: coverLink in slot 1
+  const isVideo = post.format === 'Reels' || post.format === 'Vídeo' || post.format === 'Shorts' || isYoutube || isTikTok
+  let urls: string[]
+  if (isVideo) {
+    urls = post.videoLink ? [post.videoLink] : []
+  } else if (post.format === 'Carrossel' && post.slideLinks && post.slideLinks.length > 0) {
+    urls = post.slideLinks
+  } else {
+    urls = post.coverLink ? [post.coverLink] : (post.videoLink ? [post.videoLink] : [])
+  }
+  const videoThumbnail = isVideo ? (post.coverLink ?? '') : ''
+
   const picUrls  = Array.from({ length: 10 }, (_, i) => urls[i] ?? '')
   const picAlts  = Array.from({ length: 10 }, () => '')
 
@@ -76,14 +93,14 @@ function postToMetricoolRow(post: Post): string[] {
     /* Instagram                 */ isIG,
     /* Pinterest                 */ false,
     /* TikTok                    */ isTikTok,
-    /* Youtube                   */ false,
+    /* Youtube                   */ isYoutube,
     /* Threads                   */ false,
     /* Bluesky                   */ false,
     /* Picture Url 1-10          */ ...picUrls,
     /* Alt text 1-10             */ ...picAlts,
     /* Document title            */ '',
     /* Shortener                 */ false,
-    /* Video Thumbnail Url       */ '',
+    /* Video Thumbnail Url       */ videoThumbnail,
     /* Video Cover Frame         */ '',
     /* Twitter/X Can reply       */ '',
     /* Twitter/X Type            */ isTwitter ? 'POST' : '',
@@ -95,10 +112,10 @@ function postToMetricoolRow(post: Post): string[] {
     /* Pinterest Pin New Format  */ false,
     /* Instagram Post Type       */ igPostType,
     /* Instagram Show Reel Feed  */ isIG && post.format === 'Reels' ? true : '',
-    /* Youtube Video Title       */ '',
-    /* Youtube Video Type        */ '',
-    /* Youtube Video Privacy     */ '',
-    /* Youtube for kids          */ '',
+    /* Youtube Video Title       */ isYoutube ? post.title : '',
+    /* Youtube Video Type        */ ytVideoType,
+    /* Youtube Video Privacy     */ isYoutube ? 'PUBLIC' : '',
+    /* Youtube for kids          */ false,
     /* Youtube Video Category    */ '',
     /* Youtube Video Tags        */ '',
     /* Youtube playlist          */ '',
@@ -157,7 +174,7 @@ export async function GET(req: NextRequest) {
   }
 
   let query = supabase
-    .from('posts')
+    .from('calendar_posts')
     .select('*')
     .gte('date', from)
     .lte('date', to)

@@ -21,14 +21,21 @@ async function getAccessToken(): Promise<string | null> {
   }
 }
 
+function dropboxHeaders(token: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  }
+  const ns = process.env.DROPBOX_NAMESPACE_ID
+  if (ns) headers['Dropbox-API-Path-Root'] = JSON.stringify({ '.tag': 'namespace_id', namespace_id: ns })
+  return headers
+}
+
 async function folderHasFiles(token: string, path: string): Promise<boolean> {
   try {
     const res = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers: dropboxHeaders(token),
       body: JSON.stringify({ path, limit: 1 }),
     })
     if (!res.ok) return false

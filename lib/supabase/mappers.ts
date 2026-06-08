@@ -1,6 +1,10 @@
 import type { Campaign, Collection, EventDate, FutebolEvent, Live, LiveStatus, Merchan, Post, PostSource, PostStatus, Platform } from '@/lib/types'
 import { colorFromName, shortLabel } from '@/lib/livesUtils'
 
+function normalizeTags(tags: string[]): string[] {
+  return Array.isArray(tags) ? tags : []
+}
+
 // ─── Post ────────────────────────────────────────────────────
 
 export function dbToPost(row: Record<string, unknown>, source: PostSource): Post {

@@ -13,6 +13,7 @@ import {
 import { TEAM_PROFILES } from '@/lib/data'
 import {
   campaignToDb, collectionToDb, postToDb, sourceToTable,
+  dbToPost, dbToCampaign, dbToCollection,
   dbToLive, dbToMerchan, liveToDb, merchanToDb,
 } from '@/lib/supabase/mappers'
 import { WEEKDAY_NOMES } from '@/lib/livesUtils'
@@ -29,6 +30,7 @@ import FutebolView from './FutebolView'
 import ProfileView from './ProfileView'
 import ExportModal from './ExportModal'
 import MHView from './MHView'
+import ArchivedView from './ArchivedView'
 import LivesView from './LivesView'
 import LiveModal from './LiveModal'
 import MerchansModal from './MerchansModal'

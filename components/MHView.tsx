@@ -254,7 +254,6 @@ function PautasView({
   onSimulateSync: () => void
   syncing?: boolean
   lastSyncResult: { found: number } | null
-  syncing?: boolean
   onSelectCreator: (id: MHCreatorId) => void
 }) {
   const today = todayISO()
@@ -1053,7 +1052,6 @@ export default function MHView({ onPostClick, allPosts = [], onPostsAdded, onPos
           onSimulateSync={handleSync}
           syncing={syncing}
           lastSyncResult={lastSyncResult}
-          syncing={syncing}
           onSelectCreator={id => setActiveCreator(id)}
         />
       )}

@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Campanhas — Cards redesign · SocialHub</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --surface:   #ffffff;
+  --surface-2: oklch(0.975 0.006 300);
+  --surface-3: oklch(0.96  0.008 300);
+  --ink:   oklch(0.22 0.02  300);
+  --ink-2: oklch(0.42 0.015 300);
+  --ink-3: oklch(0.62 0.012 300);
+  --ink-4: oklch(0.78 0.01  300);
+  --line:   oklch(0.94 0.01  300);
+  --line-2: oklch(0.90 0.012 300);
+  --accent:          oklch(0.72 0.16 55);
+  --accent-deep:     oklch(0.62 0.18 50);
+  --accent-soft:     oklch(0.94 0.05 60);
+  --accent-softer:   oklch(0.975 0.025 65);
+  --accent-gradient: linear-gradient(135deg, oklch(0.78 0.13 40) 0%, oklch(0.72 0.16 55) 100%);
+  --shadow:    0 2px 8px rgba(40,30,60,.06), 0 1px 2px rgba(40,30,60,.04);
+  --shadow-md: 0 6px 24px rgba(40,30,60,.1),  0 2px 6px rgba(40,30,60,.06);
+  --shadow-lg: 0 16px 48px rgba(40,30,60,.14), 0 4px 12px rgba(40,30,60,.07);
+  --radius:    14px;
+  --radius-md: 10px;
+  --radius-sm:  7px;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  /* tipo colors */
+  --c-inst: oklch(0.55 0.13 265);
+  --c-col:  oklch(0.55 0.13 25);
+  --c-prod: oklch(0.5  0.12 150);
+  --c-data: oklch(0.55 0.13 320);
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--surface-2);
+  color: var(--ink);
+  min-height: 100vh;
+  padding: 0;
+  line-height: 1.4;
+}
+
+/* ── Filter bar ── */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 32px 12px;
+  flex-wrap: wrap;
+}
+.platform-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: all .15s;
+}
+.platform-pill .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.platform-pill:hover { border-color: var(--accent-soft); background: var(--accent-softer); color: var(--ink); }
+.platform-pill.active { background: var(--ink); color: white; border-color: transparent; }
+.platform-pill.active .dot { opacity: .8; }
+.divider-v { width: 1px; height: 18px; background: var(--line); margin: 0 4px; }
+.spacer { flex: 1; }
+.count-pill {
+  font-size: 12px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+}
+.btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all .15s;
+  line-height: 1;
+}
+.btn svg { width: 15px; height: 15px; }
+.btn-ghost { background: var(--surface); border: 1px solid var(--line-2); color: var(--ink-2); }
+.btn-ghost:hover { background: var(--surface-3); color: var(--ink); }
+.btn-accent {
+  background: var(--accent-gradient);
+  color: white;
+  box-shadow: 0 2px 10px oklch(0.72 0.16 55 / .3);
+}
+.btn-accent:hover { box-shadow: 0 4px 16px oklch(0.72 0.16 55 / .45); transform: translateY(-1px); }
+
+/* ── View toggle (cards / table) ── */
+.view-toggle { display: flex; gap: 2px; background: var(--surface-3); border-radius: 8px; padding: 2px; }
+.view-btn {
+  width: 30px; height: 28px;
+  border: none; background: none;
+  border-radius: 6px;
+  cursor: pointer;
+  display: grid; place-items: center;
+  color: var(--ink-3);
+  transition: all .15s;
+}
+.view-btn.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.view-btn svg { width: 15px; height: 15px; }
+
+/* ── Cards grid ── */
+.cards-wrap { padding: 4px 32px 40px; }
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+/* ── Campaign card ── */
+.camp-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  cursor: pointer;
+  transition: box-shadow .2s, transform .2s;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.camp-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.camp-card.expanded { box-shadow: var(--shadow-md); }
+
+/* left accent strip — colored by tipo */
+.camp-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 4px;
+  border-radius: 14px 0 0 14px;
+  background: var(--tipo-color, var(--accent));
+}
+
+/* ── Card header ── */
+.card-head {
+  padding: 16px 16px 14px 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.card-head-main { flex: 1; min-width: 0; }
+.card-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.event-pack {
+  display: inline-grid; place-items: center;
+  min-width: 28px; height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ink-2);
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+}
+.event-pack.pp { background: oklch(0.95 0.03 150); color: oklch(0.45 0.12 150); border-color: oklch(0.9 0.04 150); }
+.event-pack.p  { background: oklch(0.95 0.03 215); color: oklch(0.45 0.12 230); border-color: oklch(0.9 0.04 230); }
+.event-pack.m  { background: oklch(0.95 0.03 75);  color: oklch(0.5  0.13 75);  border-color: oklch(0.9 0.04 75); }
+.event-pack.g  { background: oklch(0.95 0.04 25);  color: oklch(0.5  0.15 25);  border-color: oklch(0.9 0.05 25); }
+.tipo-pill {
+  display: inline-flex; align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.card-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.card-sub {
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-top: 4px;
+}
+.card-menu-btn {
+  width: 28px; height: 28px;
+  border: none; background: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: grid; place-items: center;
+  color: var(--ink-4);
+  transition: all .15s;
+  flex-shrink: 0;
+  margin-top: -2px;
+}
+.card-menu-btn:hover { background: var(--surface-3); color: var(--ink-2); }
+.card-menu-btn svg { width: 16px; height: 16px; }
+
+/* ── Card progress ── */
+.card-progress {
+  padding: 0 20px 14px 20px;
+}
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.progress-label { font-size: 11px; color: var(--ink-3); font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
+.progress-pct { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; font-weight: 600; margin-left: auto; }
+.progress-bar {
+  height: 8px;
+  background: var(--surface-3);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent-gradient);
+  transition: width .4s ease;
+  position: relative;
+}
+/* shimmer on progress fill */
+.progress-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.3) 50%, transparent 100%);
+  animation: shimmer 2s ease-in-out infinite;
+}
+@keyframes shimmer { from{transform:translateX(-100%)} to{transform:translateX(200%)} }
+
+/* ── Card dates ── */
+.card-dates {
+  padding: 10px 20px 14px;
+  display: flex;
+  gap: 16px;
+  border-top: 1px solid var(--line);
+}
+.date-item { display: flex; flex-direction: column; gap: 3px; }
+.date-item-label { font-size: 10.5px; color: var(--ink-4); font-weight: 500; text-transform: uppercase; letter-spacing: .05em; }
+.date-item-value { font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; font-weight: 500; }
+.date-item-value.soon { color: var(--accent-deep); font-weight: 600; }
+.date-item-value.na { color: var(--ink-4); }
+
+/* ── Milestones mini track ── */
+.milestones-track {
+  padding: 10px 20px 14px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.ms-step {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+.ms-dot {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--line-2);
+  display: grid; place-items: center;
+  flex-shrink: 0;
+  background: var(--surface);
+  transition: all .15s;
+}
+.ms-dot.done {
+  background: oklch(0.6 0.13 150);
+  border-color: oklch(0.6 0.13 150);
+  color: white;
+}
+.ms-dot svg { width: 10px; height: 10px; }
+.ms-connector { flex: 1; height: 2px; background: var(--line); border-radius: 1px; min-width: 8px; }
+.ms-connector.done { background: oklch(0.6 0.13 150); }
+.ms-label { display: none; } /* shown only in expanded */
+
+/* ── Card footer ── */
+.card-foot {
+  padding: 10px 16px 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.sb-avatar {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--accent-gradient);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  display: grid; place-items: center;
+  flex-shrink: 0;
+  letter-spacing: -.01em;
+}
+.owner-name { font-size: 12.5px; color: var(--ink-2); font-weight: 500; }
+.status-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+.sdot { width: 6px; height: 6px; border-radius: 50%; }
+.s-pub  { background: oklch(0.92 0.06 150); color: oklch(0.42 0.13 150); }
+.s-pub .sdot  { background: oklch(0.6 0.13 150); }
+.s-prod { background: oklch(0.93 0.07 75);  color: oklch(0.48 0.13 75); }
+.s-prod .sdot { background: oklch(0.62 0.13 75); }
+.posts-count {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-left: auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  cursor: pointer;
+  transition: all .15s;
+}
+.posts-count:hover { background: var(--accent-softer); border-color: var(--accent-soft); color: var(--ink); }
+.posts-count svg { width: 12px; height: 12px; }
+
+/* ── Expanded panel ── */
+.card-expansion {
+  border-top: 1px solid var(--line);
+  background: var(--accent-softer);
+  padding: 16px 20px 18px;
+  display: none;
+  flex-direction: column;
+  gap: 14px;
+  animation: expandDown .18s ease-out;
+}
+.card-expansion.open { display: flex; }
+@keyframes expandDown { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+
+.exp-section-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 10px;
+}
+.exp-dates-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px 16px;
+}
+.exp-date-cell label { display: block; font-size: 11px; color: var(--ink-3); font-weight: 500; margin-bottom: 4px; }
+.exp-date-cell .v { font-size: 13px; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.milestones-full { display: flex; flex-direction: column; gap: 8px; }
+.ms-full-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: all .15s;
+}
+.ms-full-item:hover { border-color: var(--accent-soft); }
+.ms-full-item.done { background: oklch(0.96 0.04 150); border-color: oklch(0.88 0.07 150); }
+.ms-check-box {
+  width: 20px; height: 20px;
+  border-radius: 6px;
+  border: 1.5px solid var(--line-2);
+  background: white;
+  display: grid; place-items: center;
+  flex-shrink: 0;
+  transition: all .15s;
+}
+.ms-full-item.done .ms-check-box { background: oklch(0.6 0.13 150); border-color: oklch(0.6 0.13 150); color: white; }
+.ms-check-box svg { width: 12px; height: 12px; }
+.ms-full-label { font-size: 13px; color: var(--ink-2); font-weight: 500; flex: 1; }
+.ms-full-item.done .ms-full-label { color: oklch(0.42 0.13 150); text-decoration: line-through; text-decoration-color: oklch(0.7 0.1 150); }
+.ms-full-date { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+.exp-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn-sm { padding: 7px 14px; font-size: 12.5px; }
+.btn-danger { border: none; background: none; padding: 7px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 500; color: var(--ink-3); cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: 6px; }
+.btn-danger:hover { background: oklch(0.94 0.04 25); color: oklch(0.55 0.18 25); }
+.btn-danger svg { width: 13px; height: 13px; }
+
+/* ── Skeleton loading state (for reference) ── */
+.skeleton { background: linear-gradient(90deg, var(--surface-3) 0%, var(--surface-2) 50%, var(--surface-3) 100%); background-size: 200%; animation: sk 1.5s ease infinite; border-radius: 6px; }
+@keyframes sk { from{background-position:200%} to{background-position:0%} }
+
+</style>
+</head>
+<body>
+
+<!-- ── Filter bar ── -->
+<div class="filter-bar">
+  <button class="platform-pill active">Todas</button>
+  <button class="platform-pill">
+    <span class="dot" style="background:oklch(0.62 0.13 75)"></span>Aguardando
+  </button>
+  <button class="platform-pill">
+    <span class="dot" style="background:oklch(0.6 0.13 150)"></span>Lançadas
+  </button>
+  <div class="divider-v"></div>
+  <button class="platform-pill"><span class="dot" style="background:var(--c-inst)"></span>Institucional</button>
+  <button class="platform-pill"><span class="dot" style="background:var(--c-col)"></span>Coleção</button>
+  <button class="platform-pill"><span class="dot" style="background:var(--c-prod)"></span>Produto</button>
+  <button class="platform-pill"><span class="dot" style="background:var(--c-data)"></span>Data Comemorativa</button>
+  <div class="spacer"></div>
+  <div class="view-toggle">
+    <button class="view-btn active" title="Cards">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    </button>
+    <button class="view-btn" title="Tabela">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+  </div>
+  <span class="count-pill">4 campanhas</span>
+  <button class="btn btn-accent">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    Nova campanha
+  </button>
+</div>
+
+<!-- ── Cards grid ── -->
+<div class="cards-wrap">
+  <div class="cards-grid" id="grid">
+
+    <!-- ── Card 1: Coleção Verão (expandido) ── -->
+    <div class="camp-card expanded" style="--tipo-color: var(--c-col)" onclick="toggleCard(this)">
+      <div class="card-head">
+        <div class="card-head-main">
+          <div class="card-meta-row">
+            <span class="event-pack g">G</span>
+            <span class="tipo-pill" style="background: oklch(0.95 0.04 25 / .7); color: oklch(0.55 0.13 25)">Coleção</span>
+          </div>
+          <div class="card-name">Coleção Verão 2026</div>
+          <div class="card-sub">Junho · lançamento 15/06</div>
+        </div>
+        <button class="card-menu-btn" onclick="event.stopPropagation()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg>
+        </button>
+      </div>
+
+      <div class="card-progress">
+        <div class="progress-row">
+          <span class="progress-label">Progresso</span>
+          <span class="progress-pct">75%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:75%"></div></div>
+      </div>
+
+      <div class="card-dates">
+        <div class="date-item">
+          <span class="date-item-label">Instagram</span>
+          <span class="date-item-value soon">15/06</span>
+        </div>
+        <div class="date-item">
+          <span class="date-item-label">Site</span>
+          <span class="date-item-value">18/06</span>
+        </div>
+        <div class="date-item">
+          <span class="date-item-label">Data final</span>
+          <span class="date-item-value">30/06</span>
+        </div>
+      </div>
+
+      <div class="milestones-track">
+        <div class="ms-step">
+          <div class="ms-dot done">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>
+          </div>
+        </div>
+        <div class="ms-connector done"></div>
+        <div class="ms-step">
+          <div class="ms-dot done">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>
+          </div>
+        </div>
+        <div class="ms-connector"></div>
+        <div class="ms-step">
+          <div class="ms-dot"></div>
+        </div>
+        <span style="font-size:11px;color:var(--ink-4);margin-left:8px">2/3 marcos</span>
+      </div>
+
+      <div class="card-foot">
+        <span class="sb-avatar">E</span>
+        <span class="owner-name">Eduarda</span>
+        <span class="status-pill s-prod" style="margin-left:8px"><span class="sdot"></span>Aguardando</span>
+        <button class="posts-count" onclick="event.stopPropagation()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+          12 posts
+        </button>
+      </div>
+
+      <!-- Expansion -->
+      <div class="card-expansion open" onclick="event.stopPropagation()">
+        <div>
+          <div class="exp-section-label">Cronograma completo</div>
+          <div class="exp-dates-grid">
+            <div class="exp-date-cell"><label>Previsão</label><div class="v">10/06/2026</div></div>
+            <div class="exp-date-cell"><label>Instagram</label><div class="v">15/06/2026</div></div>
+            <div class="exp-date-cell"><label>Site</label><div class="v">18/06/2026</div></div>
+            <div class="exp-date-cell"><label>Comercial</label><div class="v">14/06/2026</div></div>
+            <div class="exp-date-cell"><label>Data final</label><div class="v">30/06/2026</div></div>
+            <div class="exp-date-cell"><label>Mês foco</label><div class="v">Junho</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="exp-section-label">Marcos de produção</div>
+          <div class="milestones-full">
+            <div class="ms-full-item done">
+              <div class="ms-check-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>
+              </div>
+              <span class="ms-full-label">Brainstorm</span>
+              <span class="ms-full-date">20/04</span>
+            </div>
+            <div class="ms-full-item done">
+              <div class="ms-check-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>
+              </div>
+              <span class="ms-full-label">Aprov. Comercial</span>
+              <span class="ms-full-date">05/05</span>
+            </div>
+            <div class="ms-full-item">
+              <div class="ms-check-box"></div>
+              <span class="ms-full-label">Shooting</span>
+              <span class="ms-full-date">02/06</span>
+            </div>
+          </div>
+        </div>
+        <div class="exp-actions">
+          <button class="btn btn-accent btn-sm" onclick="">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+            Ver posts
+          </button>
+          <button class="btn btn-ghost btn-sm">Editar</button>
+          <div style="flex:1"></div>
+          <button class="btn-danger">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+            Excluir
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Card 2: Institucional ── -->
+    <div class="camp-card" style="--tipo-color: var(--c-inst)" onclick="toggleCard(this)">
+      <div class="card-head">
+        <div class="card-head-main">
+          <div class="card-meta-row">
+            <span class="event-pack m">M</span>
+            <span class="tipo-pill" style="background: oklch(0.93 0.04 265 / .7); color: oklch(0.45 0.13 265)">Institucional</span>
+          </div>
+          <div class="card-name">Dia das Mães — Brand Awareness</div>
+          <div class="card-sub">Maio · lançamento 11/05</div>
+        </div>
+        <button class="card-menu-btn" onclick="event.stopPropagation()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg>
+        </button>
+      </div>
+
+      <div class="card-progress">
+        <div class="progress-row">
+          <span class="progress-label">Progresso</span>
+          <span class="progress-pct">100%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+      </div>
+
+      <div class="card-dates">
+        <div class="date-item">
+          <span class="date-item-label">Instagram</span>
+          <span class="date-item-value">11/05</span>
+        </div>
+        <div class="date-item">
+          <span class="date-item-label">Site</span>
+          <span class="date-item-value na">—</span>
+        </div>
+        <div class="date-item">
+          <span class="date-item-label">Data final</span>
+          <span class="date-item-value">13/05</span>
+        </div>
+      </div>
+
+      <div class="milestones-track">
+        <div class="ms-step"><div class="ms-dot done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></div></div>
+        <div class="ms-connector done"></div>
+        <div class="ms-step"><div class="ms-dot done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></div></div>
+        <div class="ms-connector done"></div>
+        <div class="ms-step"><div class="ms-dot done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></div></div>
+        <span style="font-size:11px;color:oklch(0.42 0.13 150);margin-left:8px;font-weight:600">✓ Concluído</span>
+      </div>
+
+      <div class="card-foot">
+        <span class="sb-avatar" style="background:linear-gradient(135deg,oklch(0.72 0.12 265),oklch(0.6 0.15 290))">L</span>
+        <span class="owner-name">Larissa</span>
+        <span class="status-pill s-pub" style="margin-left:8px"><span class="sdot"></span>Lançado</span>
+        <button class="posts-count" onclick="event.stopPropagation()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+          8 posts
+        </button>
+      </div>
+
+      <div class="card-expansion" onclick="event.stopPropagation()">
+        <div>
+          <div class="exp-section-label">Cronograma completo</div>
+          <div class="exp-dates-grid">
+            <div class="exp-date-cell"><label>Previsão</label><div class="v">08/05/2026</div></div>
+            <div class="exp-date-cell"><label>Instagram</label><div class="v">11/05/2026</div></div>
+            <div class="exp-date-cell"><label>Site</label><div class="v">—</div></div>
+            <div class="exp-date-cell"><label>Comercial</label><div class="v">10/05/2026</div></div>
+            <div class="exp-date-cell"><label>Data final</label><div class="v">13/05/2026</div></div>
+            <div class="exp-date-cell"><label>Mês foco</label><div class="v">Maio</div></div>
+          </div>
+        </div>
+        <div class="exp-actions">
+          <button class="btn btn-accent btn-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>Ver posts</button>
+          <button class="btn btn-ghost btn-sm">Editar</button>
+          <div style="flex:1"></div>
+          <button class="btn-danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>Excluir</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Card 3: Produto ── -->
+    <div class="camp-card" style="--tipo-color: var(--c-prod)" onclick="toggleCard(this)">
+      <div class="card-head">
+        <div class="card-head-main">
+          <div class="card-meta-row">
+            <span class="event-pack p">P</span>
+            <span class="tipo-pill" style="background: oklch(0.93 0.05 150 / .7); color: oklch(0.42 0.13 150)">Produto</span>
+          </div>
+          <div class="card-name">Lançamento Linha Eco</div>
+          <div class="card-sub">Julho · lançamento 01/07</div>
+        </div>
+        <button class="card-menu-btn" onclick="event.stopPropagation()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg>
+        </button>
+      </div>
+
+      <div class="card-progress">
+        <div class="progress-row">
+          <span class="progress-label">Progresso</span>
+          <span class="progress-pct">30%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:30%"></div></div>
+      </div>
+
+      <div class="card-dates">
+        <div class="date-item">
+          <span class="date-item-label">Instagram</span>
+          <span class="date-item-value">01/07</span>
+        </div>
+        <div class="date-item">
+          <span class="date-item-label">Site</span>
+          <span class="date-item-value">03/07</span>
+        </div>
+        <div class="date-item">
+          <span class="date-item-label">Data final</span>
+          <span class="date-item-value">15/07</span>
+        </div>
+      </div>
+
+      <div class="milestones-track">
+        <div class="ms-step"><div class="ms-dot done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></div></div>
+        <div class="ms-connector"></div>
+        <div class="ms-step"><div class="ms-dot"></div></div>
+        <div class="ms-connector"></div>
+        <div class="ms-step"><div class="ms-dot"></div></div>
+        <span style="font-size:11px;color:var(--ink-4);margin-left:8px">1/3 marcos</span>
+      </div>
+
+      <div class="card-foot">
+        <span class="sb-avatar" style="background:linear-gradient(135deg,oklch(0.65 0.15 150),oklch(0.5 0.15 170))">M</span>
+        <span class="owner-name">Marina</span>
+        <span class="status-pill s-prod" style="margin-left:8px"><span class="sdot"></span>Aguardando</span>
+        <button class="posts-count" onclick="event.stopPropagation()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+          3 posts
+        </button>
+      </div>
+
+      <div class="card-expansion" onclick="event.stopPropagation()">
+        <div>
+          <div class="exp-section-label">Cronograma completo</div>
+          <div class="exp-dates-grid">
+            <div class="exp-date-cell"><label>Previsão</label><div class="v">28/06/2026</div></div>
+            <div class="exp-date-cell"><label>Instagram</label><div class="v">01/07/2026</div></div>
+            <div class="exp-date-cell"><label>Site</label><div class="v">03/07/2026</div></div>
+          </div>
+        </div>
+        <div class="exp-actions">
+          <button class="btn btn-accent btn-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>Ver posts</button>
+          <button class="btn btn-ghost btn-sm">Editar</button>
+          <div style="flex:1"></div>
+          <button class="btn-danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>Excluir</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Card 4: Data comemorativa ── -->
+    <div class="camp-card" style="--tipo-color: var(--c-data)" onclick="toggleCard(this)">
+      <div class="card-head">
+        <div class="card-head-main">
+          <div class="card-meta-row">
+            <span class="event-pack pp">PP</span>
+            <span class="tipo-pill" style="background: oklch(0.94 0.04 320 / .7); color: oklch(0.45 0.13 320)">Data Comemorativa</span>
+          </div>
+          <div class="card-name">Dia dos Namorados</div>
+          <div class="card-sub">Junho · lançamento 12/06</div>
+        </div>
+        <button class="card-menu-btn" onclick="event.stopPropagation()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg>
+        </button>
+      </div>
+
+      <div class="card-progress">
+        <div class="progress-row">
+          <span class="progress-label">Progresso</span>
+          <span class="progress-pct">55%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:55%"></div></div>
+      </div>
+
+      <div class="card-dates">
+        <div class="date-item">
+          <span class="date-item-label">Instagram</span>
+          <span class="date-item-value soon">12/06</span>
+        </div>
+        <div class="date-item">
+          <span class="date-item-label">Comercial</span>
+          <span class="date-item-value">10/06</span>
+        </div>
+        <div class="date-item">
+          <span class="date-item-label">Data final</span>
+          <span class="date-item-value">14/06</span>
+        </div>
+      </div>
+
+      <div class="milestones-track">
+        <div class="ms-step"><div class="ms-dot done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></div></div>
+        <div class="ms-connector done"></div>
+        <div class="ms-step"><div class="ms-dot"></div></div>
+        <div class="ms-connector"></div>
+        <div class="ms-step"><div class="ms-dot"></div></div>
+        <span style="font-size:11px;color:var(--ink-4);margin-left:8px">1/3 marcos</span>
+      </div>
+
+      <div class="card-foot">
+        <span class="sb-avatar" style="background:linear-gradient(135deg,oklch(0.65 0.18 320),oklch(0.55 0.18 340))">J</span>
+        <span class="owner-name">Julia</span>
+        <span class="status-pill s-prod" style="margin-left:8px"><span class="sdot"></span>Aguardando</span>
+        <button class="posts-count" onclick="event.stopPropagation()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+          5 posts
+        </button>
+      </div>
+
+      <div class="card-expansion" onclick="event.stopPropagation()">
+        <div>
+          <div class="exp-section-label">Cronograma completo</div>
+          <div class="exp-dates-grid">
+            <div class="exp-date-cell"><label>Previsão</label><div class="v">10/06/2026</div></div>
+            <div class="exp-date-cell"><label>Instagram</label><div class="v">12/06/2026</div></div>
+            <div class="exp-date-cell"><label>Comercial</label><div class="v">10/06/2026</div></div>
+          </div>
+        </div>
+        <div class="exp-actions">
+          <button class="btn btn-accent btn-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>Ver posts</button>
+          <button class="btn btn-ghost btn-sm">Editar</button>
+          <div style="flex:1"></div>
+          <button class="btn-danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>Excluir</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /cards-grid -->
+</div><!-- /cards-wrap -->
+
+<script>
+function toggleCard(card) {
+  const exp = card.querySelector('.card-expansion');
+  const isOpen = exp.classList.contains('open');
+  // close all
+  document.querySelectorAll('.card-expansion.open').forEach(e => {
+    e.classList.remove('open');
+    e.closest('.camp-card').classList.remove('expanded');
+  });
+  if (!isOpen) {
+    exp.classList.add('open');
+    card.classList.add('expanded');
+  }
+}
+</script>
+</body>
+</html>

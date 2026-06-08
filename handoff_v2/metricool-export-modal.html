@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ExportMetricoolModal — SocialHub</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --surface:   #ffffff;
+  --surface-2: oklch(0.975 0.006 300);
+  --surface-3: oklch(0.96  0.008 300);
+  --ink:   oklch(0.22 0.02  300);
+  --ink-2: oklch(0.42 0.015 300);
+  --ink-3: oklch(0.62 0.012 300);
+  --ink-4: oklch(0.78 0.01  300);
+  --line:   oklch(0.94 0.01  300);
+  --line-2: oklch(0.90 0.012 300);
+  --accent:        oklch(0.72 0.16 55);
+  --accent-deep:   oklch(0.62 0.18 50);
+  --accent-soft:   oklch(0.94 0.05 60);
+  --accent-softer: oklch(0.975 0.025 65);
+  --accent-gradient: linear-gradient(135deg, oklch(0.78 0.13 40) 0%, oklch(0.72 0.16 55) 100%);
+  --radius:    14px;
+  --radius-md: 10px;
+  --radius-sm:  7px;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: oklch(0.96 0.01 270);
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+/* ── Backdrop ── */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(30,20,50,.38);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  z-index: 40;
+}
+
+/* ── Modal shell ── */
+.modal-export {
+  background: var(--surface);
+  border-radius: 20px;
+  box-shadow: 0 28px 70px rgba(40,30,60,.18), 0 6px 20px rgba(40,30,60,.08);
+  width: min(460px, calc(100vw - 32px));
+  overflow: hidden;
+  animation: slideUp .22s ease-out both;
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Header ── */
+.modal-export .mhead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 22px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.mhead-icon {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  background: var(--accent-gradient);
+  display: grid; place-items: center;
+  flex-shrink: 0;
+}
+.mhead-icon svg { width: 20px; height: 20px; color: white; }
+.mhead-text { flex: 1; min-width: 0; }
+.mhead-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.mhead-sub {
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-top: 2px;
+  font-weight: 400;
+}
+.btn-close {
+  width: 32px; height: 32px;
+  border: none; background: none;
+  border-radius: 999px;
+  cursor: pointer;
+  display: grid; place-items: center;
+  color: var(--ink-3);
+  transition: background .15s, color .15s;
+  flex-shrink: 0;
+}
+.btn-close:hover { background: var(--accent-softer); color: var(--ink); }
+.btn-close svg { width: 18px; height: 18px; }
+
+/* ── Body ── */
+.modal-export .mbody {
+  padding: 22px 22px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Field group ── */
+.field-group { display: flex; flex-direction: column; gap: 8px; }
+.field-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.field-label svg { width: 13px; height: 13px; }
+
+/* ── Period chips ── */
+.chip-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.chip {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: all .15s;
+  line-height: 1;
+}
+.chip:hover { border-color: var(--accent-soft); background: var(--accent-softer); color: var(--ink); }
+.chip.active {
+  background: var(--accent-gradient);
+  border-color: transparent;
+  color: white;
+  font-weight: 600;
+}
+
+/* ── Date range display ── */
+.date-range-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 13px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  margin-top: 2px;
+}
+.date-range-display svg { width: 14px; height: 14px; color: var(--ink-4); flex-shrink: 0; }
+.date-range-text {
+  font-size: 13px;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  letter-spacing: -0.01em;
+  flex: 1;
+}
+.date-range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+.date-range-inputs input[type="date"] {
+  border: none;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  cursor: pointer;
+  outline: none;
+  flex: 1;
+  min-width: 0;
+}
+.date-range-separator {
+  color: var(--ink-4);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* date range hidden when not "custom" — controlled via JS */
+.date-range-custom {
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 13px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  margin-top: 2px;
+}
+.date-range-custom.visible { display: flex; }
+.date-range-custom label {
+  font-size: 11px;
+  color: var(--ink-4);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.date-range-custom input[type="date"] {
+  border: none;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+  cursor: pointer;
+  width: 100%;
+}
+
+/* ── Platform grid ── */
+.platform-grid {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.platform-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: all .15s;
+}
+.platform-chip:hover { border-color: var(--line-2); background: var(--surface-3); color: var(--ink); }
+.platform-chip.active {
+  background: var(--ink);
+  border-color: transparent;
+  color: white;
+}
+.platform-chip .picon {
+  width: 18px; height: 18px;
+  border-radius: 5px;
+  display: grid; place-items: center;
+  flex-shrink: 0;
+  transition: background .15s;
+}
+.platform-chip.active .picon { background: rgba(255,255,255,.2); }
+.platform-chip:not(.active) .picon { background: var(--surface-3); }
+
+/* specific platform colors when active */
+.platform-chip[data-p="ig"].active    { background: linear-gradient(135deg, #f58529, #dd2a7b, #8134af); border-color: transparent; }
+.platform-chip[data-p="tiktok"].active { background: #000; border-color: transparent; }
+.platform-chip[data-p="twitter"].active { background: #000; border-color: transparent; }
+.platform-chip[data-p="all"].active   { background: var(--ink); border-color: transparent; }
+
+/* ── Status filter ── */
+.notice-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 11px 13px;
+  background: var(--accent-softer);
+  border: 1px solid var(--accent-soft);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+.notice-box svg { width: 14px; height: 14px; color: var(--accent); flex-shrink: 0; margin-top: 1px; }
+.notice-box strong { color: var(--ink); font-weight: 600; }
+
+/* ── Status chips ── */
+.status-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.status-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: all .15s;
+}
+.status-chip .sdot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-chip.active { border-color: transparent; }
+.status-chip[data-s="agendado"].active  { background: oklch(0.92 0.06 265); color: oklch(0.45 0.13 265); border-color: oklch(0.82 0.09 265); }
+.status-chip[data-s="publicado"].active { background: oklch(0.92 0.06 150); color: oklch(0.42 0.13 150); border-color: oklch(0.82 0.09 150); }
+.status-chip[data-s="producao"].active  { background: oklch(0.93 0.07 75);  color: oklch(0.48 0.13 75);  border-color: oklch(0.83 0.10 75); }
+
+/* ── Divider ── */
+.divider { height: 1px; background: var(--line); }
+
+/* ── Footer ── */
+.modal-export .mfoot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 22px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--line);
+}
+.btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all .15s;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+.btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+.btn-ghost {
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  color: var(--ink-2);
+}
+.btn-ghost:hover { background: var(--surface-3); color: var(--ink); border-color: var(--line-2); }
+.btn-accent {
+  background: var(--accent-gradient);
+  color: white;
+  box-shadow: 0 2px 10px oklch(0.72 0.16 55 / 0.3);
+}
+.btn-accent:hover {
+  box-shadow: 0 4px 16px oklch(0.72 0.16 55 / 0.45);
+  transform: translateY(-1px);
+}
+.btn-accent:active { transform: translateY(0); }
+.spacer { flex: 1; }
+
+/* ── Demo scene ── */
+.demo-scene {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  min-height: 600px;
+}
+.demo-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(30,20,50,.38);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+}
+
+/* ── Variant selector (demo UI) ── */
+.variant-bar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: white;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  opacity: .7;
+  pointer-events: none;
+  z-index: 100;
+}
+</style>
+</head>
+<body>
+
+<div class="demo-scene">
+  <!-- Fake calendar blur bg -->
+  <div style="position:absolute;inset:0;background:linear-gradient(135deg,oklch(0.97 0.01 270),oklch(0.93 0.02 300));"></div>
+
+  <div class="demo-backdrop">
+    <div class="modal-export" id="modal">
+
+      <!-- ── HEADER ── -->
+      <div class="mhead">
+        <div class="mhead-icon">
+          <!-- Download / export icon -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </div>
+        <div class="mhead-text">
+          <div class="mhead-title">Exportar para Metricool</div>
+          <div class="mhead-sub">Gera um CSV para importar no Metricool</div>
+        </div>
+        <button class="btn-close" title="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- ── BODY ── -->
+      <div class="mbody">
+
+        <!-- Período -->
+        <div class="field-group">
+          <div class="field-label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+            Período
+          </div>
+          <div class="chip-row">
+            <button class="chip" data-period="week" onclick="setPeriod('week',this)">Semana atual</button>
+            <button class="chip active" data-period="month" onclick="setPeriod('month',this)">Mês atual</button>
+            <button class="chip" data-period="last30" onclick="setPeriod('last30',this)">Últimos 30 dias</button>
+            <button class="chip" data-period="custom" onclick="setPeriod('custom',this)">Personalizado</button>
+          </div>
+
+          <!-- Range estático (semana atual / mês atual / últimos 30) -->
+          <div class="date-range-display" id="range-static">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            <span class="date-range-text" id="range-text">01/05/2026 – 31/05/2026</span>
+          </div>
+
+          <!-- Range personalizado (aparece ao clicar "Personalizado") -->
+          <div class="date-range-custom" id="range-custom">
+            <div class="date-range-inputs">
+              <div style="flex:1;">
+                <label>De</label>
+                <input type="date" id="date-from" value="2026-05-01">
+              </div>
+              <div class="date-range-separator">→</div>
+              <div style="flex:1;">
+                <label>Até</label>
+                <input type="date" id="date-to" value="2026-05-31">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Plataforma -->
+        <div class="field-group">
+          <div class="field-label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            Plataforma
+          </div>
+          <div class="platform-grid">
+            <button class="platform-chip active" data-p="all" onclick="togglePlatform('all',this)">
+              <span class="picon">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </span>
+              Todas
+            </button>
+            <button class="platform-chip" data-p="ig" onclick="togglePlatform('ig',this)">
+              <span class="picon">
+                <!-- Instagram -->
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="5"/>
+                  <circle cx="12" cy="12" r="4"/>
+                  <circle cx="17.5" cy="6.5" r=".9" fill="currentColor"/>
+                </svg>
+              </span>
+              Instagram
+            </button>
+            <button class="platform-chip" data-p="tiktok" onclick="togglePlatform('tiktok',this)">
+              <span class="picon">
+                <!-- TikTok -->
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19.6 6.7a5 5 0 0 1-3.5-1.6 5 5 0 0 1-1.2-2.3h-3v12.4a2.7 2.7 0 1 1-1.9-2.6V9.4A5.6 5.6 0 1 0 14.9 15V9.3a8 8 0 0 0 4.7 1.5V7.6c-.1 0 0-.5 0-.9z"/>
+                </svg>
+              </span>
+              TikTok
+            </button>
+            <button class="platform-chip" data-p="twitter" onclick="togglePlatform('twitter',this)">
+              <span class="picon">
+                <!-- X/Twitter -->
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18 3h3l-7 8 8 10h-6l-5-6-5 6H3l8-9L3 3h6l4 5 5-5z"/>
+                </svg>
+              </span>
+              Twitter
+            </button>
+          </div>
+        </div>
+
+        <!-- Status -->
+        <div class="field-group">
+          <div class="field-label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            Status incluídos
+          </div>
+          <div class="status-chips">
+            <button class="status-chip active" data-s="agendado" onclick="toggleStatus('agendado',this)">
+              <span class="sdot" style="background:oklch(0.6 0.13 265)"></span>Agendado
+            </button>
+            <button class="status-chip" data-s="publicado" onclick="toggleStatus('publicado',this)">
+              <span class="sdot" style="background:oklch(0.6 0.13 150)"></span>Publicado
+            </button>
+            <button class="status-chip" data-s="producao" onclick="toggleStatus('producao',this)">
+              <span class="sdot" style="background:oklch(0.62 0.13 75)"></span>Em produção
+            </button>
+          </div>
+        </div>
+
+        <!-- Notice -->
+        <div class="notice-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+          <span>O CSV gerado segue o formato de importação do <strong>Metricool</strong>. Cada linha representa um post com data, plataforma e legenda.</span>
+        </div>
+
+      </div><!-- /mbody -->
+
+      <!-- ── FOOTER ── -->
+      <div class="mfoot">
+        <div class="spacer"></div>
+        <button class="btn btn-ghost" onclick="">Cancelar</button>
+        <button class="btn btn-accent" onclick="">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Baixar CSV
+        </button>
+      </div>
+
+    </div><!-- /modal-export -->
+  </div><!-- /demo-backdrop -->
+</div><!-- /demo-scene -->
+
+<script>
+const PERIODS = {
+  week:   { label: 'Semana atual',   range: () => {
+    const now = new Date();
+    const day = now.getDay();
+    const mon = new Date(now); mon.setDate(now.getDate() - ((day+6)%7));
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+    return [mon, sun];
+  }},
+  month:  { label: 'Mês atual',      range: () => {
+    const now = new Date();
+    return [new Date(now.getFullYear(), now.getMonth(), 1),
+            new Date(now.getFullYear(), now.getMonth()+1, 0)];
+  }},
+  last30: { label: 'Últimos 30 dias', range: () => {
+    const now = new Date();
+    const ago = new Date(now); ago.setDate(now.getDate()-29);
+    return [ago, now];
+  }},
+  custom: null
+};
+
+function fmt(d) {
+  return d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' });
+}
+
+function setPeriod(key, btn) {
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+
+  const rangeStatic = document.getElementById('range-static');
+  const rangeCustom = document.getElementById('range-custom');
+  const rangeText   = document.getElementById('range-text');
+
+  if (key === 'custom') {
+    rangeStatic.style.display = 'none';
+    rangeCustom.classList.add('visible');
+  } else {
+    rangeStatic.style.display = 'flex';
+    rangeCustom.classList.remove('visible');
+    const [start, end] = PERIODS[key].range();
+    rangeText.textContent = `${fmt(start)} – ${fmt(end)}`;
+  }
+}
+
+// Initialize range text
+setPeriod('month', document.querySelector('[data-period="month"]'));
+
+// Multi-select platforms
+let activePlatforms = new Set(['all']);
+function togglePlatform(key, btn) {
+  if (key === 'all') {
+    activePlatforms.clear();
+    activePlatforms.add('all');
+    document.querySelectorAll('.platform-chip').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    return;
+  }
+  // deactivate "all"
+  document.querySelector('[data-p="all"]').classList.remove('active');
+  activePlatforms.delete('all');
+
+  if (activePlatforms.has(key)) {
+    activePlatforms.delete(key);
+    btn.classList.remove('active');
+    if (activePlatforms.size === 0) {
+      activePlatforms.add('all');
+      document.querySelector('[data-p="all"]').classList.add('active');
+    }
+  } else {
+    activePlatforms.add(key);
+    btn.classList.add('active');
+  }
+}
+
+// Multi-select status
+let activeStatuses = new Set(['agendado']);
+function toggleStatus(key, btn) {
+  if (activeStatuses.has(key) && activeStatuses.size === 1) return; // prevent deselecting all
+  if (activeStatuses.has(key)) {
+    activeStatuses.delete(key);
+    btn.classList.remove('active');
+  } else {
+    activeStatuses.add(key);
+    btn.classList.add('active');
+  }
+}
+</script>
+</body>
+</html>

@@ -3,6 +3,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import "./socialhub.css";
+import "./lives.css";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],

@@ -1,18 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 
-export async function GET() {
-  const result: Record<string, unknown> = {}
-
-  // 1. Verifica variáveis de ambiente
-  result.env = {
-    DROPBOX_REFRESH_TOKEN: process.env.DROPBOX_REFRESH_TOKEN ? '✓ presente' : '✗ ausente',
-    DROPBOX_CLIENT_ID:     process.env.DROPBOX_CLIENT_ID     ? '✓ presente' : '✗ ausente',
-    DROPBOX_CLIENT_SECRET: process.env.DROPBOX_CLIENT_SECRET ? '✓ presente' : '✗ ausente',
-  }
-
-  // 2. Tenta obter access token
-  let token: string | null = null
+async function getAccessToken(): Promise<string | null> {
   try {
     const res = await fetch('https://api.dropbox.com/oauth2/token', {
       method: 'POST',
@@ -24,46 +12,76 @@ export async function GET() {
         client_secret: process.env.DROPBOX_CLIENT_SECRET!,
       }),
     })
-    const data = await res.json() as Record<string, unknown>
-    if (data.access_token) {
-      token = data.access_token as string
-      result.token = '✓ obtido com sucesso'
-    } else {
-      result.token = `✗ erro: ${JSON.stringify(data)}`
-    }
-  } catch (e) {
-    result.token = `✗ exceção: ${String(e)}`
+    const data = await res.json() as { access_token?: string }
+    return data.access_token ?? null
+  } catch { return null }
+}
+
+async function listFolder(token: string, path: string, namespaceId?: string) {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  }
+  if (namespaceId) {
+    headers['Dropbox-API-Path-Root'] = JSON.stringify({ '.tag': 'namespace_id', namespace_id: namespaceId })
+  }
+  const res = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ path, limit: 10 }),
+  })
+  const data = await res.json() as Record<string, unknown>
+  return { status: res.status, data }
+}
+
+export async function GET() {
+  const result: Record<string, unknown> = {}
+
+  // 1. Env vars
+  result.env = {
+    DROPBOX_REFRESH_TOKEN: process.env.DROPBOX_REFRESH_TOKEN ? '✓' : '✗ ausente',
+    DROPBOX_CLIENT_ID:     process.env.DROPBOX_CLIENT_ID     ? '✓' : '✗ ausente',
+    DROPBOX_CLIENT_SECRET: process.env.DROPBOX_CLIENT_SECRET ? '✓' : '✗ ausente',
+    DROPBOX_NAMESPACE_ID:  process.env.DROPBOX_NAMESPACE_ID  ?? '(não configurado)',
   }
 
-  // 3. Testa listagem de pasta da Rebeca (semana atual)
-  if (token) {
-    const testPath = '/MKT SOCIAL/CREATORS/REBECA'
-    try {
-      const res = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: testPath, limit: 10 }),
-      })
-      const data = await res.json() as Record<string, unknown>
-      result.dropbox_rebeca_root = {
-        status: res.status,
-        entries: (data.entries as { name: string }[] | undefined)?.map(e => e.name) ?? data,
-      }
-    } catch (e) {
-      result.dropbox_rebeca_root = `✗ exceção: ${String(e)}`
-    }
-  }
+  // 2. Obter access token
+  const token = await getAccessToken()
+  result.token = token ? '✓ obtido' : '✗ falhou'
+  if (!token) return NextResponse.json(result)
 
-  // 4. Mostra posts "Em pauta" no banco
+  // 3. Info da conta (pega namespace do team)
   try {
-    const supabase = await createClient()
-    const { data: posts, error } = await supabase
-      .from('mh_posts')
-      .select('id, owner, semana, status')
-      .eq('status', 'pauta')
-    result.posts_em_pauta = error ? `✗ ${error.message}` : posts
-  } catch (e) {
-    result.posts_em_pauta = `✗ exceção: ${String(e)}`
+    const res = await fetch('https://api.dropboxapi.com/2/users/get_current_account', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: 'null',
+    })
+    const acc = await res.json() as Record<string, unknown>
+    const team = acc.team as Record<string, unknown> | undefined
+    result.account = {
+      name: (acc.name as Record<string, unknown>)?.display_name,
+      team_name: team?.name,
+      root_info: acc.root_info,
+    }
+  } catch (e) { result.account = String(e) }
+
+  // 4. Testa pasta sem namespace
+  const testPath = '/MKT SOCIAL/CREATORS/REBECA'
+  result.sem_namespace = await listFolder(token, testPath).catch(e => String(e))
+
+  // 5. Testa pasta com namespace configurado (se existir)
+  const nsId = process.env.DROPBOX_NAMESPACE_ID
+  if (nsId) {
+    result.com_namespace = await listFolder(token, testPath, nsId).catch(e => String(e))
+  }
+
+  // 6. Tenta achar namespace via root_namespace_id da conta
+  const rootInfo = (result.account as Record<string, unknown>)?.root_info as Record<string, unknown> | undefined
+  const rootNs = rootInfo?.root_namespace_id as string | undefined
+  if (rootNs && rootNs !== nsId) {
+    result.com_root_namespace = await listFolder(token, testPath, rootNs).catch(e => String(e))
+    result.root_namespace_id = rootNs
   }
 
   return NextResponse.json(result, { status: 200 })

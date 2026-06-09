@@ -25,11 +25,12 @@ const LIVES_ACCENT     = 'oklch(0.72 0.16 55)'
 const LIVES_ACCENT_DEEP = 'oklch(0.62 0.18 50)'
 
 const PERIODS = [
-  { id: 7    as number | 'all', label: '7 dias'   },
-  { id: 30   as number | 'all', label: '30 dias'  },
-  { id: 90   as number | 'all', label: '90 dias'  },
-  { id: 365  as number | 'all', label: '12 meses' },
-  { id: 'all' as number | 'all', label: 'Tudo'    },
+  { id: 7      as number | 'all' | 'custom', label: '7 dias'       },
+  { id: 30     as number | 'all' | 'custom', label: '30 dias'      },
+  { id: 90     as number | 'all' | 'custom', label: '90 dias'      },
+  { id: 365    as number | 'all' | 'custom', label: '12 meses'     },
+  { id: 'all'  as number | 'all' | 'custom', label: 'Tudo'         },
+  { id: 'custom' as number | 'all' | 'custom', label: 'Período…'  },
 ]
 
 // ─── Tooltips ────────────────────────────────────────────────
@@ -475,7 +476,9 @@ export default function LivesView({
   onGenerateProposta, generatingProposta,
 }: Props) {
   const today = todayISO()
-  const [period, setPeriod] = useState<number | 'all'>(90)
+  const [period, setPeriod] = useState<number | 'all' | 'custom'>(90)
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [search, setSearch] = useState('')
   const [merchanFilter, setMerchanFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -485,10 +488,14 @@ export default function LivesView({
     [lives]
   )
 
-  const livesInPeriod = useMemo(
-    () => lives.filter(l => inPeriod(l.date, period, today)),
-    [lives, period, today]
-  )
+  const livesInPeriod = useMemo(() => {
+    if (period === 'custom') {
+      const from = customFrom
+      const to   = customTo || today
+      return lives.filter(l => (!from || l.date >= from) && l.date <= to)
+    }
+    return lives.filter(l => inPeriod(l.date, period, today))
+  }, [lives, period, today, customFrom, customTo])
 
   const kpis      = useMemo(() => liveKpis(livesInPeriod), [livesInPeriod])
   const perMerchan = useMemo(() => perMerchanMetrics(livesInPeriod, merchans), [livesInPeriod, merchans])
@@ -546,6 +553,15 @@ export default function LivesView({
             </button>
           ))}
         </div>
+        {period === 'custom' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input type="date" className="field" style={{ fontSize: 12, padding: '3px 8px', width: 130 }}
+              value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
+            <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>até</span>
+            <input type="date" className="field" style={{ fontSize: 12, padding: '3px 8px', width: 130 }}
+              value={customTo} onChange={e => setCustomTo(e.target.value)} />
+          </div>
+        )}
         <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
           {kpis.count} live{kpis.count === 1 ? '' : 's'} realizadas no período
         </div>
@@ -616,7 +632,7 @@ export default function LivesView({
         <span className="sub">receita semana a semana · mês até hoje vs mesmo período do mês anterior</span>
       </div>
       <div className="lives-grid lives-grid-trend">
-        <DashCard title="Receita semanal" hint={`período: ${period === 'all' ? 'jan/2025 → hoje' : `últimos ${period} dias`}`}>
+        <DashCard title="Receita semanal" hint={`período: ${period === 'all' ? 'jan/2025 → hoje' : period === 'custom' ? `${customFrom || '?'} → ${customTo || 'hoje'}` : `últimos ${period} dias`}`}>
           <WeeklyTrend data={weekly} />
         </DashCard>
         <DashCard title="Mês atual vs anterior" hint={`comparativo justo · dia 1–${mvp.dayOfMonth} de cada mês`}>

@@ -691,11 +691,12 @@ a { color: inherit; text-decoration: none }
 
 /* ============ PostModal — 2-column variant ============ */
 .modal.modal-post {
-  width: min(1000px, calc(100vw - 40px));
+  width: min(1160px, calc(100vw - 40px));
 }
 .modal.modal-post .modal-body {
   display: grid;
-  grid-template-columns: 1fr 1.05fr;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr;
   padding: 0;
   gap: 0;
   overflow: hidden;

@@ -737,7 +737,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
       {/* ── Sidebar ──────────────────────────────────────────── */}
       <aside className="sidebar">
         <div className="sb-brand">
-          <img src="/socialhub_logo.png" alt="SocialHub" style={{ height: 44, width: 'auto', maxWidth: '100%' }} />
+          <img src="/socialhub_logo.svg" alt="SocialHub" style={{ height: 44, width: 'auto', maxWidth: '100%' }} />
         </div>
 
         <div className="sb-section">

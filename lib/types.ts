@@ -447,7 +447,7 @@ export const FORMATS_LIST = ['Story', 'Estático', 'Coleção', 'Reels', 'Campan
 
 // ---- Stories Analytics ----
 
-export type StoryStatus = 'nao_iniciado' | 'em_andamento' | 'feito' | 'nao_postado' | 'proposta'
+export type StoryStatus = 'nao_iniciado' | 'em_andamento' | 'feito' | 'nao_postado' | 'proposta' | 'postado'
 
 export interface Story {
   id: string

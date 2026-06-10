@@ -363,4 +363,11 @@ export const STORY_STATUS_META: Record<string, { label: string; bg: string; text
     border: 'oklch(0.86 0.08 150)',
     dot: 'oklch(0.6 0.13 150)',
   },
+  postado: {
+    label: 'Postado',
+    bg: 'oklch(0.93 0.06 145)',
+    text: 'oklch(0.32 0.12 145)',
+    border: 'oklch(0.80 0.1 145)',
+    dot: 'oklch(0.42 0.15 145)',
+  },
 }

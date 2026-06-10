@@ -69,6 +69,13 @@
 }
 .status-pill.s-st-np .sdot { background: oklch(0.5 0.15 25) }
 
+.status-pill.s-st-postado {
+  background: oklch(0.93 0.06 145);
+  color: oklch(0.32 0.12 145);
+  border-color: oklch(0.80 0.1 145);
+}
+.status-pill.s-st-postado .sdot { background: oklch(0.42 0.15 145) }
+
 /* ============================================================
    TABELA DE STORIES
    ============================================================ */

@@ -112,6 +112,7 @@ function StoryStatusPill({ status }: { status: string }) {
     : status === 'em_andamento' ? 's-st-ea'
     : status === 'feito' ? 's-st-feito'
     : status === 'proposta' ? 's-st-post'
+    : status === 'postado' ? 's-st-postado'
     : 's-st-np'
   return (
     <span className={`status-pill ${cls}`}>
@@ -466,7 +467,7 @@ const STATUS_FILTERS = [
   { id: 'nao_postado',  label: 'Não postado',     dot: 'oklch(0.5 0.15 25)' },
 ]
 
-function StoriesTable({ stories }: { stories: Story[] }) {
+function StoriesTable({ stories, onRowClick }: { stories: Story[]; onRowClick: (s: Story) => void }) {
   const [statusFilt, setStatusFilt] = useState('all')
 
   const filtered = useMemo(() => {
@@ -505,7 +506,7 @@ function StoriesTable({ stories }: { stories: Story[] }) {
               const [, mm, dd] = s.date.split('-')
               const hh = String(s.hora).padStart(2, '0')
               return (
-                <tr key={s.id} className="st-row">
+                <tr key={s.id} className="st-row" style={{ cursor: 'pointer' }} onClick={() => onRowClick(s)}>
                   <td className="st-td">
                     <div className="st-date-cell">
                       <span className="st-day">{dd}/{mm}</span>
@@ -557,9 +558,10 @@ interface Props {
   dayAggregates: DayAggregate[]
   onStoryCreated: (s: Story) => void
   onStoryUpdated: (s: Story) => void
+  onStoryClick: (s: Story) => void
 }
 
-export default function StoriesView({ stories, dayAggregates, onStoryCreated }: Props) {
+export default function StoriesView({ stories, dayAggregates, onStoryCreated, onStoryClick }: Props) {
   const today = todayISO()
   const [period, setPeriod] = useState<Period>('tudo')
   const [createOpen, setCreateOpen] = useState(false)
@@ -669,7 +671,7 @@ export default function StoriesView({ stories, dayAggregates, onStoryCreated }: 
       <ProdutosChart stories={filteredStories} />
 
       {/* Table */}
-      <StoriesTable stories={filteredStories} />
+      <StoriesTable stories={filteredStories} onRowClick={onStoryClick} />
 
       {/* Create modal */}
       {createOpen && (

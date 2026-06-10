@@ -1,4 +1,4 @@
-import type { Campaign, Collection, EventDate, FutebolEvent, Live, LiveStatus, Merchan, Post, PostSource, PostStatus, Platform } from '@/lib/types'
+import type { Campaign, Collection, DayAggregate, EventDate, FutebolEvent, Live, LiveStatus, Merchan, Post, PostSource, PostStatus, Platform, Story, StoryStatus } from '@/lib/types'
 import { colorFromName, shortLabel } from '@/lib/livesUtils'
 
 function normalizeTags(tags: string[]): string[] {
@@ -298,5 +298,60 @@ export function merchanToDb(m: Pick<Merchan, 'nome' | 'ativo' | 'forte' | 'sempr
     ativo:          m.ativo,
     forte:          m.forte,
     sempre_sozinho: m.sempreSozinho,
+  }
+}
+
+// ─── Stories ─────────────────────────────────────────────────
+
+function slugify(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+export function dbToStory(row: Record<string, unknown>): Story {
+  const produto = (row.produto as string) ?? ''
+  return {
+    id:              String(row.id),
+    date:            (row.date as string) ?? '',
+    hora:            (row.hora as number) ?? 18,
+    diaSemana:       (row.dia_semana as string) ?? '',
+    utm:             (row.utm as string) ?? '',
+    produto,
+    produtoSlug:     slugify(produto),
+    categoria:       (row.categoria as string) ?? '',
+    status:          ((row.status as string) ?? 'nao_iniciado') as StoryStatus,
+    linkMidia:       (row.link_midia as string) ?? null,
+    linkUtm:         (row.link_utm as string) ?? null,
+    rastreioReceita: (row.rastreio_receita as string) ?? null,
+    receita:         (row.receita as number) ?? null,
+    origem:          (row.origem as string) ?? 'manual',
+  }
+}
+
+export function storyToDb(s: Omit<Story, 'id' | 'produtoSlug'>): Record<string, unknown> {
+  return {
+    date:             s.date,
+    hora:             s.hora,
+    dia_semana:       s.diaSemana,
+    utm:              s.utm,
+    produto:          s.produto,
+    categoria:        s.categoria,
+    status:           s.status,
+    link_midia:       s.linkMidia,
+    link_utm:         s.linkUtm,
+    rastreio_receita: s.rastreioReceita,
+    receita:          s.receita,
+    origem:           s.origem,
+  }
+}
+
+export function dbToDayAggregate(row: Record<string, unknown>): DayAggregate {
+  return {
+    id:                String(row.id),
+    date:              (row.date as string) ?? '',
+    alcance:           (row.alcance as number) ?? 0,
+    visualizacoes:     (row.visualizacoes as number) ?? 0,
+    respostas:         (row.respostas as number) ?? 0,
+    compartilhamentos: (row.compartilhamentos as number) ?? 0,
+    visitasPerfil:     (row.visitas_perfil as number) ?? 0,
   }
 }

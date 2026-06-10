@@ -445,6 +445,37 @@ export const PACKAGE_INFO = [
 
 export const FORMATS_LIST = ['Story', 'Estático', 'Coleção', 'Reels', 'Campanha']
 
+// ---- Stories Analytics ----
+
+export type StoryStatus = 'nao_iniciado' | 'em_andamento' | 'feito' | 'nao_postado' | 'proposta'
+
+export interface Story {
+  id: string
+  date: string          // YYYY-MM-DD
+  hora: number          // 14
+  diaSemana: string
+  utm: string
+  produto: string
+  produtoSlug: string   // derivado: sem acentos, lowercase, sem espaços
+  categoria: string
+  status: StoryStatus
+  linkMidia: string | null
+  linkUtm: string | null
+  rastreioReceita: string | null
+  receita: number | null
+  origem: string
+}
+
+export interface DayAggregate {
+  id: string
+  date: string
+  alcance: number
+  visualizacoes: number
+  respostas: number
+  compartilhamentos: number
+  visitasPerfil: number
+}
+
 export type RenderJobStatus = 'queued' | 'running' | 'done' | 'error'
 
 export interface RenderJob {

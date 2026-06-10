@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Post, Platform, PostSource, AppView, CalendarMode, Campaign, Collection, Linking,
@@ -14,7 +14,7 @@ import { TEAM_PROFILES } from '@/lib/data'
 import {
   campaignToDb, collectionToDb, postToDb, sourceToTable,
   dbToPost, dbToCampaign, dbToCollection,
-  dbToLive, dbToMerchan, liveToDb, merchanToDb, dbToStory,
+  dbToLive, dbToMerchan, liveToDb, merchanToDb, dbToStory, storyToDb,
 } from '@/lib/supabase/mappers'
 import { WEEKDAY_NOMES } from '@/lib/livesUtils'
 import { Icon, PlatformIcon } from './Icons'
@@ -34,6 +34,7 @@ import ArchivedView from './ArchivedView'
 import LivesView from './LivesView'
 import LiveModal from './LiveModal'
 import MerchansModal from './MerchansModal'
+import StoryModal from './StoryModal'
 
 
 interface Props {
@@ -170,7 +171,17 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   const [merchans, setMerchans] = useState<Merchan[]>(initialMerchans)
   const [stories, setStories] = useState<Story[]>(initialStories)
   const [dayAggregates] = useState<DayAggregate[]>(initialDayAggregates)
+  const knownProducts = useMemo(() => {
+    const seen = new Set<string>()
+    const result: string[] = []
+    for (const s of stories) {
+      const p = s.produto?.trim()
+      if (p && !seen.has(p)) { seen.add(p); result.push(p) }
+    }
+    return result.sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  }, [stories])
   const [activeLive, setActiveLive] = useState<Live | null>(null)
+  const [activeStory, setActiveStory] = useState<Story | null>(null)
   const [merchansOpen, setMerchansOpen] = useState(false)
   const [generatingProposta, setGeneratingProposta] = useState(false)
   const [view, setView] = useState<AppView>('calendar')
@@ -330,11 +341,11 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   }, [supabase])
 
   // ─── Filtering ────────────────────────────────────────────────
-  const calendarPosts = posts.filter(p => p.source !== 'mh')
+  const calendarPosts = posts.filter(p => p.source !== 'mh' || p.status !== 'pauta')
   let shownPosts: typeof posts
   if (view === 'branding')      shownPosts = posts.filter(p => p.source === 'branding')
   else if (view === 'mh')       shownPosts = posts.filter(p => p.source === 'mh')
-  else if (tagFilter === 'mh')       shownPosts = posts.filter(p => p.source === 'mh')
+  else if (tagFilter === 'mh')       shownPosts = posts.filter(p => p.source === 'mh' && p.status !== 'pauta')
   else if (tagFilter === 'branding') shownPosts = posts.filter(p => p.source === 'branding')
   else if (tagFilter === 'futebol')  shownPosts = posts.filter(p => p.tags?.includes('FUTEBOL'))
   else if (tagFilter === 'campanha') shownPosts = posts.filter(p => !!p.campaign?.trim())
@@ -525,6 +536,19 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   }
 
   const approveLive = (l: Live) => saveLive({ ...l, status: 'confirmada' })
+
+  // ─── Stories handlers ──────────────────────────────────────────
+
+  const saveStory = async (s: Story) => {
+    setStories(arr => arr.map(x => x.id === s.id ? s : x))
+    const { id, produtoSlug, ...rest } = s
+    await supabase.from('stories').update(storyToDb(rest)).eq('id', id)
+  }
+
+  const deleteStory = async (s: Story) => {
+    setStories(arr => arr.filter(x => x.id !== s.id))
+    await supabase.from('stories').delete().eq('id', s.id)
+  }
 
   const approveAllPropostas = async () => {
     const propostas = lives.filter(l => l.status === 'proposta')
@@ -1007,6 +1031,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             dayAggregates={dayAggregates}
             onStoryCreated={s => setStories(arr => [s, ...arr])}
             onStoryUpdated={s => setStories(arr => arr.map(x => x.id === s.id ? s : x))}
+            onStoryClick={setActiveStory}
           />
         )}
         {view === 'comemorativas' && <ComemorativasView initialItems={initialEventDates} />}
@@ -1060,6 +1085,17 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
         )}
         {view === 'archived' && <ArchivedView />}
       </main>
+
+      {/* Story modal */}
+      {activeStory && (
+        <StoryModal
+          story={activeStory}
+          knownProducts={knownProducts}
+          onClose={() => setActiveStory(null)}
+          onSave={s => { saveStory(s); setActiveStory(null) }}
+          onDelete={s => { deleteStory(s); setActiveStory(null) }}
+        />
+      )}
 
       {/* Live modal */}
       {activeLive && (

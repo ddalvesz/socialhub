@@ -319,9 +319,6 @@ function PautasView({
           <button key={c.id} className={`creator-filter-pill ${creatorFilter === c.id ? 'active' : ''}`} onClick={() => onCreatorFilterChange(c.id)}>
             <span className="cfp-av" style={{ background: c.color }}>{c.initial}</span>
             {c.name}
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: creatorFilter === c.id ? 'rgba(255,255,255,.7)' : 'var(--ink-3)', marginLeft: 4 }}>
-              {semanaLabel(c.semanaAtual)}
-            </span>
           </button>
         ))}
       </div>
@@ -769,16 +766,25 @@ function ListView({
   year: number
   month: number
 }) {
-  const [statusFilter, setStatusFilter] = useState<string>('sched')
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set(['sched']))
   const [creatorFilter, setCreatorFilter] = useState<string>('all')
   const today = todayISO()
+
+  function toggleStatus(id: string) {
+    if (id === 'all') { setStatusFilter(new Set()); return }
+    setStatusFilter(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
 
   const filtered = useMemo(() => {
     return posts
       .filter(p => {
         const d = parseISO(p.date)
         if (d.getFullYear() !== year || d.getMonth() !== month) return false
-        if (statusFilter !== 'all' && p.status !== statusFilter) return false
+        if (statusFilter.size > 0 && !statusFilter.has(p.status)) return false
         if (creatorFilter !== 'all' && ownerToCreatorId(p.owner) !== creatorFilter) return false
         return true
       })
@@ -812,8 +818,8 @@ function ListView({
         {[{ id: 'all', label: 'Todos' }, ...STATUSES_MH.map(s => ({ id: s.id, label: s.label }))].map(s => (
           <button
             key={s.id}
-            className={`creator-filter-pill ${statusFilter === s.id ? 'active' : ''}`}
-            onClick={() => setStatusFilter(s.id)}
+            className={`creator-filter-pill ${s.id === 'all' ? (statusFilter.size === 0 ? 'active' : '') : (statusFilter.has(s.id) ? 'active' : '')}`}
+            onClick={() => toggleStatus(s.id)}
           >
             {s.id !== 'all' && (
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUSES_MH.find(x => x.id === s.id)?.dot, flexShrink: 0 }} />

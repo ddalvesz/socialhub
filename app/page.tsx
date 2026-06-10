@@ -4,7 +4,7 @@ import SocialHubApp from '@/components/SocialHubApp'
 import type { Post } from '@/lib/types'
 import {
   dbToCampaign, dbToCollection, dbToEventDate, dbToFutebolEvent, dbToPost,
-  dbToLive, dbToMerchan,
+  dbToLive, dbToMerchan, dbToStory, dbToDayAggregate,
 } from '@/lib/supabase/mappers'
 
 export const dynamic = 'force-dynamic'
@@ -29,6 +29,8 @@ export default async function HomePage() {
     { data: products },
     { data: livesData },
     { data: merchansData },
+    { data: storiesData },
+    { data: dayAggregatesData },
   ] = await Promise.all([
     supabase.from('mh_posts').select('*').eq('archived', false).order('date', { ascending: true }),
     supabase.from('branding_posts').select('*').eq('archived', false).order('date', { ascending: true }),
@@ -43,6 +45,8 @@ export default async function HomePage() {
     supabase.from('products').select('name').order('name', { ascending: true }),
     supabase.from('lives').select('*').order('date', { ascending: true }),
     supabase.from('merchans').select('*').order('nome', { ascending: true }),
+    supabase.from('stories').select('*').order('date', { ascending: false }),
+    supabase.from('stories_day_aggregates').select('*').order('date', { ascending: true }),
   ])
 
   const allPosts: Post[] = [
@@ -69,6 +73,8 @@ export default async function HomePage() {
       initialProducts={(products ?? []).map(p => (p as { name: string }).name)}
       initialLives={(livesData ?? []).map(r => dbToLive(r as Record<string, unknown>))}
       initialMerchans={(merchansData ?? []).map(r => dbToMerchan(r as Record<string, unknown>))}
+      initialStories={(storiesData ?? []).map(r => dbToStory(r as Record<string, unknown>))}
+      initialDayAggregates={(dayAggregatesData ?? []).map(r => dbToDayAggregate(r as Record<string, unknown>))}
       userEmail={userEmail}
       userName={userName}
     />

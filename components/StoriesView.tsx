@@ -1,892 +1,686 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
-import { Icon } from './Icons'
-import { GenericSelect } from './FormHelpers'
-import { MONTHS, WEEKDAYS, buildMonthGrid, todayISO, parseISO, toISO, pad, fmtBR } from '@/lib/types'
+import { useState, useMemo, useCallback } from 'react'
+import {
+  ComposedChart, Area, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, BarChart, LabelList,
+} from 'recharts'
+import type { Story, DayAggregate } from '@/lib/types'
+import {
+  Period, filterByPeriod, storiesKpis, eficienciaAlcance,
+  receitaComparacao, receitaVariacao, engajamentoDiario, correlacaoReceitaAlcance,
+  projecaoMes, mediaPorDiaSemana, heatmapTiming, performancePorProduto, produtoColor,
+  STORY_STATUS_META, fmtBRL, fmtBRLk, fmtNumk, fmtPct,
+} from '@/lib/storiesUtils'
+import { todayISO } from '@/lib/types'
+import CreateStoryModal from './CreateStoryModal'
 
-/* ---- Constants ---- */
-const STORY_CATEGORIES = [
-  { id: 'asmr',        label: 'ASMR',        color: 'oklch(0.65 0.16 320)' },
-  { id: 'trends',      label: 'Trends',      color: 'oklch(0.6 0.16 265)'  },
-  { id: 'bastidores',  label: 'Bastidores',  color: 'oklch(0.65 0.14 60)'  },
-  { id: 'produto',     label: 'Produto',     color: 'oklch(0.6 0.15 150)'  },
-  { id: 'promocao',    label: 'Promoção',    color: 'oklch(0.6 0.18 25)'   },
-  { id: 'branding',    label: 'Branding',    color: 'oklch(0.55 0.15 285)' },
-  { id: 'engajamento', label: 'Engajamento', color: 'oklch(0.62 0.13 210)' },
+/* ── Constants ────────────────────────────────────────────── */
+
+const PERIOD_OPTS: { id: Period; label: string }[] = [
+  { id: '7d',   label: '7 dias'   },
+  { id: '30d',  label: '30 dias'  },
+  { id: '90d',  label: '90 dias'  },
+  { id: '12m',  label: '12 meses' },
+  { id: 'tudo', label: 'Tudo'     },
 ]
 
-const STORY_STATUSES = [
-  { id: 'naoIniciado', label: 'Não iniciado', color: 'oklch(0.65 0.012 300)' },
-  { id: 'andamento',   label: 'Em andamento', color: 'oklch(0.62 0.13 75)'   },
-  { id: 'feito',       label: 'Feito',        color: 'oklch(0.6 0.13 265)'   },
-  { id: 'postado',     label: 'Postado',      color: 'oklch(0.6 0.13 150)'   },
-  { id: 'naoPostado',  label: 'Não postado',  color: 'oklch(0.6 0.05 25)'    },
-]
-
-const PRODUTOS_FOCO = [
-  'Capa Care Verão', 'Carteira Care', 'Capa Liso Premium', 'Capa Floral Autoral',
-  'Disney 100 — Princesas', 'Tampas Pastel', 'Coleção ASMR', 'Caneca Care',
-  'Pop socket Care', 'Linha Geométrico', 'Capa Marvel', 'Linha Branding',
-]
-
-/* ---- Types ---- */
-interface Story {
-  id: number
-  date: string
-  time: string
-  produto: string
-  categoria: string
-  status: string
-  receita: number | null
-  sessoes: number | null
-  transacoes: number | null
-  link: string
-  linkCta: string
+const PERIOD_DAYS: Record<Period, number | null> = {
+  '7d': 7, '30d': 30, '90d': 90, '12m': 365, tudo: null,
 }
 
-/* ---- Helpers ---- */
-const storyCode = (iso: string, time: string) => {
-  if (!iso || !time) return ''
-  const [y, m, d] = iso.split('-')
-  const [hh] = time.split(':')
-  return `${y}${m}${d}${hh}`
-}
-const storyCodePretty = (iso: string, time: string) => {
-  if (!iso || !time) return '—'
-  const d = parseISO(iso)
-  const [hh] = time.split(':')
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}, às ${hh}h`
-}
-const fmtBRL = (n: number | null) =>
-  n == null ? '—' : 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-const fmtInt = (n: number | null) =>
-  n == null ? '—' : n.toLocaleString('pt-BR')
+const WEEKDAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
+const SLOT_LABELS = ['7h–9h','9h–11h','11h–13h','13h–15h','15h–17h','17h–19h','19h–21h','21h–23h']
 
-/* ---- Mock data ---- */
-function genMockStories(): Story[] {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = now.getMonth()
-  const today = now.getDate()
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
+const AXIS_COLOR = 'oklch(0.62 0.012 300)'
+const GRID_COLOR = 'oklch(0.94 0.01 300)'
+const ACCENT     = 'oklch(0.72 0.16 55)'
+const CHART_BLUE = 'oklch(0.52 0.16 250)'
+const CHART_CYAN = 'oklch(0.62 0.13 215)'
 
-  const rows: [string, string, number][] = [
-    ['Capa Care Verão',       'produto',     9],
-    ['Coleção ASMR',          'asmr',       11],
-    ['Carteira Care',         'produto',    14],
-    ['Linha Branding',        'branding',   18],
-    ['Capa Floral Autoral',   'produto',    10],
-    ['Caneca Care',           'promocao',   16],
-    ['Disney 100 — Princesas','produto',    12],
-    ['Capa Liso Premium',     'engajamento',19],
-    ['Coleção ASMR',          'asmr',       21],
-    ['Tampas Pastel',         'bastidores', 13],
-    ['Pop socket Care',       'trends',     17],
-    ['Capa Marvel',           'produto',    15],
-    ['Linha Geométrico',      'bastidores', 11],
-    ['Capa Care Verão',       'trends',     14],
-    ['Carteira Care',         'branding',   20],
-    ['Linha Branding',        'engajamento', 8],
-    ['Tampas Pastel',         'promocao',   16],
-    ['Coleção ASMR',          'asmr',       10],
-    ['Disney 100 — Princesas','promocao',   18],
-    ['Capa Floral Autoral',   'engajamento',12],
-    ['Capa Care Verão',       'produto',    21],
-    ['Caneca Care',           'bastidores',  9],
-    ['Pop socket Care',       'produto',    13],
-    ['Linha Geométrico',      'trends',     17],
-    ['Coleção ASMR',          'asmr',       15],
-    ['Capa Marvel',           'trends',     19],
-    ['Capa Liso Premium',     'produto',    11],
-    ['Tampas Pastel',         'produto',    14],
-    ['Linha Branding',        'branding',   16],
-    ['Carteira Care',         'engajamento',18],
-  ]
+/* ── Helpers ──────────────────────────────────────────────── */
 
-  const out: Story[] = []
-  let id = 1
-  rows.forEach((row, i) => {
-    const [produto, categoria, baseHour] = row
-    const dayOffset = (i * 2 + (i % 3)) % (daysInMonth + 4)
-    const dayN = 1 + dayOffset
-    let d: number, m = month, y = year
-    if (dayN > daysInMonth) {
-      d = dayN - daysInMonth; m = month + 1
-      if (m > 11) { m = 0; y = year + 1 }
-    } else { d = dayN }
-    const dateISO = toISO(y, m, d)
-    const min = (i * 13) % 60
-    const time = `${pad(baseHour)}:${pad(min)}`
-
-    const isPast = (y < year) || (y === year && m < month) || (y === year && m === month && d < today)
-    const isToday = (y === year && m === month && d === today)
-    let status: string
-    if (isPast) {
-      status = i % 6 === 0 ? 'naoPostado' : 'postado'
-    } else if (isToday) {
-      status = i % 2 === 0 ? 'feito' : 'andamento'
-    } else {
-      const cycle = i % 5
-      status = cycle === 0 ? 'feito' : cycle === 1 ? 'andamento' : 'naoIniciado'
-    }
-
-    let receita: number | null = null, sessoes: number | null = null, transacoes: number | null = null
-    if (status === 'postado') {
-      const base = 800 + ((i * 173) % 2400)
-      receita = base * (12 + (i % 7))
-      sessoes = 2400 + ((i * 311) % 9000)
-      transacoes = 12 + ((i * 7) % 95)
-    }
-
-    out.push({
-      id: id++, date: dateISO, time, produto, categoria, status,
-      receita, sessoes, transacoes,
-      link: status === 'postado' ? `https://instagram.com/story/${id}` : '',
-      linkCta: `https://gocase.com.br/${produto.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-')}`,
-    })
-  })
-  return out
+function periodLabel(period: Period): string {
+  const d = PERIOD_DAYS[period]
+  if (!d) return 'de todos os tempos'
+  return `nos últimos ${d < 365 ? d + ' dias' : '12 meses'}`
 }
 
-/* ============================================================
-   Sub-components
-   ============================================================ */
-function StoryStatusPill({ status }: { status: string }) {
-  const st = STORY_STATUSES.find(s => s.id === status) || STORY_STATUSES[0]
+/* ── Sub-components ───────────────────────────────────────── */
+
+function DashCard({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
-    <span className="story-status-pill" style={{
-      background: `color-mix(in oklab, ${st.color}, white 88%)`,
-      color: `color-mix(in oklab, ${st.color}, black 25%)`,
-      border: `1px solid color-mix(in oklab, ${st.color}, white 78%)`,
-    }}>
-      <span className="dot" style={{ background: st.color, width: 6, height: 6 }} />
-      {st.label}
-    </span>
-  )
-}
-
-function StoryCategoryChip({ id }: { id: string }) {
-  const c = STORY_CATEGORIES.find(x => x.id === id)
-  if (!c) return null
-  return (
-    <span className="story-cat-chip" style={{
-      background: `color-mix(in oklab, ${c.color}, white 90%)`,
-      color: `color-mix(in oklab, ${c.color}, black 20%)`,
-    }}>
-      {c.label}
-    </span>
-  )
-}
-
-function StoryDot({ story, onClick }: { story: Story; onClick: (s: Story) => void }) {
-  const cat = STORY_CATEGORIES.find(c => c.id === story.categoria)!
-  const st = STORY_STATUSES.find(s => s.id === story.status)!
-  return (
-    <button
-      className="story-chip"
-      onClick={e => { e.stopPropagation(); onClick(story) }}
-      title={`${story.time} · ${story.produto} · ${st.label}`}
-      style={{
-        background: `color-mix(in oklab, ${cat.color}, white 92%)`,
-        borderLeft: `3px solid ${cat.color}`,
-        opacity: story.status === 'naoPostado' ? 0.55 : 1,
-      }}
-    >
-      <span className="sc-time">{story.time}</span>
-      <span className="sc-title" style={{ textDecoration: story.status === 'naoPostado' ? 'line-through' : 'none' }}>
-        {story.produto}
-      </span>
-      <span className="sc-status-dot" style={{ background: st.color }} title={st.label} />
-    </button>
-  )
-}
-
-function StoriesCalendarGrid({ year, month, stories, onStoryClick, onNewStory }: {
-  year: number; month: number; stories: Story[]
-  onStoryClick: (s: Story) => void
-  onNewStory: (iso: string) => void
-}) {
-  const cells = useMemo(() => buildMonthGrid(year, month), [year, month])
-  const today = todayISO()
-
-  const byDay = useMemo(() => {
-    const map: Record<string, Story[]> = {}
-    stories.forEach(s => { (map[s.date] = map[s.date] || []).push(s) })
-    Object.values(map).forEach(arr => arr.sort((a, b) => a.time.localeCompare(b.time)))
-    return map
-  }, [stories])
-
-  const maxPerCell = 3
-  return (
-    <div className="cal-grid">
-      {WEEKDAYS.map(w => <div key={w} className="cal-head">{w}</div>)}
-      {cells.map((c, i) => {
-        const isToday = c.iso === today
-        const day = byDay[c.iso] || []
-        const visible = day.slice(0, maxPerCell)
-        const more = day.length - visible.length
-        return (
-          <div key={i}
-            className={`cal-cell ${c.other ? 'other' : ''} ${isToday ? 'today' : ''}`}
-            onClick={() => !c.other && onNewStory(c.iso)}>
-            <div className="cal-num-row">
-              <span className="cal-num-box">{c.day}</span>
-              {day.length > 0 && (
-                <span className="story-day-count" title={`${day.length} story${day.length > 1 ? 's' : ''}`}>
-                  {day.length}
-                </span>
-              )}
-            </div>
-            {visible.map(s => <StoryDot key={s.id} story={s} onClick={onStoryClick} />)}
-            {more > 0 && <div className="cal-more" onClick={e => e.stopPropagation()}>+{more} mais</div>}
-          </div>
-        )
-      })}
+    <div className="live-card" style={{ marginBottom: 20 }}>
+      <div className="live-card-head">
+        <div>
+          <div className="live-card-title">{title}</div>
+          {hint && <div style={{ fontSize: 11, color: AXIS_COLOR, marginTop: 2 }}>{hint}</div>}
+        </div>
+      </div>
+      <div className="live-card-body">{children}</div>
     </div>
   )
 }
 
-/* ---- Category/Status button row ---- */
-function CatButtons({ selected, items, onSelect }: {
-  selected: string
-  items: { id: string; label: string; color: string }[]
-  onSelect: (id: string) => void
-}) {
+function KpiCard({ label, value, sub, accent }: { label: string; value: string; sub: string; accent?: boolean }) {
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-      {items.map(c => (
-        <button key={c.id} type="button"
-          className={`story-cat-btn ${selected === c.id ? 'active' : ''}`}
-          onClick={() => onSelect(c.id)}
-          style={selected === c.id ? {
-            background: `color-mix(in oklab, ${c.color}, white 84%)`,
-            color: `color-mix(in oklab, ${c.color}, black 25%)`,
-            borderColor: `color-mix(in oklab, ${c.color}, white 70%)`,
-          } : {}}>
-          <span className="dot" style={{ background: c.color }} />
-          {c.label}
-        </button>
+    <div className="live-kpi">
+      <div className="live-kpi-l">{label}</div>
+      <div className="live-kpi-v" style={accent ? { color: ACCENT } : {}}>{value}</div>
+      <div className="live-kpi-s">{sub}</div>
+    </div>
+  )
+}
+
+function VariacaoBadge({ delta }: { delta: number | null }) {
+  if (delta === null) return null
+  const pos = delta >= 0
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '3px 9px', borderRadius: 999, fontSize: 12, fontWeight: 700,
+      background: pos ? 'oklch(0.95 0.04 150)' : 'oklch(0.95 0.04 25)',
+      color: pos ? 'oklch(0.42 0.13 150)' : 'oklch(0.5 0.15 25)',
+      border: `1px solid ${pos ? 'oklch(0.86 0.08 150)' : 'oklch(0.87 0.09 25)'}`,
+    }}>
+      {delta >= 0 ? '▲' : '▼'} {fmtPct(Math.abs(delta))}
+    </span>
+  )
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function LiveTip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="live-tip">
+      <div className="live-tip-head">{label}</div>
+      {payload.map((p: { name: string; value: number; color: string }, i: number) => (
+        <div key={i} className="live-tip-row">
+          <span className="live-tip-swatch" style={{ background: p.color }} />
+          <span>{p.name}</span>
+          <span className="live-tip-val">{typeof p.value === 'number' && p.value > 100 ? fmtBRL(p.value) : p.value}</span>
+        </div>
       ))}
     </div>
   )
 }
 
-/* ---- Expanded inline card (list mode) ---- */
-function StoryExpandedCard({ draft, set, onSave, onCancel, onDelete }: {
-  draft: Story
-  set: (k: keyof Story, v: any) => void
-  onSave: (s: Story) => void
-  onCancel: () => void
-  onDelete: (s: Story) => void
-}) {
-  const cat = STORY_CATEGORIES.find(c => c.id === draft.categoria)
-  const isPostado = draft.status === 'postado'
+function StoryStatusPill({ status }: { status: string }) {
+  const meta = STORY_STATUS_META[status]
+  if (!meta) return <span>{status}</span>
+  const cls = status === 'nao_iniciado' ? 's-st-ni'
+    : status === 'em_andamento' ? 's-st-ea'
+    : status === 'feito' ? 's-st-feito'
+    : status === 'proposta' ? 's-st-post'
+    : 's-st-np'
+  return (
+    <span className={`status-pill ${cls}`}>
+      <span className="sdot" />
+      {meta.label}
+    </span>
+  )
+}
+
+function CopyUtmBtn({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(code)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }, [code])
+  return (
+    <button className={`btn-copy-utm ${copied ? 'copied' : ''}`} onClick={handleCopy}>
+      {copied ? (
+        <>
+          <svg viewBox="0 0 16 16" width={12} height={12} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 8 6.5 12 13 4" />
+          </svg>
+          Copiado!
+        </>
+      ) : (
+        <>
+          <svg viewBox="0 0 16 16" width={12} height={12} fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="5" y="5" width="9" height="9" rx="2"/>
+            <path d="M11 5V3a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/>
+          </svg>
+          Copiar UTM
+        </>
+      )}
+    </button>
+  )
+}
+
+/* ── Chart 1: Comparação de receita ──────────────────────── */
+
+function ReceitaComparacaoChart({ period, stories }: { period: Period; stories: Story[] }) {
+  const today = todayISO()
+  const data = useMemo(() => receitaComparacao(stories, period, today), [stories, period, today])
+  const delta = useMemo(() => receitaVariacao(data), [data])
+  const hasComparacao = period !== '12m' && period !== 'tudo'
+
+  const title = period === '7d' ? 'Esta semana vs semana passada'
+    : period === '30d' ? 'Últimos 30 dias vs 30 anteriores'
+    : period === '90d' ? 'Últimos 90 dias vs 90 anteriores'
+    : 'Receita por semana'
 
   return (
-    <div className="list-expansion stories-exp">
-      <div className="stories-exp-head">
-        <div className="story-modal-mark" style={{
-          background: `color-mix(in oklab, ${cat?.color || 'var(--accent)'}, white 80%)`,
-          color: cat?.color || 'var(--accent-deep)',
-          width: 38, height: 38, borderRadius: 10, flex: '0 0 38px',
-        }}>
-          <Icon.stories />
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 500, letterSpacing: '.04em', textTransform: 'uppercase' }}>
-            Editar story · #{storyCode(draft.date, draft.time) || '—'}
-          </div>
-          <div style={{ fontSize: 17, fontWeight: 700, marginTop: 2, lineHeight: 1.2, letterSpacing: '-0.01em' }}>
-            {draft.produto || 'Sem produto'}
-          </div>
-          <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 1 }}>{storyCodePretty(draft.date, draft.time)}</div>
-        </div>
+    <div className="live-card" style={{ marginBottom: 20 }}>
+      <div className="live-card-head" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="live-card-title">{title}</div>
+        {hasComparacao && <VariacaoBadge delta={delta} />}
       </div>
-
-      <div className="stories-exp-grid">
-        <div className="exp-cell">
-          <label>Data</label>
-          <input className="field" type="date" value={draft.date} onChange={e => set('date', e.target.value)} />
-        </div>
-        <div className="exp-cell">
-          <label>Hora</label>
-          <input className="field" type="time" value={draft.time} onChange={e => set('time', e.target.value)} />
-        </div>
-        <div className="exp-cell" style={{ gridColumn: 'span 2' }}>
-          <label>Produto foco</label>
-          <GenericSelect value={draft.produto}
-            options={PRODUTOS_FOCO.map(p => ({ id: p, label: p }))}
-            onChange={v => set('produto', v)}
-            placeholder="Selecionar produto..." width={300} />
-        </div>
-
-        <div className="exp-cell" style={{ gridColumn: '1 / -1' }}>
-          <label>Categoria</label>
-          <CatButtons selected={draft.categoria} items={STORY_CATEGORIES} onSelect={v => set('categoria', v)} />
-        </div>
-
-        <div className="exp-cell" style={{ gridColumn: '1 / -1' }}>
-          <label>Status</label>
-          <CatButtons selected={draft.status} items={STORY_STATUSES} onSelect={v => set('status', v)} />
-        </div>
-
-        <div className="exp-cell" style={{ gridColumn: 'span 2' }}>
-          <label>Link do conteúdo</label>
-          <input className="field" placeholder="https://instagram.com/story/..."
-            value={draft.link || ''} onChange={e => set('link', e.target.value)} />
-        </div>
-        <div className="exp-cell" style={{ gridColumn: 'span 2' }}>
-          <label>Link CTA</label>
-          <input className="field" placeholder="https://gocase.com.br/..."
-            value={draft.linkCta || ''} onChange={e => set('linkCta', e.target.value)} />
-        </div>
-
-        {isPostado && (
-          <>
-            <div className="exp-section-divider"><span>Métricas</span></div>
-            <div className="exp-cell">
-              <label>Receita do story (R$)</label>
-              <input className="field" type="number" placeholder="0"
-                value={draft.receita ?? ''}
-                onChange={e => set('receita', e.target.value === '' ? null : Number(e.target.value))} />
+      <div className="live-card-body">
+        <ResponsiveContainer width="100%" height={200}>
+          <ComposedChart data={data} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
+            <defs>
+              <linearGradient id="atualGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%"  stopColor={ACCENT} stopOpacity={0.22} />
+                <stop offset="95%" stopColor={ACCENT} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 10.5, fill: AXIS_COLOR }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 10.5, fill: AXIS_COLOR }} axisLine={false} tickLine={false} tickFormatter={v => fmtBRLk(v)} width={60} />
+            <Tooltip content={<LiveTip />} />
+            <Area dataKey="atual" name="Período atual" stroke={ACCENT} strokeWidth={2} fill="url(#atualGrad)" dot={false} activeDot={{ r: 4 }} />
+            {hasComparacao && (
+              <Line dataKey="anterior" name="Período anterior" stroke={AXIS_COLOR} strokeWidth={1.5} strokeDasharray="4 3" dot={false} activeDot={{ r: 3 }} />
+            )}
+          </ComposedChart>
+        </ResponsiveContainer>
+        {hasComparacao && (
+          <div className="cmp-legend" style={{ display: 'flex', gap: 18, borderTop: `1px dashed ${GRID_COLOR}`, paddingTop: 10, marginTop: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: AXIS_COLOR }}>
+              <span style={{ display: 'inline-block', width: 18, height: 3, borderRadius: 2, background: ACCENT }} />
+              Período atual
             </div>
-            <div className="exp-cell">
-              <label>Sessões totais</label>
-              <input className="field" type="number" placeholder="0"
-                value={draft.sessoes ?? ''}
-                onChange={e => set('sessoes', e.target.value === '' ? null : Number(e.target.value))} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: AXIS_COLOR }}>
+              <span style={{ display: 'inline-block', width: 18, borderTop: `2px dashed ${AXIS_COLOR}` }} />
+              Período anterior
             </div>
-            <div className="exp-cell">
-              <label>Transações</label>
-              <input className="field" type="number" placeholder="0"
-                value={draft.transacoes ?? ''}
-                onChange={e => set('transacoes', e.target.value === '' ? null : Number(e.target.value))} />
-            </div>
-          </>
+          </div>
         )}
       </div>
-
-      <div className="stories-exp-actions">
-        <button className="btn btn-ghost danger-ghost" onClick={() => onDelete(draft)}>
-          <Icon.trash /> Excluir
-        </button>
-        <div style={{ flex: 1 }} />
-        <button className="btn btn-ghost" onClick={onCancel}>Cancelar</button>
-        <button className="btn btn-accent" onClick={() => onSave(draft)}>Salvar alterações</button>
-      </div>
     </div>
   )
 }
 
-/* ---- List with expandable rows ---- */
-const LIST_GRID_COLS = '40px 110px 110px 72px minmax(180px, 1fr) 130px 115px 90px 80px 135px 86px 48px'
-const LIST_HEADERS = ['', 'Código', 'Data', 'Hora', 'Produto foco', 'Categoria', 'Receita', 'Sessões', 'Trans.', 'Status', 'Links', '']
+/* ── Chart 2: Engajamento diário ──────────────────────────── */
 
-function StoriesList({ stories, onSave, onDelete }: {
-  stories: Story[]
-  onSave: (s: Story) => void
-  onDelete: (s: Story) => void
-}) {
-  const [expanded, setExpanded] = useState<number | null>(null)
-  const [draft, setDraft] = useState<Story | null>(null)
+function EngajamentoDiarioChart({ aggregates }: { aggregates: DayAggregate[] }) {
+  const data = useMemo(() => engajamentoDiario(aggregates), [aggregates])
 
-  const open = (s: Story) => { setExpanded(s.id); setDraft({ ...s }) }
-  const close = () => { setExpanded(null); setDraft(null) }
-  const set = (k: keyof Story, v: any) => setDraft(d => d ? { ...d, [k]: v } : d)
-
-  if (stories.length === 0) {
+  if (aggregates.length === 0) {
     return (
-      <div className="stories-empty">
-        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink-2)' }}>Nenhum story</div>
-        <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 4 }}>Crie um novo story ou ajuste os filtros.</div>
-      </div>
+      <DashCard title="Engajamento diário">
+        <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: AXIS_COLOR, fontSize: 13 }}>
+          Sem dados de alcance. Preencha os dados diários para ver este gráfico.
+        </div>
+      </DashCard>
     )
   }
 
   return (
-    <div className="list stories-list">
-      <div className="list-row list-head" style={{ gridTemplateColumns: LIST_GRID_COLS }}>
-        {LIST_HEADERS.map((h, i) => <div key={i} className="cell">{h}</div>)}
-      </div>
-      {stories.map(s => {
-        const isOpen = expanded === s.id
-        const liveDraft = isOpen && draft ? draft : s
-        return (
-          <div key={s.id}>
-            <div className={`list-row expandable ${isOpen ? 'expanded' : ''}`}
-              style={{ gridTemplateColumns: LIST_GRID_COLS }}
-              onClick={() => isOpen ? close() : open(s)}>
-              <div className="cell" style={{ padding: '14px 0 14px 12px' }}>
-                <span style={{
-                  display: 'inline-grid', placeItems: 'center', width: 22, height: 22, borderRadius: 999,
-                  color: 'var(--ink-3)', transition: 'transform .2s',
-                  transform: isOpen ? 'rotate(0)' : 'rotate(-90deg)',
-                }}>
-                  <Icon.chevD />
-                </span>
-              </div>
-              <div className="cell" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-2)' }}>
-                {storyCode(s.date, s.time)}
-              </div>
-              <div className="cell" style={{ fontSize: 13, color: 'var(--ink-2)', fontVariantNumeric: 'tabular-nums' }}>
-                {fmtBR(s.date)}
-              </div>
-              <div className="cell" style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5 }}>{s.time}</div>
-              <div className="cell" style={{ fontWeight: 500, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {s.produto}
-              </div>
-              <div className="cell"><StoryCategoryChip id={s.categoria} /></div>
-              <div className="cell" style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums', color: s.receita == null ? 'var(--ink-4)' : 'var(--ink)' }}>
-                {fmtBRL(s.receita)}
-              </div>
-              <div className="cell" style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums', color: s.sessoes == null ? 'var(--ink-4)' : 'var(--ink-2)' }}>
-                {fmtInt(s.sessoes)}
-              </div>
-              <div className="cell" style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums', color: s.transacoes == null ? 'var(--ink-4)' : 'var(--ink-2)' }}>
-                {fmtInt(s.transacoes)}
-              </div>
-              <div className="cell"><StoryStatusPill status={s.status} /></div>
-              <div className="cell" style={{ display: 'flex', gap: 6 }}>
-                {s.link && (
-                  <a href={s.link} target="_blank" rel="noopener noreferrer"
-                    className="story-link-btn" onClick={e => e.stopPropagation()} title="Link do conteúdo">
-                    <Icon.link />
-                  </a>
-                )}
-                {s.linkCta && (
-                  <a href={s.linkCta} target="_blank" rel="noopener noreferrer"
-                    className="story-link-btn cta" onClick={e => e.stopPropagation()} title="Link CTA">
-                    <Icon.link />
-                  </a>
-                )}
-              </div>
-              <div className="cell" style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button className="story-row-del" onClick={e => { e.stopPropagation(); onDelete(s) }} title="Excluir">
-                  <Icon.trash />
-                </button>
-              </div>
-            </div>
-            {isOpen && draft && (
-              <StoryExpandedCard
-                draft={liveDraft}
-                set={set}
-                onSave={d => { onSave(d); close() }}
-                onCancel={close}
-                onDelete={d => { onDelete(d); close() }}
-              />
-            )}
+    <DashCard title="Engajamento diário">
+      <ResponsiveContainer width="100%" height={200}>
+        <ComposedChart data={data} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
+          <defs>
+            <linearGradient id="alcGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%"  stopColor={CHART_BLUE} stopOpacity={0.22} />
+              <stop offset="95%" stopColor={CHART_BLUE} stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="viewGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%"  stopColor={CHART_CYAN} stopOpacity={0.16} />
+              <stop offset="95%" stopColor={CHART_CYAN} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+          <XAxis dataKey="label" tick={{ fontSize: 10.5, fill: AXIS_COLOR }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+          <YAxis tick={{ fontSize: 10.5, fill: AXIS_COLOR }} axisLine={false} tickLine={false} tickFormatter={fmtNumk} width={48} />
+          <Tooltip content={<LiveTip />} />
+          <Area dataKey="visualizacoes" name="Visualizações" stroke={CHART_CYAN} strokeWidth={1.5} fill="url(#viewGrad)" dot={false} />
+          <Area dataKey="alcance" name="Alcance" stroke={CHART_BLUE} strokeWidth={2} fill="url(#alcGrad)" dot={false} />
+        </ComposedChart>
+      </ResponsiveContainer>
+      <div style={{ display: 'flex', gap: 18, borderTop: `1px dashed ${GRID_COLOR}`, paddingTop: 10, marginTop: 4 }}>
+        {[{ color: CHART_BLUE, label: 'Alcance' }, { color: CHART_CYAN, label: 'Visualizações' }].map(l => (
+          <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: AXIS_COLOR }}>
+            <span style={{ display: 'inline-block', width: 18, height: 9, borderRadius: 2, background: l.color + '44', borderTop: `2px solid ${l.color}` }} />
+            {l.label}
           </div>
-        )
-      })}
-    </div>
+        ))}
+      </div>
+    </DashCard>
   )
 }
 
-/* ---- Story Modal (calendar mode) ---- */
-function StoryModal({ story, isNew, onClose, onSave, onDelete }: {
-  story: Story; isNew: boolean
-  onClose: () => void
-  onSave: (s: Story) => void
-  onDelete: (s: Story) => void
-}) {
-  const [draft, setDraft] = useState<Story>(story)
-  useEffect(() => { setDraft(story) }, [story.id])
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', h)
-    return () => window.removeEventListener('keydown', h)
-  }, [onClose])
+/* ── Chart 3: Correlação receita × alcance ────────────────── */
 
-  const set = (k: keyof Story, v: any) => setDraft(d => ({ ...d, [k]: v }))
-  const cat = STORY_CATEGORIES.find(c => c.id === draft.categoria)
-  const isPostado = draft.status === 'postado'
+function CorrelacaoChart({ stories, aggregates }: { stories: Story[]; aggregates: DayAggregate[] }) {
+  const data = useMemo(() => correlacaoReceitaAlcance(stories, aggregates), [stories, aggregates])
+  const barWidth = Math.max(4, Math.min(28, 240 / Math.max(data.length, 1)))
+
+  if (!data.length) return null
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-head">
-          <div className="story-modal-mark" style={{
-            background: `color-mix(in oklab, ${cat?.color || 'var(--accent)'}, white 80%)`,
-            color: cat?.color || 'var(--accent-deep)',
-          }}>
-            <Icon.stories />
+    <DashCard title="Correlação receita × alcance" hint="barras = alcance (eixo esq.) · linha = receita via UTM (eixo dir.)">
+      <ResponsiveContainer width="100%" height={200}>
+        <ComposedChart data={data} margin={{ top: 4, right: 48, bottom: 0, left: 0 }}>
+          <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+          <XAxis dataKey="label" tick={{ fontSize: 10, fill: AXIS_COLOR }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+          <YAxis yAxisId="left" tick={{ fontSize: 10, fill: AXIS_COLOR }} axisLine={false} tickLine={false} tickFormatter={fmtNumk} width={48} />
+          <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: AXIS_COLOR }} axisLine={false} tickLine={false} tickFormatter={fmtBRLk} width={52} />
+          <Tooltip content={<LiveTip />} />
+          <Bar yAxisId="left" dataKey="alcance" name="Alcance" barSize={barWidth}
+            fill={CHART_BLUE} fillOpacity={0.18}
+            stroke={CHART_BLUE} strokeWidth={0.5}
+            radius={[3, 3, 0, 0]}
+          />
+          <Line yAxisId="right" dataKey="receita" name="Receita" stroke={ACCENT} strokeWidth={2} dot={false} activeDot={{ r: 5 }} />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </DashCard>
+  )
+}
+
+/* ── Chart 4: Projeção do mês ─────────────────────────────── */
+
+function ProjecaoMesCard({ stories, aggregates }: { stories: Story[]; aggregates: DayAggregate[] }) {
+  const today = todayISO()
+  const proj  = useMemo(() => projecaoMes(stories, aggregates, today), [stories, aggregates, today])
+  const [y, m] = today.split('-').map(Number)
+  const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+
+  return (
+    <div className="live-card">
+      <div className="live-card-head">
+        <div className="live-card-title">Projeção do mês</div>
+      </div>
+      <div className="live-card-body">
+        <div className="live-mvp">
+          <div className="live-mvp-cur">
+            <div className="lbl">{monthNames[m - 1]} <span className="lbl-sub">dia 1 – {proj.dayOfMonth}</span></div>
+            <div className="val" style={{ color: ACCENT }}>{fmtBRLk(proj.curRev)}</div>
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 500, letterSpacing: '.04em', textTransform: 'uppercase' }}>
-              {isNew ? 'Novo story' : 'Editar story'}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginTop: 4 }}>
-              <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.15, letterSpacing: '-0.01em' }}>
-                {draft.produto || 'Sem produto'}
-              </div>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)' }}>
-                #{storyCode(draft.date, draft.time) || '—'}
-              </span>
-            </div>
-            <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 2 }}>{storyCodePretty(draft.date, draft.time)}</div>
+          <div>
+            <VariacaoBadge delta={proj.delta} />
+            {proj.delta === null && <span style={{ fontSize: 12, color: AXIS_COLOR }}>sem comparativo anterior</span>}
           </div>
-          <button className="modal-close" onClick={onClose}><Icon.x /></button>
-        </div>
-
-        <div className="modal-body">
-          <div className="modal-grid">
-            <label>Data</label>
-            <input className="field" type="date" value={draft.date}
-              onChange={e => set('date', e.target.value)} style={{ width: 200 }} />
-
-            <label>Hora</label>
-            <input className="field" type="time" value={draft.time}
-              onChange={e => set('time', e.target.value)} style={{ width: 140 }} />
-
-            <label>Produto foco</label>
-            <GenericSelect value={draft.produto}
-              options={PRODUTOS_FOCO.map(p => ({ id: p, label: p }))}
-              onChange={v => set('produto', v)} placeholder="Selecionar produto..." width={300} />
-
-            <label>Categoria</label>
-            <CatButtons selected={draft.categoria} items={STORY_CATEGORIES} onSelect={v => set('categoria', v)} />
-
-            <label>Status</label>
-            <CatButtons selected={draft.status} items={STORY_STATUSES} onSelect={v => set('status', v)} />
-
-            <label>Link do conteúdo</label>
-            <input className="field" placeholder="https://instagram.com/story/..."
-              value={draft.link || ''} onChange={e => set('link', e.target.value)} />
-
-            <label>Link CTA</label>
-            <input className="field" placeholder="https://gocase.com.br/..."
-              value={draft.linkCta || ''} onChange={e => set('linkCta', e.target.value)} />
-
-            {isPostado && (
-              <>
-                <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--line)', margin: '6px 0 2px',
-                  paddingTop: 14, fontSize: 11, fontWeight: 500, letterSpacing: '.04em', textTransform: 'uppercase',
-                  color: 'var(--ink-3)' }}>
-                  Métricas
-                </div>
-                <label>Receita do story</label>
-                <div className="field-inline">
-                  <span style={{ color: 'var(--ink-3)', fontSize: 13 }}>R$</span>
-                  <input className="field" type="number" placeholder="0"
-                    value={draft.receita ?? ''} onChange={e => set('receita', e.target.value === '' ? null : Number(e.target.value))}
-                    style={{ width: 180 }} />
-                </div>
-
-                <label>Sessões totais</label>
-                <input className="field" type="number" placeholder="0"
-                  value={draft.sessoes ?? ''} onChange={e => set('sessoes', e.target.value === '' ? null : Number(e.target.value))}
-                  style={{ width: 180 }} />
-
-                <label>Transações</label>
-                <input className="field" type="number" placeholder="0"
-                  value={draft.transacoes ?? ''} onChange={e => set('transacoes', e.target.value === '' ? null : Number(e.target.value))}
-                  style={{ width: 140 }} />
-              </>
-            )}
+          <div className="live-mvp-prev">
+            <div className="lbl">Projeção até dia {proj.daysInMonth} <span className="lbl-sub">· ritmo atual</span></div>
+            <div className="val">{fmtBRLk(proj.projected)}</div>
           </div>
-        </div>
-
-        <div className="modal-foot">
-          {!isNew && (
-            <button className="btn btn-ghost danger-ghost" onClick={() => { onDelete(draft); onClose() }}>
-              <Icon.trash /> Excluir
-            </button>
-          )}
-          <div style={{ flex: 1 }} />
-          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-accent" onClick={() => { onSave(draft); onClose() }}>
-            {isNew ? 'Criar story' : 'Salvar alterações'}
-          </button>
+          <div className="live-mvp-foot">
+            Mês anterior mesmo período: {fmtBRLk(proj.prevRev)}
+            {proj.alcanceCur > 0 && ` · Alcance: ${fmtNumk(proj.alcanceCur)} vs ${fmtNumk(proj.alcancePrev)} anterior`}
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
-/* ============================================================
-   StoriesAgenda — timeline list view
-   ============================================================ */
-function StoriesAgenda({ stories, today, onStoryClick }: {
-  stories: Story[]; today: string; onStoryClick: (s: Story) => void
-}) {
-  const weekday = (iso: string) => {
-    const d = parseISO(iso)
-    return ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][d.getDay()]
-  }
+/* ── Chart 5: Média por dia da semana ────────────────────── */
 
-  const sorted = [...stories].sort((a, b) => {
-    const av = `${a.date} ${a.time}`; const bv = `${b.date} ${b.time}`
-    return av < bv ? -1 : av > bv ? 1 : 0
-  })
-
-  const grouped: [string, Story[]][] = []
-  for (const s of sorted) {
-    const last = grouped[grouped.length - 1]
-    if (last && last[0] === s.date) last[1].push(s)
-    else grouped.push([s.date, [s]])
-  }
-
-  if (grouped.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--ink-3)' }}>
-        Nenhum story neste mês.
-      </div>
-    )
-  }
+function MediaDiaSemana({ stories, aggregates }: { stories: Story[]; aggregates: DayAggregate[] }) {
+  const data = useMemo(() => mediaPorDiaSemana(stories, aggregates), [stories, aggregates])
 
   return (
-    <div className="pautas-view" style={{ paddingTop: 16 }}>
-      {grouped.map(([date, dayStories]) => {
-        const isToday = date === today
-        const isPast = date < today
-        return (
-          <div key={date} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', paddingBottom: 2 }}>
-            <div style={{
-              width: 64, flexShrink: 0, paddingTop: 10, textAlign: 'right',
-              fontFamily: 'var(--font-mono)', fontSize: 12.5, lineHeight: 1.3,
-              color: isToday ? 'var(--accent)' : isPast ? 'var(--ink-3)' : 'var(--ink-2)',
-              fontWeight: isToday ? 700 : 500,
-            }}>
-              <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1 }}>{date.slice(8)}</div>
-              <div style={{ fontSize: 11, marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{weekday(date)}</div>
-              {isToday && <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 2, fontWeight: 700 }}>hoje</div>}
-            </div>
-            <div style={{ flex: 1, borderLeft: `2px solid ${isToday ? 'var(--accent-soft)' : 'var(--border)'}`, paddingLeft: 16, paddingTop: 8, paddingBottom: 8 }}>
-              {dayStories.map(s => {
-                const cat = STORY_CATEGORIES.find(c => c.id === s.categoria)
-                const st = STORY_STATUSES.find(x => x.id === s.status)
+    <div className="live-card">
+      <div className="live-card-head">
+        <div className="live-card-title">Média por dia da semana</div>
+      </div>
+      <div className="live-card-body">
+        <ResponsiveContainer width="100%" height={200}>
+          <ComposedChart data={data} margin={{ top: 4, right: 48, bottom: 0, left: 0 }}>
+            <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 10.5, fill: AXIS_COLOR }} axisLine={false} tickLine={false} />
+            <YAxis yAxisId="left" tick={{ fontSize: 10, fill: AXIS_COLOR }} axisLine={false} tickLine={false} tickFormatter={fmtNumk} width={44} />
+            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: AXIS_COLOR }} axisLine={false} tickLine={false} tickFormatter={fmtBRLk} width={52} />
+            <Tooltip content={<LiveTip />} />
+            <Bar yAxisId="left" dataKey="avgAlcance" name="Alcance médio" fill={CHART_BLUE} fillOpacity={0.20} barSize={30} radius={[4, 4, 0, 0]} />
+            <Line yAxisId="right" dataKey="avgReceita" name="Receita média" stroke={ACCENT} strokeWidth={2} dot={{ r: 4, fill: ACCENT }} activeDot={{ r: 5 }} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  )
+}
+
+/* ── Chart 6: Heatmap timing ─────────────────────────────── */
+
+function HeatmapTiming({ stories }: { stories: Story[] }) {
+  const { cells, maxVal } = useMemo(() => heatmapTiming(stories), [stories])
+  const [tooltip, setTooltip] = useState<{ slot: number; dow: number; avg: number; count: number } | null>(null)
+
+  function cellColor(avg: number): string {
+    if (!maxVal) return 'var(--surface-3)'
+    const t = avg / maxVal
+    const L = 0.96 - t * 0.34
+    const C = 0.02 + t * 0.16
+    return `oklch(${L.toFixed(3)} ${C.toFixed(3)} 55)`
+  }
+
+  const cellMap = new Map(cells.map(c => [`${c.slot}_${c.dow}`, c]))
+
+  // gradient stops for legend
+  const gradStops = Array.from({ length: 10 }, (_, i) => {
+    const t = i / 9
+    const L = 0.96 - t * 0.34
+    const C = 0.02 + t * 0.16
+    return `oklch(${L.toFixed(3)} ${C.toFixed(3)} 55) ${(t * 100).toFixed(0)}%`
+  }).join(', ')
+
+  return (
+    <DashCard title="Timing de postagem">
+      <div className="st-heatmap">
+        <div className="st-hm-grid">
+          <div className="st-hm-corner" />
+          {WEEKDAYS.map(d => <div key={d} className="st-hm-day-hdr">{d}</div>)}
+          {SLOT_LABELS.map((slot, si) => (
+            <>
+              <div key={`lbl-${si}`} className="st-hm-slot-lbl">{slot}</div>
+              {WEEKDAYS.map((_, di) => {
+                const cell = cellMap.get(`${si}_${di}`)
                 return (
                   <div
-                    key={s.id}
-                    onClick={() => onStoryClick(s)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', marginBottom: 4, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.12s' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-softer)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'var(--surface)')}
+                    key={`c-${si}-${di}`}
+                    className={`st-hm-cell ${cell ? 'has-data' : ''}`}
+                    style={{ background: cell ? cellColor(cell.avg) : undefined }}
+                    onMouseEnter={() => cell && setTooltip(cell)}
+                    onMouseLeave={() => setTooltip(null)}
                   >
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)', width: 40, flexShrink: 0 }}>{s.time}</div>
-                    {cat && (
-                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', padding: '2px 7px', borderRadius: 5, background: cat.color + '22', color: cat.color, flexShrink: 0 }}>
-                        {cat.label}
-                      </span>
-                    )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.produto}</div>
-                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1, fontFamily: 'var(--font-mono)' }}>{storyCodePretty(s.date, s.time)}</div>
-                    </div>
-                    {s.receita != null && (
-                      <div style={{ fontSize: 11, color: 'var(--ink-3)', flexShrink: 0, textAlign: 'right' }}>
-                        <div style={{ fontWeight: 600, color: 'var(--ink-2)' }}>{fmtBRL(s.receita)}</div>
-                        <div>{fmtInt(s.sessoes)} sess.</div>
-                      </div>
-                    )}
-                    {st && (
-                      <span style={{ fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 6, background: st.color + '20', color: st.color, flexShrink: 0 }}>
-                        {st.label}
-                      </span>
-                    )}
+                    {cell && <span className="st-hm-count">{cell.count}</span>}
                   </div>
                 )
               })}
-            </div>
+            </>
+          ))}
+        </div>
+        {tooltip && (
+          <div style={{
+            fontSize: 12, color: 'var(--ink)', background: 'var(--surface)',
+            border: '1px solid var(--line)', borderRadius: 8, padding: '6px 10px',
+            boxShadow: '0 4px 12px rgba(40,30,60,.1)', alignSelf: 'flex-start',
+          }}>
+            <strong>{WEEKDAYS[(tooltip.dow)]} · {SLOT_LABELS[tooltip.slot]}</strong>
+            <div>Receita média: {fmtBRL(tooltip.avg)}</div>
+            <div>Stories: {tooltip.count}</div>
           </div>
-        )
-      })}
-    </div>
+        )}
+        <div className="st-hm-legend">
+          <span>Menos receita</span>
+          <div className="st-hm-legend-bar" style={{ background: `linear-gradient(to right, ${gradStops})` }} />
+          <span>Mais receita</span>
+        </div>
+      </div>
+    </DashCard>
   )
 }
 
-/* ============================================================
-   StoriesView — main export
-   ============================================================ */
-export default function StoriesView() {
-  const today = todayISO()
-  const todayD = parseISO(today)
+/* ── Chart 7: Performance por produto ───────────────────── */
 
-  const [stories, setStories] = useState<Story[]>(() => genMockStories())
-  const [mode, setMode] = useState<'calendar' | 'list' | 'agenda'>('calendar')
-  const [year, setYear] = useState(todayD.getFullYear())
-  const [month, setMonth] = useState(todayD.getMonth())
+function ProdutosChart({ stories }: { stories: Story[] }) {
+  const data = useMemo(() => performancePorProduto(stories), [stories])
 
-  const [catFilter, setCatFilter] = useState('all')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [search, setSearch] = useState('')
-
-  const [active, setActive] = useState<Story | null>(null)
-  const [isNew, setIsNew] = useState(false)
-
-  const goPrev = () => { if (month === 0) { setMonth(11); setYear(y => y - 1) } else setMonth(m => m - 1) }
-  const goNext = () => { if (month === 11) { setMonth(0); setYear(y => y + 1) } else setMonth(m => m + 1) }
-  const goToday = () => { const t = parseISO(today); setYear(t.getFullYear()); setMonth(t.getMonth()) }
-
-  const filtered = useMemo(() => {
-    let arr = stories
-    if (catFilter !== 'all')    arr = arr.filter(s => s.categoria === catFilter)
-    if (statusFilter !== 'all') arr = arr.filter(s => s.status === statusFilter)
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      arr = arr.filter(s => s.produto.toLowerCase().includes(q) || storyCode(s.date, s.time).includes(q))
-    }
-    return arr
-  }, [stories, catFilter, statusFilter, search])
-
-  const monthFiltered = useMemo(() =>
-    filtered.filter(s => {
-      const d = parseISO(s.date)
-      return d.getFullYear() === year && d.getMonth() === month
-    }), [filtered, year, month])
-
-  const sortedList = useMemo(() => {
-    return [...filtered].sort((a, b) => {
-      const av = `${a.date} ${a.time}`
-      const bv = `${b.date} ${b.time}`
-      return av < bv ? -1 : av > bv ? 1 : 0
-    })
-  }, [filtered])
-
-  const saveStory = (s: Story) => {
-    setStories(arr => arr.some(x => x.id === s.id) ? arr.map(x => x.id === s.id ? s : x) : [...arr, s])
+  if (!data.length) {
+    return (
+      <DashCard title="Performance por produto foco">
+        <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', color: AXIS_COLOR, fontSize: 13 }}>
+          Sem receita registrada no período.
+        </div>
+      </DashCard>
+    )
   }
-  const deleteStory = (s: Story) => setStories(arr => arr.filter(x => x.id !== s.id))
 
-  const openNew = (defaults: Partial<Story> = {}) => {
-    const nextId = stories.reduce((m, s) => Math.max(m, s.id), 0) + 1
-    setActive({
-      id: nextId, date: defaults.date ?? today, time: '12:00',
-      produto: PRODUTOS_FOCO[0], categoria: 'produto', status: 'naoIniciado',
-      receita: null, sessoes: null, transacoes: null, link: '', linkCta: '',
-    })
-    setIsNew(true)
-  }
-  const openExisting = (s: Story) => { setActive(s); setIsNew(false) }
-
-  const stats = useMemo(() => {
-    const monthAll = stories.filter(s => {
-      const d = parseISO(s.date)
-      return d.getFullYear() === year && d.getMonth() === month
-    })
-    const postados = monthAll.filter(s => s.status === 'postado')
-    return {
-      total: monthAll.length,
-      postados: postados.length,
-      receita: postados.reduce((sum, s) => sum + (s.receita || 0), 0),
-      sessoes: postados.reduce((sum, s) => sum + (s.sessoes || 0), 0),
-      transacoes: postados.reduce((sum, s) => sum + (s.transacoes || 0), 0),
-    }
-  }, [stories, year, month])
+  const chartHeight = Math.max(160, 28 + data.length * 38)
 
   return (
-    <>
-      {/* sub-toolbar */}
-      <div className="stories-toolbar">
-        <div className="view-toggle">
-          <button className={mode === 'calendar' ? 'active' : ''} onClick={() => setMode('calendar')}>
-            <Icon.cal /> Calendário
+    <DashCard title="Performance por produto foco">
+      <ResponsiveContainer width="100%" height={chartHeight}>
+        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 80, bottom: 0, left: 0 }}>
+          <CartesianGrid stroke={GRID_COLOR} horizontal={false} />
+          <XAxis type="number" tick={{ fontSize: 10.5, fill: AXIS_COLOR }} axisLine={false} tickLine={false} tickFormatter={fmtBRLk} />
+          <YAxis type="category" dataKey="produto" width={140} tick={{ fontSize: 11, fill: 'var(--ink)' }} axisLine={false} tickLine={false} />
+          <Tooltip content={<LiveTip />} />
+          <Bar dataKey="total" name="Receita total" barSize={18} radius={[0, 6, 6, 0]}>
+            {data.map((entry, i) => (
+              <rect key={`bar-${i}`} fill={produtoColor(entry.produto, i)} />
+            ))}
+            <LabelList dataKey="total" position="right" formatter={(v: unknown) => fmtBRLk(Number(v))} style={{ fontSize: 11, fill: 'var(--ink-2)', fontWeight: 600 }} />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </DashCard>
+  )
+}
+
+/* ── Stories Table ───────────────────────────────────────── */
+
+const STATUS_FILTERS = [
+  { id: 'all',         label: 'Todos os status', dot: AXIS_COLOR },
+  { id: 'nao_iniciado', label: 'Não iniciado',   dot: 'oklch(0.72 0.02 300)' },
+  { id: 'em_andamento', label: 'Em andamento',   dot: 'oklch(0.72 0.16 55)' },
+  { id: 'feito',        label: 'Feito',           dot: 'oklch(0.6 0.13 265)' },
+  { id: 'proposta',     label: 'Proposta',        dot: 'oklch(0.6 0.13 150)' },
+  { id: 'nao_postado',  label: 'Não postado',     dot: 'oklch(0.5 0.15 25)' },
+]
+
+function StoriesTable({ stories }: { stories: Story[] }) {
+  const [statusFilt, setStatusFilt] = useState('all')
+
+  const filtered = useMemo(() => {
+    const base = statusFilt === 'all' ? stories : stories.filter(s => s.status === statusFilt)
+    return base.slice(0, 100)
+  }, [stories, statusFilt])
+
+  return (
+    <DashCard title="Histórico de stories">
+      <div className="st-table-filters">
+        {STATUS_FILTERS.map(sf => (
+          <button
+            key={sf.id}
+            className={`platform-pill ${statusFilt === sf.id ? 'active' : ''}`}
+            onClick={() => setStatusFilt(sf.id)}
+          >
+            <span className="st-filter-dot" style={{ background: sf.dot }} />
+            {sf.label}
           </button>
-          <button className={mode === 'list' ? 'active' : ''} onClick={() => setMode('list')}>
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
-            Lista
-          </button>
-          <button className={mode === 'agenda' ? 'active' : ''} onClick={() => setMode('agenda')}>
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-            Agenda
-          </button>
-        </div>
-
-        {(mode === 'calendar' || mode === 'agenda') && (
-          <>
-            <div className="month-nav">
-              <button onClick={goPrev}><Icon.chevL /></button>
-              <div className="label">{MONTHS[month]} {year}</div>
-              <button onClick={goNext}><Icon.chevR /></button>
-            </div>
-            <button className="today-btn" onClick={goToday}>Hoje</button>
-          </>
-        )}
-
-        <div className="search-box" style={{ minWidth: 220 }}>
-          <Icon.search />
-          <input placeholder="Buscar story ou código..." value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-
-        <div style={{ flex: 1 }} />
-
-        <button className="btn btn-accent" onClick={() => openNew()}>
-          <Icon.plus /> Novo story
-        </button>
+        ))}
       </div>
+      <div className="st-table-wrap">
+        <table className="st-table">
+          <thead>
+            <tr>
+              <th>Data / Hora</th>
+              <th>Produto foco</th>
+              <th>Categoria</th>
+              <th>Status</th>
+              <th className="st-td-num">Receita</th>
+              <th>UTM</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((s, i) => {
+              const [, mm, dd] = s.date.split('-')
+              const hh = String(s.hora).padStart(2, '0')
+              return (
+                <tr key={s.id} className="st-row">
+                  <td className="st-td">
+                    <div className="st-date-cell">
+                      <span className="st-day">{dd}/{mm}</span>
+                      <span className="st-time">{hh}:00</span>
+                    </div>
+                  </td>
+                  <td className="st-td">
+                    <div className="st-produto-cell">
+                      <span className="st-dot" style={{ background: produtoColor(s.produto, i) }} />
+                      {s.produto || '—'}
+                    </div>
+                  </td>
+                  <td className="st-td">
+                    {s.categoria && <span className="st-cat-chip">{s.categoria}</span>}
+                  </td>
+                  <td className="st-td">
+                    <StoryStatusPill status={s.status} />
+                  </td>
+                  <td className="st-td st-td-num">
+                    {s.receita ? (
+                      <span className="st-receita">{fmtBRL(s.receita)}</span>
+                    ) : (
+                      <span className="st-no-rev">—</span>
+                    )}
+                  </td>
+                  <td className="st-td">
+                    {s.rastreioReceita
+                      ? <CopyUtmBtn code={s.rastreioReceita} />
+                      : <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>—</span>
+                    }
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      {stories.length > 100 && (
+        <div className="st-table-footer">Exibindo 100 de {stories.length} stories</div>
+      )}
+    </DashCard>
+  )
+}
 
-      {/* stats strip */}
-      {(mode === 'calendar' || mode === 'agenda') && (
-        <div className="stories-stats">
-          {[
-            { label: 'No mês',      value: stats.total,                         sub: 'stories' },
-            { label: 'Postados',    value: stats.postados,                      sub: `de ${stats.total}` },
-            { label: 'Receita',     value: fmtBRL(stats.receita),               sub: 'soma postados', accent: true },
-            { label: 'Sessões',     value: fmtInt(stats.sessoes),               sub: 'totais' },
-            { label: 'Transações',  value: fmtInt(stats.transacoes),            sub: 'geradas' },
-          ].map(c => (
-            <div key={c.label} className={`ss-card ${c.accent ? 'accent' : ''}`}>
-              <div className="ss-label">{c.label}</div>
-              <div className="ss-value">{c.value}</div>
-              <div className="ss-sub">{c.sub}</div>
-            </div>
+/* ── Main StoriesView ────────────────────────────────────── */
+
+interface Props {
+  stories: Story[]
+  dayAggregates: DayAggregate[]
+  onStoryCreated: (s: Story) => void
+  onStoryUpdated: (s: Story) => void
+}
+
+export default function StoriesView({ stories, dayAggregates, onStoryCreated }: Props) {
+  const today = todayISO()
+  const [period, setPeriod] = useState<Period>('tudo')
+  const [createOpen, setCreateOpen] = useState(false)
+
+  const filteredStories = useMemo(
+    () => filterByPeriod(stories, period, today),
+    [stories, period, today]
+  )
+
+  const filteredAggregates = useMemo(
+    () => filterByPeriod(dayAggregates, period, today),
+    [dayAggregates, period, today]
+  )
+
+  const kpis = useMemo(
+    () => storiesKpis(filteredStories, filteredAggregates),
+    [filteredStories, filteredAggregates]
+  )
+
+  const eficiencia = useMemo(
+    () => eficienciaAlcance(kpis.receitaTotal, kpis.alcanceTotal),
+    [kpis.receitaTotal, kpis.alcanceTotal]
+  )
+
+  const days = PERIOD_DAYS[period]
+  const countLabel = `${kpis.count} stories ${periodLabel(period)}`
+
+  return (
+    <div className="lives-wrap">
+      {/* Period filter bar */}
+      <div className="lives-period-bar" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="view-toggle">
+          {PERIOD_OPTS.map(opt => (
+            <button
+              key={opt.id}
+              className={period === opt.id ? 'active' : ''}
+              onClick={() => setPeriod(opt.id)}
+            >
+              {opt.label}
+            </button>
           ))}
         </div>
-      )}
-
-      {/* filter pills */}
-      <div className="filter-bar" style={{ paddingTop: 0 }}>
-        <button className={`platform-pill ${catFilter === 'all' ? 'active' : ''}`} onClick={() => setCatFilter('all')}>
-          Todas categorias
-        </button>
-        {STORY_CATEGORIES.map(c => (
-          <button key={c.id} className={`platform-pill ${catFilter === c.id ? 'active' : ''}`} onClick={() => setCatFilter(c.id)}>
-            <span className="dot" style={{ background: c.color }} />
-            {c.label}
-          </button>
-        ))}
-
-        <div style={{ width: 1, height: 18, background: 'var(--line)', margin: '0 8px' }} />
-
-        <button className={`tag-chip ${statusFilter === 'all' ? 'active' : ''}`} onClick={() => setStatusFilter('all')}>
-          Todos status
-        </button>
-        {STORY_STATUSES.map(s => (
-          <button key={s.id} className={`tag-chip ${statusFilter === s.id ? 'active' : ''}`} onClick={() => setStatusFilter(s.id)}>
-            {s.label}
-          </button>
-        ))}
-
+        <span className="st-period-info">{countLabel}</span>
         <div style={{ flex: 1 }} />
-        <span className="count-pill">
-          {mode === 'calendar' || mode === 'agenda'
-            ? `${monthFiltered.length} stories neste mês`
-            : `${sortedList.length} stories no total`}
-        </span>
+        <button className="btn btn-accent" style={{ fontSize: 13, padding: '8px 14px' }} onClick={() => setCreateOpen(true)}>
+          <svg viewBox="0 0 16 16" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+            <line x1="8" y1="3" x2="8" y2="13" /><line x1="3" y1="8" x2="13" y2="8" />
+          </svg>
+          Novo story
+        </button>
       </div>
 
-      {/* body */}
-      {mode === 'calendar' && (
-        <div className="cal-wrap">
-          <StoriesCalendarGrid year={year} month={month} stories={filtered}
-            onStoryClick={openExisting} onNewStory={d => openNew({ date: d })} />
+      {/* KPI strip */}
+      <div className="lives-kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 12 }}>
+        <KpiCard
+          label="Receita rastreada"
+          value={fmtBRLk(kpis.receitaTotal)}
+          sub={`${kpis.countComUtm} stories com UTM postados`}
+          accent
+        />
+        <KpiCard
+          label="Alcance total"
+          value={fmtNumk(kpis.alcanceTotal)}
+          sub="soma dos dias no período"
+        />
+        <KpiCard
+          label="Visualizações"
+          value={fmtNumk(kpis.viewsTotal)}
+          sub="total de views dos stories"
+        />
+        <KpiCard
+          label="Stories criados"
+          value={String(kpis.count)}
+          sub={`postados no período`}
+        />
+      </div>
+
+      {/* Efficiency strip */}
+      {eficiencia !== null && (
+        <div className="lives-kpis-secondary" style={{ marginBottom: 20 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: AXIS_COLOR, textTransform: 'uppercase' }}>Eficiência</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>
+            R$ {eficiencia.toFixed(2).replace('.', ',')} por 1k de alcance
+          </span>
         </div>
-      )}
-      {mode === 'list' && (
-        <div className="list-wrap">
-          <StoriesList stories={sortedList} onSave={saveStory} onDelete={deleteStory} />
-        </div>
-      )}
-      {mode === 'agenda' && (
-        <StoriesAgenda stories={monthFiltered} today={today} onStoryClick={openExisting} />
       )}
 
-      {active && (
-        <StoryModal story={active} isNew={isNew}
-          onClose={() => { setActive(null); setIsNew(false) }}
-          onSave={saveStory} onDelete={deleteStory} />
+      {/* Chart 1: Comparação de receita */}
+      <ReceitaComparacaoChart period={period} stories={filteredStories} />
+
+      {/* Chart 2: Engajamento diário */}
+      <EngajamentoDiarioChart aggregates={filteredAggregates} />
+
+      {/* Chart 3: Correlação */}
+      <CorrelacaoChart stories={filteredStories} aggregates={filteredAggregates} />
+
+      {/* Charts 4 & 5: 2-col grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+        <ProjecaoMesCard stories={stories} aggregates={dayAggregates} />
+        <MediaDiaSemana stories={filteredStories} aggregates={filteredAggregates} />
+      </div>
+
+      {/* Chart 6: Heatmap */}
+      <HeatmapTiming stories={filteredStories} />
+
+      {/* Chart 7: Produtos */}
+      <ProdutosChart stories={filteredStories} />
+
+      {/* Table */}
+      <StoriesTable stories={filteredStories} />
+
+      {/* Create modal */}
+      {createOpen && (
+        <CreateStoryModal
+          onClose={() => setCreateOpen(false)}
+          onSaved={story => {
+            onStoryCreated(story)
+            setCreateOpen(false)
+          }}
+        />
       )}
-    </>
+    </div>
   )
 }

@@ -4,6 +4,7 @@ import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import "./socialhub.css";
 import "./lives.css";
+import "./stories-analytics.css";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],

@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Post, Platform, PostSource, AppView, CalendarMode, Campaign, Collection, Linking,
-  EventDate, FutebolEvent, Live, Merchan, LiveStatus,
+  EventDate, FutebolEvent, Live, Merchan, LiveStatus, Story, DayAggregate,
   MONTHS, PLATFORMS, TAGS, STATUSES,
   addDaysISO, startOfWeekISO, todayISO, parseISO,
   CONTENT_TYPES_IG, CONTENT_TYPES_OTHER,
@@ -14,7 +14,7 @@ import { TEAM_PROFILES } from '@/lib/data'
 import {
   campaignToDb, collectionToDb, postToDb, sourceToTable,
   dbToPost, dbToCampaign, dbToCollection,
-  dbToLive, dbToMerchan, liveToDb, merchanToDb,
+  dbToLive, dbToMerchan, liveToDb, merchanToDb, dbToStory,
 } from '@/lib/supabase/mappers'
 import { WEEKDAY_NOMES } from '@/lib/livesUtils'
 import { Icon, PlatformIcon } from './Icons'
@@ -45,6 +45,8 @@ interface Props {
   initialProducts: string[]
   initialLives: Live[]
   initialMerchans: Merchan[]
+  initialStories: Story[]
+  initialDayAggregates: DayAggregate[]
   userEmail: string
   userName: string
 }
@@ -155,7 +157,7 @@ function CalendarListView({ posts, year, month, onPostClick }: {
   )
 }
 
-export default function SocialHubApp({ initialPosts, initialCampaigns, initialCollections, initialEventDates, initialFutebolEvents, initialProducts, initialLives, initialMerchans, userEmail, userName }: Props) {
+export default function SocialHubApp({ initialPosts, initialCampaigns, initialCollections, initialEventDates, initialFutebolEvents, initialProducts, initialLives, initialMerchans, initialStories, initialDayAggregates, userEmail, userName }: Props) {
   const supabase = createClient()
   const meId = getMeId(userEmail)
   const ownerName = getOwnerName(userEmail)
@@ -166,6 +168,8 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   const [products, setProducts] = useState<string[]>(initialProducts)
   const [lives, setLives] = useState<Live[]>(initialLives)
   const [merchans, setMerchans] = useState<Merchan[]>(initialMerchans)
+  const [stories, setStories] = useState<Story[]>(initialStories)
+  const [dayAggregates] = useState<DayAggregate[]>(initialDayAggregates)
   const [activeLive, setActiveLive] = useState<Live | null>(null)
   const [merchansOpen, setMerchansOpen] = useState(false)
   const [generatingProposta, setGeneratingProposta] = useState(false)
@@ -268,6 +272,17 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'merchans' }, ({ old: row }) => {
         setMerchans(arr => arr.filter(x => x.id !== String((row as Record<string, unknown>).id)))
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'stories' }, ({ new: row }) => {
+        const s = dbToStory(row as Record<string, unknown>)
+        setStories(arr => arr.some(x => x.id === s.id) ? arr : [s, ...arr])
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'stories' }, ({ new: row }) => {
+        const s = dbToStory(row as Record<string, unknown>)
+        setStories(arr => arr.map(x => x.id === s.id ? s : x))
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'stories' }, ({ old: row }) => {
+        setStories(arr => arr.filter(x => x.id !== String((row as Record<string, unknown>).id)))
       })
 
     ch.subscribe()
@@ -986,7 +1001,14 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             return u ?? p
           }))
         }} />}
-        {view === 'stories'       && <StoriesView />}
+        {view === 'stories'       && (
+          <StoriesView
+            stories={stories}
+            dayAggregates={dayAggregates}
+            onStoryCreated={s => setStories(arr => [s, ...arr])}
+            onStoryUpdated={s => setStories(arr => arr.map(x => x.id === s.id ? s : x))}
+          />
+        )}
         {view === 'comemorativas' && <ComemorativasView initialItems={initialEventDates} />}
         {view === 'futebol'       && <FutebolView initialItems={initialFutebolEvents} />}
         {view === 'campaigns'     && (

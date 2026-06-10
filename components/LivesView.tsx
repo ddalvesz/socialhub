@@ -24,13 +24,12 @@ const LIVES_INK        = 'oklch(0.22 0.02 300)'
 const LIVES_ACCENT     = 'oklch(0.72 0.16 55)'
 const LIVES_ACCENT_DEEP = 'oklch(0.62 0.18 50)'
 
-const PERIODS = [
-  { id: 7      as number | 'all' | 'custom', label: '7 dias'       },
-  { id: 30     as number | 'all' | 'custom', label: '30 dias'      },
-  { id: 90     as number | 'all' | 'custom', label: '90 dias'      },
-  { id: 365    as number | 'all' | 'custom', label: '12 meses'     },
-  { id: 'all'  as number | 'all' | 'custom', label: 'Tudo'         },
-  { id: 'custom' as number | 'all' | 'custom', label: 'Período…'  },
+type PeriodId = 'week' | 'month' | 90 | 'custom'
+const PERIODS: { id: PeriodId; label: string }[] = [
+  { id: 'week',   label: 'Essa semana' },
+  { id: 'month',  label: 'Esse mês'   },
+  { id: 90,       label: '90 dias'    },
+  { id: 'custom', label: 'Período…'   },
 ]
 
 // ─── Tooltips ────────────────────────────────────────────────
@@ -476,7 +475,7 @@ export default function LivesView({
   onGenerateProposta, generatingProposta,
 }: Props) {
   const today = todayISO()
-  const [period, setPeriod] = useState<number | 'all' | 'custom'>(90)
+  const [period, setPeriod] = useState<PeriodId>('month')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [search, setSearch] = useState('')
@@ -493,6 +492,19 @@ export default function LivesView({
       const from = customFrom
       const to   = customTo || today
       return lives.filter(l => (!from || l.date >= from) && l.date <= to)
+    }
+    if (period === 'week') {
+      const d = new Date(today + 'T00:00:00')
+      const dow = d.getDay()
+      const monday = new Date(d); monday.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1))
+      const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6)
+      const from = monday.toISOString().slice(0, 10)
+      const to   = sunday.toISOString().slice(0, 10)
+      return lives.filter(l => l.date >= from && l.date <= to)
+    }
+    if (period === 'month') {
+      const from = today.slice(0, 7) + '-01'
+      return lives.filter(l => l.date >= from && l.date <= today)
     }
     return lives.filter(l => inPeriod(l.date, period, today))
   }, [lives, period, today, customFrom, customTo])
@@ -632,7 +644,7 @@ export default function LivesView({
         <span className="sub">receita semana a semana · mês até hoje vs mesmo período do mês anterior</span>
       </div>
       <div className="lives-grid lives-grid-trend">
-        <DashCard title="Receita semanal" hint={`período: ${period === 'all' ? 'jan/2025 → hoje' : period === 'custom' ? `${customFrom || '?'} → ${customTo || 'hoje'}` : `últimos ${period} dias`}`}>
+        <DashCard title="Receita semanal" hint={`período: ${period === 'week' ? 'essa semana' : period === 'month' ? 'esse mês' : period === 'custom' ? `${customFrom || '?'} → ${customTo || 'hoje'}` : `últimos ${period} dias`}`}>
           <WeeklyTrend data={weekly} />
         </DashCard>
         <DashCard title="Mês atual vs anterior" hint={`comparativo justo · dia 1–${mvp.dayOfMonth} de cada mês`}>

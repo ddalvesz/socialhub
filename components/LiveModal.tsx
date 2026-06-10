@@ -184,7 +184,7 @@ export default function LiveModal({ live, merchans, onClose, onSave, onDelete, o
               </span>
               {draft.origem && (
                 <span className="origem-pill" title="Origem do registro">
-                  {draft.origem === 'skill' ? '🤖' : draft.origem === 'import' ? '📥' : '✍'} {draft.origem}
+                  {draft.origem === 'skill' ? '🤖' : '📥'} import
                 </span>
               )}
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', marginLeft: 'auto' }}>

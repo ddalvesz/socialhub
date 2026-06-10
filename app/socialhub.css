@@ -2259,6 +2259,7 @@ textarea.field { resize: vertical; min-height: 80px; font-family: inherit; line-
 /* MH modal extras */
 .mh-section { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--line-2); }
 .mh-section-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 11px; color: var(--accent-deep); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; }
+.mh-section-head svg { width: 13px; height: 13px; flex-shrink: 0; }
 .mh-pauta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; }
 .mh-pauta-cell { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 11px; }
 .mh-pauta-cell-label { font-size: 9.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 500; margin-bottom: 3px; }

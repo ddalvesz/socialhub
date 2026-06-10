@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { Post } from '@/lib/types'
 
 // Metricool CSV column headers (exact order from the template)
 const HEADERS = [
@@ -40,37 +39,49 @@ function csvCell(value: string | number | boolean | null | undefined): string {
   return str
 }
 
-function postToMetricoolRow(post: Post): string[] {
-  const isIG      = post.platform === 'ig'
-  const isTikTok  = post.platform === 'tiktok'
-  const isTwitter = post.platform === 'twitter'
-  const isYoutube = post.platform === 'youtube'
+// Raw DB row from calendar_posts view (snake_case columns)
+type DbRow = Record<string, unknown>
+
+function postToMetricoolRow(post: DbRow): string[] {
+  const platform   = String(post.platform ?? '')
+  const format     = String(post.format ?? '')
+  const videoLink  = String(post.video_link ?? '')
+  const coverLink  = String(post.cover_link ?? '')
+  const slideLinks = (post.slide_links as string[] | null) ?? []
+  const title      = String(post.title ?? '')
+
+  const isIG      = platform === 'ig'
+  const isTikTok  = platform === 'tiktok'
+  const isTwitter = platform === 'twitter'
+  const isYoutube = platform === 'youtube'
 
   // Instagram post type mapping
   let igPostType = ''
   if (isIG) {
-    if (post.format === 'Reels') igPostType = 'REEL'
-    else if (post.format === 'Story') igPostType = 'STORY'
+    const fmtLower = format.toLowerCase()
+    if (fmtLower === 'reels') igPostType = 'REEL'
+    else if (fmtLower === 'story') igPostType = 'STORY'
     else igPostType = 'POST'
   }
 
   // YouTube video type mapping
-  const ytVideoType = isYoutube ? (post.format === 'Shorts' ? 'SHORT' : 'VIDEO') : ''
+  const ytVideoType = isYoutube ? (format === 'Shorts' ? 'SHORT' : 'VIDEO') : ''
 
   // Image URL mapping
   // - Video/Reels/TikTok/YouTube: videoLink in slot 1; coverLink as thumbnail
   // - Carousel: slideLinks fill slots 1-10; coverLink as fallback for slot 1
   // - Static/other: coverLink in slot 1
-  const isVideo = post.format === 'Reels' || post.format === 'Vídeo' || post.format === 'Shorts' || isYoutube || isTikTok
+  const formatLower = format.toLowerCase()
+  const isVideo = formatLower === 'reels' || formatLower === 'vídeo' || formatLower === 'video' || formatLower === 'shorts' || isYoutube || isTikTok
   let urls: string[]
   if (isVideo) {
-    urls = post.videoLink ? [post.videoLink] : []
-  } else if (post.format === 'Carrossel' && post.slideLinks && post.slideLinks.length > 0) {
-    urls = post.slideLinks
+    urls = videoLink ? [videoLink] : []
+  } else if ((formatLower === 'carrossel' || formatLower === 'carousel') && slideLinks.length > 0) {
+    urls = slideLinks
   } else {
-    urls = post.coverLink ? [post.coverLink] : (post.videoLink ? [post.videoLink] : [])
+    urls = coverLink ? [coverLink] : (videoLink ? [videoLink] : [])
   }
-  const videoThumbnail = isVideo ? (post.coverLink ?? '') : ''
+  const videoThumbnail = isVideo ? coverLink : ''
 
   const picUrls  = Array.from({ length: 10 }, (_, i) => urls[i] ?? '')
   const picAlts  = Array.from({ length: 10 }, () => '')
@@ -82,8 +93,8 @@ function postToMetricoolRow(post: Post): string[] {
   const time = post.time ? `${post.time}:00` : '12:00:00'
 
   const row: (string | boolean | number) [] = [
-    /* Text                      */ post.caption ?? '',
-    /* Date                      */ post.date,
+    /* Text                      */ String(post.caption ?? ''),
+    /* Date                      */ String(post.date ?? ''),
     /* Time                      */ time,
     /* Draft                     */ isDraft,
     /* Facebook                  */ false,
@@ -111,8 +122,8 @@ function postToMetricoolRow(post: Post): string[] {
     /* Pinterest Pin Link        */ '',
     /* Pinterest Pin New Format  */ false,
     /* Instagram Post Type       */ igPostType,
-    /* Instagram Show Reel Feed  */ isIG && post.format === 'Reels' ? true : '',
-    /* Youtube Video Title       */ isYoutube ? post.title : '',
+    /* Instagram Show Reel Feed  */ isIG && formatLower === 'reels' ? true : '',
+    /* Youtube Video Title       */ isYoutube ? title : '',
     /* Youtube Video Type        */ ytVideoType,
     /* Youtube Video Privacy     */ isYoutube ? 'PUBLIC' : '',
     /* Youtube for kids          */ false,
@@ -123,7 +134,7 @@ function postToMetricoolRow(post: Post): string[] {
     /* Facebook Post Type        */ '',
     /* Facebook Title            */ '',
     /* First Comment Text        */ '',
-    /* TikTok Title              */ isTikTok ? post.title.slice(0, 90) : '',
+    /* TikTok Title              */ isTikTok ? title.slice(0, 90) : '',
     /* TikTok disable comments   */ false,
     /* TikTok disable duet       */ false,
     /* TikTok disable stitch     */ false,
@@ -194,7 +205,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const rows = (posts as Post[]).map(postToMetricoolRow)
+  const rows = (posts as DbRow[]).map(postToMetricoolRow)
   const csv = [
     HEADERS.map(h => csvCell(h)).join(','),
     ...rows.map(r => r.join(',')),

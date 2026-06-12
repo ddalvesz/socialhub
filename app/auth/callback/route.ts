@@ -24,5 +24,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login?error=domain_not_allowed`)
   }
 
+  // Upsert do perfil com dados Google atualizados (avatar, nome)
+  const meta = user.user_metadata ?? {}
+  const name = (meta.full_name as string | undefined)
+    ?? (meta.name as string | undefined)
+    ?? user.email.split('@')[0]
+  const initial    = name.charAt(0).toUpperCase()
+  const owner_id   = name.split(' ')[0]   // fallback: primeiro nome
+  const avatar_url = (meta.avatar_url as string | undefined) ?? null
+
+  await supabase.from('profiles').upsert(
+    { id: user.id, email: user.email, name, avatar_url, initial, owner_id },
+    { onConflict: 'id', ignoreDuplicates: false }
+  )
+
   return NextResponse.redirect(`${origin}${next}`)
 }

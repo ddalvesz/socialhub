@@ -214,14 +214,16 @@ export interface FutebolEvent {
 }
 
 export interface TeamProfile {
-  id: string
-  name: string
+  id: string        // mapeia para post.owner (ex: "Duda", "Kel")
+  name: string      // nome de exibição
   role: string
   email: string
   joined: string
   color: string
   initial: string
   isMe?: boolean
+  avatarUrl?: string   // foto do Google (ou upload customizado)
+  supabaseId?: string  // UUID do auth.users
 }
 
 export const PLATFORMS = [

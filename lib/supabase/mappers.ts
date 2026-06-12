@@ -1,4 +1,4 @@
-import type { Campaign, Collection, DayAggregate, EventDate, FutebolEvent, Live, LiveStatus, Merchan, Post, PostSource, PostStatus, Platform, Story, StoryStatus } from '@/lib/types'
+import type { Campaign, Collection, DayAggregate, EventDate, FutebolEvent, Live, LiveStatus, Merchan, Post, PostSource, PostStatus, Platform, Story, StoryStatus, TeamProfile } from '@/lib/types'
 import { colorFromName, shortLabel } from '@/lib/livesUtils'
 
 function normalizeTags(tags: string[]): string[] {
@@ -341,6 +341,24 @@ export function storyToDb(s: Omit<Story, 'id' | 'produtoSlug'>): Record<string, 
     rastreio_receita: s.rastreioReceita,
     receita:          s.receita,
     origem:           s.origem,
+  }
+}
+
+// ─── Profile ─────────────────────────────────────────────────
+
+export function dbToProfile(row: Record<string, unknown>): TeamProfile {
+  const name    = (row.name as string) ?? ''
+  const ownerId = (row.owner_id as string) || name.split(' ')[0] || (row.email as string)?.split('@')[0] || ''
+  return {
+    id:         ownerId,
+    name,
+    role:       (row.role as string) ?? '',
+    email:      (row.email as string) ?? '',
+    joined:     row.joined_at ? (row.joined_at as string).slice(0, 10) : '',
+    color:      (row.color as string) ?? 'oklch(0.62 0.15 265)',
+    initial:    (row.initial as string) || name.charAt(0).toUpperCase() || '',
+    avatarUrl:  (row.avatar_url as string) || undefined,
+    supabaseId: (row.id as string) ?? undefined,
   }
 }
 

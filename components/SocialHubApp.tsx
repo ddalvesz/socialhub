@@ -10,7 +10,7 @@ import {
   CONTENT_TYPES_IG, CONTENT_TYPES_OTHER,
   colProgress,
 } from '@/lib/types'
-import { TEAM_PROFILES } from '@/lib/data'
+import type { TeamProfile } from '@/lib/types'
 import {
   campaignToDb, collectionToDb, postToDb, sourceToTable,
   dbToPost, dbToCampaign, dbToCollection,
@@ -48,20 +48,16 @@ interface Props {
   initialMerchans: Merchan[]
   initialStories: Story[]
   initialDayAggregates: DayAggregate[]
+  initialProfiles: TeamProfile[]
   userEmail: string
   userName: string
 }
 
-function getOwnerName(email: string) {
-  const profile = TEAM_PROFILES.find(p => p.email === email)
+function resolveOwnerName(email: string, profiles: TeamProfile[]) {
+  const profile = profiles.find(p => p.email === email)
   if (profile) return profile.id
   const name = email.split('@')[0].split('.').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
   return name
-}
-
-function getMeId(email: string) {
-  const profile = TEAM_PROFILES.find(p => p.email === email)
-  return profile?.id ?? getOwnerName(email)
 }
 
 // ─── CalendarListView ─────────────────────────────────────────
@@ -158,10 +154,10 @@ function CalendarListView({ posts, year, month, onPostClick }: {
   )
 }
 
-export default function SocialHubApp({ initialPosts, initialCampaigns, initialCollections, initialEventDates, initialFutebolEvents, initialProducts, initialLives, initialMerchans, initialStories, initialDayAggregates, userEmail, userName }: Props) {
+export default function SocialHubApp({ initialPosts, initialCampaigns, initialCollections, initialEventDates, initialFutebolEvents, initialProducts, initialLives, initialMerchans, initialStories, initialDayAggregates, initialProfiles, userEmail, userName }: Props) {
   const supabase = createClient()
-  const meId = getMeId(userEmail)
-  const ownerName = getOwnerName(userEmail)
+  const meId = resolveOwnerName(userEmail, initialProfiles)
+  const ownerName = meId
 
   const [posts, setPosts] = useState<Post[]>(initialPosts)
   const [collections, setCollectionsRaw] = useState<Collection[]>(initialCollections)
@@ -204,7 +200,15 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   const [duplicateFor, setDuplicateFor] = useState<Post | null>(null)
   const [showExport, setShowExport] = useState(false)
   const [profileId, setProfileId] = useState(meId)
-  const [photos, setPhotos] = useState<Record<string, string>>({})
+  const [profileOverrides, setProfileOverrides] = useState<Partial<TeamProfile>>({})
+  // profiles com isMe marcado e avatarUrl do Google
+  const profiles = useMemo(() =>
+    initialProfiles.map(p => p.id === meId ? { ...p, isMe: true, ...profileOverrides } : { ...p, isMe: false }),
+  [initialProfiles, meId, profileOverrides])
+
+  const handleProfileUpdate = useCallback((updated: Partial<TeamProfile>) => {
+    setProfileOverrides(prev => ({ ...prev, ...updated }))
+  }, [])
 
   // ─── Realtime subscriptions ──────────────────────────────────
   useEffect(() => {
@@ -738,7 +742,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   }
 
   // ─── Sidebar user ─────────────────────────────────────────────
-  const meProfile = TEAM_PROFILES.find(p => p.id === meId)
+  const meProfile = profiles.find(p => p.id === meId)
   const meInitial = meProfile?.initial ?? ownerName.charAt(0).toUpperCase()
 
   // ─── View titles ──────────────────────────────────────────────
@@ -823,10 +827,10 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
           onClick={() => { setView('profile'); setProfileId(meId) }}
           title="Abrir meu perfil"
         >
-          {photos[meId] ? (
-            <img src={photos[meId]} alt={userName} style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flex: '0 0 34px' }} />
+          {meProfile?.avatarUrl ? (
+            <img src={meProfile.avatarUrl} alt={userName} style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flex: '0 0 34px' }} referrerPolicy="no-referrer" />
           ) : (
-            <div className="sb-avatar">{meInitial}</div>
+            <div className="sb-avatar" style={meProfile?.color ? { background: `linear-gradient(135deg, ${meProfile.color}, color-mix(in oklab, ${meProfile.color}, black 15%))` } : undefined}>{meInitial}</div>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13.5, fontWeight: 600, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -1075,12 +1079,13 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
         {view === 'profile'       && (
           <ProfileView
             posts={posts}
+            profiles={profiles}
+            campaigns={campaigns}
             profileId={profileId}
             meId={meId}
             onSelectProfile={setProfileId}
             onPostClick={setActivePost}
-            photos={photos}
-            onSetPhoto={(id, url) => setPhotos(p => ({ ...p, [id]: url }))}
+            onProfileUpdate={handleProfileUpdate}
           />
         )}
         {view === 'archived' && <ArchivedView />}

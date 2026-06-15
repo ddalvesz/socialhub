@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
+import { BrandProvider } from "@/lib/brand-context";
 import "./globals.css";
 import "./socialhub.css";
 import "./lives.css";
@@ -32,7 +33,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={`${dmSans.variable} ${jetbrainsMono.variable}`}>
       <body style={{ fontFamily: "var(--loaded-sans, var(--font-sans))" }}>
-        {children}
+        <BrandProvider>{children}</BrandProvider>
         <Analytics />
       </body>
     </html>

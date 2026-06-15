@@ -9,13 +9,16 @@ import {
   addDaysISO, startOfWeekISO, todayISO, parseISO,
   CONTENT_TYPES_IG, CONTENT_TYPES_OTHER,
   colProgress,
+  Brand, BRANDS,
 } from '@/lib/types'
 import type { TeamProfile } from '@/lib/types'
 import {
   campaignToDb, collectionToDb, postToDb, sourceToTable,
   dbToPost, dbToCampaign, dbToCollection,
   dbToLive, dbToMerchan, liveToDb, merchanToDb, dbToStory, storyToDb,
+  dbToEventDate, dbToFutebolEvent, dbToDayAggregate,
 } from '@/lib/supabase/mappers'
+import BrandSwitcher from './BrandSwitcher'
 import { WEEKDAY_NOMES } from '@/lib/livesUtils'
 import { Icon, PlatformIcon } from './Icons'
 import CalendarGrid from './CalendarGrid'
@@ -167,6 +170,9 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   const meId = resolveOwnerName(userEmail, initialProfiles)
   const ownerName = meId
 
+  const [brand, setBrandState] = useState<Brand>('gocase')
+  const [brandLoading, setBrandLoading] = useState(false)
+
   const [posts, setPosts] = useState<Post[]>(initialPosts)
   const [collections, setCollectionsRaw] = useState<Collection[]>(initialCollections)
   const [campaigns, setCampaignsRaw] = useState<Campaign[]>(initialCampaigns)
@@ -174,7 +180,9 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   const [lives, setLives] = useState<Live[]>(initialLives)
   const [merchans, setMerchans] = useState<Merchan[]>(initialMerchans)
   const [stories, setStories] = useState<Story[]>(initialStories)
-  const [dayAggregates] = useState<DayAggregate[]>(initialDayAggregates)
+  const [dayAggregates, setDayAggregates] = useState<DayAggregate[]>(initialDayAggregates)
+  const [eventDates, setEventDates] = useState<EventDate[]>(initialEventDates)
+  const [futebolEvents, setFutebolEvents] = useState<FutebolEvent[]>(initialFutebolEvents)
   const knownProducts = useMemo(() => {
     const seen = new Set<string>()
     const result: string[] = []
@@ -184,6 +192,85 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     }
     return result.sort((a, b) => a.localeCompare(b, 'pt-BR'))
   }, [stories])
+  const fetchForBrand = useCallback(async (b: Brand) => {
+    setBrandLoading(true)
+    try {
+      const [
+        { data: mhData }, { data: brandingData }, { data: tiktokData },
+        { data: twitterData }, { data: canalData }, { data: copaData },
+        { data: campaignsData }, { data: collectionsData },
+        { data: eventDatesData }, { data: futebolData },
+        { data: productsData }, { data: livesData }, { data: merchansData },
+        { data: storiesData }, { data: dayAggData },
+      ] = await Promise.all([
+        supabase.from('mh_posts').select('*').eq('brand', b).eq('archived', false).order('date', { ascending: true }),
+        supabase.from('branding_posts').select('*').eq('brand', b).eq('archived', false).order('date', { ascending: true }),
+        supabase.from('tiktok_posts').select('*').eq('brand', b).eq('archived', false).order('date', { ascending: true }),
+        supabase.from('twitter_posts').select('*').eq('brand', b).eq('archived', false).order('date', { ascending: true }),
+        supabase.from('canal_posts').select('*').eq('brand', b).eq('archived', false).order('date', { ascending: true }),
+        supabase.from('copa_posts').select('*').eq('brand', b).eq('archived', false).order('date', { ascending: true }),
+        supabase.from('campaigns').select('*').eq('brand', b).eq('archived', false).order('id', { ascending: true }),
+        supabase.from('collections').select('*').eq('brand', b).order('id', { ascending: true }),
+        supabase.from('event_dates').select('*').eq('brand', b).order('start_date', { ascending: true }),
+        supabase.from('futebol_events').select('*').eq('brand', b).order('date', { ascending: true }),
+        supabase.from('products').select('name').eq('brand', b).order('name', { ascending: true }),
+        supabase.from('lives').select('*').eq('brand', b).order('date', { ascending: true }),
+        supabase.from('merchans').select('*').eq('brand', b).order('nome', { ascending: true }),
+        supabase.from('stories').select('*').eq('brand', b).order('date', { ascending: false }),
+        supabase.from('stories_day_aggregates').select('*').eq('brand', b).order('date', { ascending: true }),
+      ])
+      const allPosts: Post[] = [
+        ...(mhData      ?? []).map(r => dbToPost(r as Record<string, unknown>, 'mh')),
+        ...(brandingData ?? []).map(r => dbToPost(r as Record<string, unknown>, 'branding')),
+        ...(tiktokData  ?? []).map(r => dbToPost(r as Record<string, unknown>, 'tiktok')),
+        ...(twitterData ?? []).map(r => dbToPost(r as Record<string, unknown>, 'twitter')),
+        ...(canalData   ?? []).map(r => dbToPost(r as Record<string, unknown>, 'canal')),
+        ...(copaData    ?? []).map(r => dbToPost(r as Record<string, unknown>, 'copa')),
+      ].sort((a, z) => a.date.localeCompare(z.date))
+      setPosts(allPosts)
+      setCampaignsRaw((campaignsData ?? []).map(dbToCampaign))
+      setCollectionsRaw((collectionsData ?? []).map(dbToCollection))
+      setEventDates((eventDatesData ?? []).map(r => dbToEventDate(r as Record<string, unknown>)))
+      setFutebolEvents((futebolData ?? []).map(r => dbToFutebolEvent(r as Record<string, unknown>)))
+      setProducts((productsData ?? []).map(p => (p as { name: string }).name))
+      setLives((livesData ?? []).map(r => dbToLive(r as Record<string, unknown>)))
+      setMerchans((merchansData ?? []).map(r => dbToMerchan(r as Record<string, unknown>)))
+      setStories((storiesData ?? []).map(r => dbToStory(r as Record<string, unknown>)))
+      setDayAggregates((dayAggData ?? []).map(r => dbToDayAggregate(r as Record<string, unknown>)))
+    } finally {
+      setBrandLoading(false)
+    }
+  }, [supabase])
+
+  useEffect(() => {
+    const stored = localStorage.getItem('activeBrand') as Brand | null
+    if (stored && stored !== 'gocase') {
+      setBrandState(stored)
+      applyBrandTheme(stored)
+      fetchForBrand(stored)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const applyBrandTheme = useCallback((b: Brand) => {
+    const { theme } = BRANDS.find(x => x.slug === b)!
+    const root = document.documentElement
+    root.style.setProperty('--accent',                  theme.accent)
+    root.style.setProperty('--accent-deep',             theme.accentDeep)
+    root.style.setProperty('--accent-soft',             theme.accentSoft)
+    root.style.setProperty('--accent-softer',           theme.accentSofter)
+    root.style.setProperty('--accent-gradient',         theme.accentGradient)
+    root.style.setProperty('--accent-gradient-soft',    theme.accentGradientSoft)
+    root.style.setProperty('--accent-gradient-softer',  theme.accentGradientSofter)
+  }, [])
+
+  const handleBrandChange = (b: Brand) => {
+    setBrandState(b)
+    localStorage.setItem('activeBrand', b)
+    applyBrandTheme(b)
+    fetchForBrand(b)
+  }
+
   const [activeLive, setActiveLive] = useState<Live | null>(null)
   const [activeStory, setActiveStory] = useState<Story | null>(null)
   const [merchansOpen, setMerchansOpen] = useState(false)
@@ -461,7 +548,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
       slideLinks:[],
       ...defaults,
     }
-    const { data } = await supabase.from(sourceToTable(source)).insert(postToDb(newPost, source)).select().single()
+    const { data } = await supabase.from(sourceToTable(source)).insert({ ...postToDb(newPost, source), brand }).select().single()
     if (data) {
       const created = { ...newPost, id: String(data.id), source } as Post
       setPosts(arr => [...arr, created])
@@ -485,7 +572,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     if (newPlatform === 'ig'     && !CONTENT_TYPES_IG.includes(newPost.format))    newPost.format = 'Reels'
     if (newPlatform !== 'ig'     && !CONTENT_TYPES_OTHER.includes(newPost.format)) newPost.format = 'Vídeo'
     const { id, source, ...rest } = newPost
-    const { data } = await supabase.from(sourceToTable(targetSource)).insert(postToDb(rest, targetSource)).select().single()
+    const { data } = await supabase.from(sourceToTable(targetSource)).insert({ ...postToDb(rest, targetSource), brand }).select().single()
     if (data) {
       const created = { ...newPost, id: String(data.id), source: targetSource } as Post
       // Vincula o post original ao novo
@@ -537,7 +624,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
       notes: '',
       ...defaults,
     }
-    const { data } = await supabase.from('lives').insert(liveToDb(payload)).select().single()
+    const { data } = await supabase.from('lives').insert({ ...liveToDb(payload), brand }).select().single()
     if (data) {
       const created = dbToLive(data as Record<string, unknown>)
       setLives(arr => [...arr, created].sort((a, b) => a.date.localeCompare(b.date)))
@@ -608,7 +695,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     if (existing) return existing
     const { data } = await supabase
       .from('merchans')
-      .insert({ nome, ativo: true, forte: false, sempre_sozinho: false })
+      .insert({ nome, ativo: true, forte: false, sempre_sozinho: false, brand })
       .select()
       .single()
     const created = dbToMerchan(data as Record<string, unknown>)
@@ -675,6 +762,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
       previsao: collection.dataSite || todayISO(),
       launched: collection.launched, progresso: 0,
       colecao_id: collection.id,
+      brand,
     }
     const { data } = await supabase.from('campaigns').insert(payload).select().single()
     if (!data) throw new Error('Falha ao criar campanha')
@@ -708,6 +796,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
         reelsEnabled: false, reels: false, trincaEnabled: false, trinca: false,
         shootingEnabled: false, shooting: false, storiesEnabled: false, stories: false,
         influsEnabled: false, influs: false },
+      brand,
     }
     const { data } = await supabase.from('collections').insert(payload).select().single()
     if (!data) throw new Error('Falha ao criar coleção')
@@ -774,8 +863,8 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   const isCalView = view === 'calendar' || view === 'branding'
 
   const calEvents = view === 'calendar' ? [
-    ...initialEventDates.filter(e => e.start && e.end && e.start !== '-' && e.end !== '-' && e.start === e.end),
-    ...initialFutebolEvents
+    ...eventDates.filter(e => e.start && e.end && e.start !== '-' && e.end !== '-' && e.start === e.end),
+    ...futebolEvents
       .filter(f => f.date && f.date !== '-')
       .map(f => ({
         id: f.id, type: f.type, name: f.name,
@@ -792,6 +881,10 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
       <aside className="sidebar">
         <div className="sb-brand">
           <img src="/socialhub_logo.svg" alt="SocialHub" style={{ height: 44, width: 'auto', maxWidth: '100%' }} />
+        </div>
+
+        <div style={{ padding: '0 12px 8px' }}>
+          <BrandSwitcher brand={brand} onChange={handleBrandChange} loading={brandLoading} />
         </div>
 
         <div className="sb-section">
@@ -1041,7 +1134,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
         {view === 'mh'            && <MHView onPostClick={setActivePost} allPosts={posts} onPostsAdded={async (newPosts) => {
           for (const p of newPosts) {
             const { id, source, ...rest } = p
-            const { data } = await supabase.from('mh_posts').insert(postToDb(rest, 'mh')).select().single()
+            const { data } = await supabase.from('mh_posts').insert({ ...postToDb(rest, 'mh'), brand }).select().single()
             if (data) setPosts(arr => [...arr, { ...p, id: String(data.id), source: 'mh' as const }])
           }
         }} onPostsUpdated={(updatedPosts) => {
@@ -1059,8 +1152,8 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             onStoryClick={setActiveStory}
           />
         )}
-        {view === 'comemorativas' && <ComemorativasView initialItems={initialEventDates} />}
-        {view === 'futebol'       && <FutebolView initialItems={initialFutebolEvents} />}
+        {view === 'comemorativas' && <ComemorativasView initialItems={eventDates} />}
+        {view === 'futebol'       && <FutebolView initialItems={futebolEvents} />}
         {view === 'campaigns'     && (
           <CampaignsView
             posts={posts}
@@ -1164,7 +1257,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
           campaigns={campaigns}
           products={products}
           onAddProduct={async (name) => {
-            await supabase.from('products').insert({ name })
+            await supabase.from('products').insert({ name, brand })
             setProducts(prev => [...prev, name].sort())
           }}
           tagOptions={[...new Set(posts.flatMap(p => p.tags ?? []).filter(Boolean))].sort()}

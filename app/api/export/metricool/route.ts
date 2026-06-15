@@ -170,13 +170,7 @@ function postToMetricoolRow(post: DbRow): string[] {
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const from     = searchParams.get('from')
-  const to       = searchParams.get('to')
-  const platform = searchParams.get('platform') // optional filter
-
-  if (!from || !to) {
-    return NextResponse.json({ error: 'Parâmetros from e to são obrigatórios' }, { status: 400 })
-  }
+  const idsParam = searchParams.get('ids')
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -187,18 +181,41 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from('calendar_posts')
     .select('*')
-    .gte('date', from)
-    .lte('date', to)
     .order('date', { ascending: true })
     .order('time', { ascending: true })
 
-  if (platform && platform !== 'all') {
-    query = query.eq('platform', platform)
-  }
+  let filename: string
 
-  const statusParam = searchParams.get('statuses')
-  const statuses = statusParam ? statusParam.split(',') : ['sched']
-  query = query.in('status', statuses)
+  if (idsParam) {
+    // Export by specific post IDs (selected in list view)
+    const ids = idsParam.split(',').filter(Boolean)
+    if (ids.length === 0) {
+      return NextResponse.json({ error: 'Nenhum ID fornecido' }, { status: 400 })
+    }
+    query = query.in('id', ids)
+    filename = `metricool-selecionados-${ids.length}posts.csv`
+  } else {
+    // Export by date range + filters
+    const from     = searchParams.get('from')
+    const to       = searchParams.get('to')
+    const platform = searchParams.get('platform')
+
+    if (!from || !to) {
+      return NextResponse.json({ error: 'Parâmetros from e to são obrigatórios' }, { status: 400 })
+    }
+
+    query = query.gte('date', from).lte('date', to)
+
+    if (platform && platform !== 'all') {
+      query = query.eq('platform', platform)
+    }
+
+    const statusParam = searchParams.get('statuses')
+    const statuses = statusParam ? statusParam.split(',') : ['sched']
+    query = query.in('status', statuses)
+
+    filename = `metricool-${from}-a-${to}.csv`
+  }
 
   const { data: posts, error } = await query
   if (error) {
@@ -210,8 +227,6 @@ export async function GET(req: NextRequest) {
     HEADERS.map(h => csvCell(h)).join(','),
     ...rows.map(r => r.join(',')),
   ].join('\r\n')
-
-  const filename = `metricool-${from}-a-${to}.csv`
 
   return new NextResponse(csv, {
     status: 200,

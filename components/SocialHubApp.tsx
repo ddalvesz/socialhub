@@ -62,8 +62,9 @@ function resolveOwnerName(email: string, profiles: TeamProfile[]) {
 
 // ─── CalendarListView ─────────────────────────────────────────
 
-function CalendarListView({ posts, year, month, onPostClick }: {
+function CalendarListView({ posts, year, month, onPostClick, selectedIds, onToggle }: {
   posts: Post[]; year: number; month: number; onPostClick: (p: Post) => void
+  selectedIds: Set<string>; onToggle: (id: string) => void
 }) {
   const today = todayISO()
   const weekday = (iso: string) => {
@@ -120,10 +121,17 @@ function CalendarListView({ posts, year, month, onPostClick }: {
                   <div
                     key={p.id}
                     onClick={() => onPostClick(p)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', marginBottom: 4, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.12s' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-softer)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'var(--surface)')}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', marginBottom: 4, borderRadius: 10, background: selectedIds.has(p.id) ? 'var(--accent-softer)' : 'var(--surface)', border: selectedIds.has(p.id) ? '1px solid var(--accent-soft)' : '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.12s' }}
+                    onMouseEnter={e => { if (!selectedIds.has(p.id)) e.currentTarget.style.background = 'var(--accent-softer)' }}
+                    onMouseLeave={e => { if (!selectedIds.has(p.id)) e.currentTarget.style.background = 'var(--surface)' }}
                   >
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(p.id)}
+                      onClick={e => e.stopPropagation()}
+                      onChange={() => onToggle(p.id)}
+                      style={{ width: 15, height: 15, flexShrink: 0, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                    />
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)', width: 40, flexShrink: 0 }}>{p.time}</div>
                     <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', padding: '2px 6px', borderRadius: 5, background: pc.bg, color: pc.fg, flexShrink: 0 }}>
                       {p.platform === 'tiktok' ? 'TT' : p.platform === 'youtube' ? 'YT' : p.platform?.toUpperCase()}
@@ -199,6 +207,9 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   const [activePost, setActivePost] = useState<Post | null>(null)
   const [duplicateFor, setDuplicateFor] = useState<Post | null>(null)
   const [showExport, setShowExport] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const toggleSelected = (id: string) =>
+    setSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
   const [profileId, setProfileId] = useState(meId)
   const [profileOverrides, setProfileOverrides] = useState<Partial<TeamProfile>>({})
   // profiles com isMe marcado e avatarUrl do Google
@@ -787,7 +798,6 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
           <div className="sb-label">Calendários</div>
           {([
             { id: 'calendar', label: 'Calendário do mês', icon: <Icon.cal />,      count: monthPosts.length },
-            { id: 'stories',  label: 'Stories',           icon: <Icon.stories />,  count: monthPosts.filter(p => p.platform === 'ig' && p.format === 'Story').length },
             { id: 'branding', label: 'Branding',          icon: <Icon.branding />, count: posts.filter(p => p.source === 'branding' && parseISO(p.date).getFullYear() === year && parseISO(p.date).getMonth() === month).length },
             { id: 'mh',       label: 'Máquina de Hits',  icon: <Icon.mh />,       count: posts.filter(p => p.source === 'mh' && parseISO(p.date).getFullYear() === year && parseISO(p.date).getMonth() === month).length },
           ] as const).map(item => (
@@ -819,6 +829,10 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
           <button className={`sb-item ${view === 'lives' ? 'active' : ''}`} onClick={() => setView('lives')}>
             <Icon.mh /> <span>Lives</span>
             <span className="sb-count">{lives.filter(l => l.status === 'realizada').length}</span>
+          </button>
+          <button className={`sb-item ${view === 'stories' ? 'active' : ''}`} onClick={() => setView('stories')}>
+            <Icon.stories /> <span>Stories</span>
+            <span className="sb-count">{stories.filter(s => s.status === 'feito').length}</span>
           </button>
         </div>
 
@@ -889,6 +903,11 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
               <path d="M12 3v13M7 12l5 5 5-5"/><path d="M4 19h16"/>
             </svg>
             CSV
+            {selectedIds.size > 0 && (
+              <span style={{ background: 'var(--accent)', color: 'white', borderRadius: 10, fontSize: 10, fontWeight: 700, padding: '1px 6px', lineHeight: 1.5 }}>
+                {selectedIds.size}
+              </span>
+            )}
           </button>
 
           <button className="btn btn-ghost" onClick={handleLogout} title="Sair" style={{ padding: '9px 12px' }}>
@@ -1014,6 +1033,8 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             year={year}
             month={month}
             onPostClick={setActivePost}
+            selectedIds={selectedIds}
+            onToggle={toggleSelected}
           />
         )}
 
@@ -1128,7 +1149,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
       )}
 
       {/* Export modal */}
-      {showExport && <ExportModal onClose={() => setShowExport(false)} />}
+      {showExport && <ExportModal onClose={() => setShowExport(false)} selectedIds={selectedIds.size > 0 ? selectedIds : undefined} />}
 
       {/* Post modal */}
       {activePost && (

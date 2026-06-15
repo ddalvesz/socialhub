@@ -6,6 +6,7 @@ import { PLATFORMS, todayISO, parseISO, toISO, pad } from '@/lib/types'
 
 interface Props {
   onClose: () => void
+  selectedIds?: Set<string>
 }
 
 type Preset = 'week' | 'month' | 'last30' | 'custom'
@@ -71,7 +72,8 @@ const PLATFORM_OPTIONS = [
   { id: 'youtube', label: 'YouTube',   icon: <PlatformIcon platform="youtube" size={13} />,  color: '#FF0000'  },
 ]
 
-export default function ExportModal({ onClose }: Props) {
+export default function ExportModal({ onClose, selectedIds }: Props) {
+  const hasSelection = selectedIds && selectedIds.size > 0
   const [preset,      setPreset]      = useState<Preset>('month')
   const [platforms,   setPlatforms]   = useState<string[]>(['all'])
   const [statuses,    setStatuses]    = useState<string[]>(['sched'])
@@ -108,13 +110,21 @@ export default function ExportModal({ onClose }: Props) {
   const handleExport = async () => {
     setLoading(true); setError('')
     try {
-      const activePlatforms = platforms.includes('all') ? [] : platforms
-      const params = new URLSearchParams({
-        from:     range.from,
-        to:       range.to,
-        statuses: statuses.join(','),
-        ...(activePlatforms.length === 1 && { platform: activePlatforms[0] }),
-      })
+      let params: URLSearchParams
+      let filename: string
+      if (hasSelection) {
+        params = new URLSearchParams({ ids: [...selectedIds!].join(',') })
+        filename = `metricool-selecionados-${[...selectedIds!].length}posts.csv`
+      } else {
+        const activePlatforms = platforms.includes('all') ? [] : platforms
+        params = new URLSearchParams({
+          from:     range.from,
+          to:       range.to,
+          statuses: statuses.join(','),
+          ...(activePlatforms.length === 1 && { platform: activePlatforms[0] }),
+        })
+        filename = `metricool-${range.from}-a-${range.to}.csv`
+      }
       const res = await fetch(`/api/export/metricool?${params}`)
       if (!res.ok) {
         const json = await res.json().catch(() => ({}))
@@ -123,7 +133,7 @@ export default function ExportModal({ onClose }: Props) {
       const blob = await res.blob()
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement('a')
-      a.href = url; a.download = `metricool-${range.from}-a-${range.to}.csv`
+      a.href = url; a.download = filename
       a.click(); URL.revokeObjectURL(url)
       onClose()
     } catch (e: any) {
@@ -156,8 +166,23 @@ export default function ExportModal({ onClose }: Props) {
         {/* Body */}
         <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
+          {/* Seleção ativa */}
+          {hasSelection && (
+            <div style={{
+              display: 'flex', gap: 10, alignItems: 'center',
+              padding: '12px 16px', borderRadius: 10,
+              background: 'oklch(0.96 0.03 250)', border: '1px solid oklch(0.88 0.07 250)',
+            }}>
+              <span style={{ fontSize: 20 }}>✓</span>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-1)', lineHeight: 1.5 }}>
+                <strong>{selectedIds!.size} {selectedIds!.size === 1 ? 'post selecionado' : 'posts selecionados'}</strong> na visão de lista.
+                O CSV incluirá somente esses posts, ignorando os filtros de período e plataforma.
+              </p>
+            </div>
+          )}
+
           {/* Período */}
-          <div>
+          <div style={{ opacity: hasSelection ? 0.35 : 1, pointerEvents: hasSelection ? 'none' : 'auto' }}>
             <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--ink-3)', marginBottom: 10, textTransform: 'uppercase' }}>
               Período
             </div>
@@ -198,7 +223,7 @@ export default function ExportModal({ onClose }: Props) {
           </div>
 
           {/* Plataforma */}
-          <div>
+          <div style={{ opacity: hasSelection ? 0.35 : 1, pointerEvents: hasSelection ? 'none' : 'auto' }}>
             <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--ink-3)', marginBottom: 10, textTransform: 'uppercase' }}>
               Plataforma
             </div>
@@ -227,7 +252,7 @@ export default function ExportModal({ onClose }: Props) {
           </div>
 
           {/* Status incluídos */}
-          <div>
+          <div style={{ opacity: hasSelection ? 0.35 : 1, pointerEvents: hasSelection ? 'none' : 'auto' }}>
             <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--ink-3)', marginBottom: 10, textTransform: 'uppercase' }}>
               Status incluídos
             </div>

@@ -9,6 +9,7 @@ import {
 import { Icon } from './Icons'
 import CalendarGrid from './CalendarGrid'
 import { DatePicker } from './FormHelpers'
+import ExportModal from './ExportModal'
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -758,13 +759,15 @@ function BatchPautaModal({ open, onClose, onCreated }: {
 const STATUS_ORDER = ['sched', 'entregue', 'prod', 'pauta', 'pub', 'cancel']
 
 function ListView({
-  posts, allPosts, onPostClick, year, month,
+  posts, allPosts, onPostClick, year, month, selectedIds, onToggle,
 }: {
   posts: Post[]
   allPosts: Post[]
   onPostClick: (p: Post) => void
   year: number
   month: number
+  selectedIds: Set<string>
+  onToggle: (id: string) => void
 }) {
   const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set(['sched']))
   const [creatorFilter, setCreatorFilter] = useState<string>('all')
@@ -879,12 +882,20 @@ function ListView({
                         style={{
                           display: 'flex', alignItems: 'center', gap: 10,
                           padding: '9px 12px', marginBottom: 4, borderRadius: 10,
-                          background: 'var(--surface)', border: '1px solid var(--border)',
+                          background: selectedIds.has(p.id) ? 'var(--accent-softer)' : 'var(--surface)',
+                          border: selectedIds.has(p.id) ? '1px solid var(--accent-soft)' : '1px solid var(--border)',
                           cursor: 'pointer', transition: 'background 0.12s',
                         }}
-                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-softer)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'var(--surface)')}
+                        onMouseEnter={e => { if (!selectedIds.has(p.id)) e.currentTarget.style.background = 'var(--accent-softer)' }}
+                        onMouseLeave={e => { if (!selectedIds.has(p.id)) e.currentTarget.style.background = 'var(--surface)' }}
                       >
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(p.id)}
+                          onClick={e => e.stopPropagation()}
+                          onChange={() => onToggle(p.id)}
+                          style={{ width: 15, height: 15, flexShrink: 0, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                        />
                         {/* Time */}
                         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)', width: 40, flexShrink: 0 }}>{p.time}</div>
 
@@ -968,6 +979,10 @@ export default function MHView({ onPostClick, allPosts = [], onPostsAdded, onPos
   const [syncing, setSyncing] = useState(false)
   const [year, setYear] = useState(todayDate.getFullYear())
   const [month, setMonth] = useState(todayDate.getMonth())
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showExport, setShowExport] = useState(false)
+  const toggleSelected = (id: string) =>
+    setSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
 
   const mhPosts = useMemo(() => allPosts.filter(p => p.source === 'mh'), [allPosts])
 
@@ -1041,6 +1056,25 @@ export default function MHView({ onPostClick, allPosts = [], onPostsAdded, onPos
 
         <div className="mh-controls-spacer" />
 
+        {mhMode === 'list' && (
+          <button
+            className="btn btn-ghost"
+            onClick={() => setShowExport(true)}
+            title="Exportar para Metricool"
+            style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3v13M7 12l5 5 5-5"/><path d="M4 19h16"/>
+            </svg>
+            CSV
+            {selectedIds.size > 0 && (
+              <span style={{ background: 'var(--accent)', color: 'white', borderRadius: 10, fontSize: 10, fontWeight: 700, padding: '1px 6px', lineHeight: 1.5 }}>
+                {selectedIds.size}
+              </span>
+            )}
+          </button>
+        )}
+
         <button className="btn btn-accent" onClick={() => setBatchOpen(true)}>
           <Icon.plus /> Nova pauta da semana
         </button>
@@ -1083,6 +1117,15 @@ export default function MHView({ onPostClick, allPosts = [], onPostsAdded, onPos
           onPostClick={onPostClick}
           year={year}
           month={month}
+          selectedIds={selectedIds}
+          onToggle={toggleSelected}
+        />
+      )}
+
+      {showExport && (
+        <ExportModal
+          onClose={() => setShowExport(false)}
+          selectedIds={selectedIds.size > 0 ? selectedIds : undefined}
         />
       )}
 

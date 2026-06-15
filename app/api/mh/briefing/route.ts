@@ -62,6 +62,11 @@ async function getOrCreateDoc(drive: ReturnType<typeof google.drive>, docs: Retu
 //
 // Portanto inserimos na ordem inversa:
 //   1. separador  2. \n + tabela + H3 (último vídeo)  ...  N. H2 semana
+const POPPINS_STYLE = {
+  weightedFontFamily: { fontFamily: 'Poppins' },
+  fontSize: { magnitude: 11, unit: 'PT' },
+}
+
 function buildInsertRequests(semanaLabel: string, videos: VideoData[]): object[] {
   const GRAY = { red: 0.8, green: 0.8, blue: 0.8 }
   const IDX = 1
@@ -73,8 +78,8 @@ function buildInsertRequests(semanaLabel: string, videos: VideoData[]): object[]
   requests.push({
     updateTextStyle: {
       range: { startIndex: IDX, endIndex: IDX + sepText.length - 1 },
-      textStyle: { foregroundColor: { color: { rgbColor: GRAY } } },
-      fields: 'foregroundColor',
+      textStyle: { foregroundColor: { color: { rgbColor: GRAY } }, ...POPPINS_STYLE },
+      fields: 'foregroundColor,weightedFontFamily,fontSize',
     },
   })
 
@@ -98,6 +103,13 @@ function buildInsertRequests(semanaLabel: string, videos: VideoData[]): object[]
         fields: 'namedStyleType',
       },
     })
+    requests.push({
+      updateTextStyle: {
+        range: { startIndex: IDX, endIndex: IDX + h3.length - 1 },
+        textStyle: { bold: false, ...POPPINS_STYLE },
+        fields: 'bold,weightedFontFamily,fontSize',
+      },
+    })
   }
 
   // 3. H2 da semana (inserido por último → ficará no topo)
@@ -108,6 +120,13 @@ function buildInsertRequests(semanaLabel: string, videos: VideoData[]): object[]
       range: { startIndex: IDX, endIndex: IDX + h2.length },
       paragraphStyle: { namedStyleType: 'HEADING_2' },
       fields: 'namedStyleType',
+    },
+  })
+  requests.push({
+    updateTextStyle: {
+      range: { startIndex: IDX, endIndex: IDX + h2.length - 1 },
+      textStyle: { bold: false, ...POPPINS_STYLE },
+      fields: 'bold,weightedFontFamily,fontSize',
     },
   })
 
@@ -147,9 +166,8 @@ async function fillTableCells(docs: ReturnType<typeof google.docs>, docId: strin
   // insertText muda índices — então precisamos enviar em dois batches:
   // 1) todos os insertText em ordem DECRESCENTE de índice (para não deslocar uns aos outros)
   // 2) depois os style requests (updateTextStyle + updateTableCellStyle) que não mudam índices
-  type InsertOp = { index: number; text: string; bold: boolean }
+  type InsertOp = { index: number; text: string }
   const inserts: InsertOp[] = []
-  const styleRequests: object[] = []
 
   for (let vi = 0; vi < relevantTables.length; vi++) {
     const table = relevantTables[vi]
@@ -161,24 +179,8 @@ async function fillTableCells(docs: ReturnType<typeof google.docs>, docId: strin
       const valueCell = table.rows[r]?.cells[1]
       if (!labelCell || !valueCell) continue
 
-      inserts.push({ index: labelCell.startIndex + 1, text: LABELS[r], bold: true })
-      inserts.push({ index: valueCell.startIndex + 1, text: values[r] || '—', bold: false })
-
-      styleRequests.push({
-        updateTableCellStyle: {
-          tableCellStyle: { backgroundColor: { color: { rgbColor: PINK_BG } } },
-          tableRange: {
-            tableCellLocation: {
-              tableStartLocation: { index: table.startIndex },
-              rowIndex: r,
-              columnIndex: 0,
-            },
-            rowSpan: 1,
-            columnSpan: 1,
-          },
-          fields: 'backgroundColor',
-        },
-      })
+      inserts.push({ index: labelCell.startIndex + 1, text: LABELS[r] })
+      inserts.push({ index: valueCell.startIndex + 1, text: values[r] || '—' })
     }
   }
 
@@ -191,6 +193,7 @@ async function fillTableCells(docs: ReturnType<typeof google.docs>, docId: strin
   const insertRequests = inserts.map(op => ({
     insertText: { location: { index: op.index }, text: op.text },
   }))
+
   await docs.documents.batchUpdate({ documentId: docId, requestBody: { requests: insertRequests } })
 
   // Relê o doc para obter os índices corretos após as inserções
@@ -210,24 +213,59 @@ async function fillTableCells(docs: ReturnType<typeof google.docs>, docId: strin
   }
   const relevantTables2 = tables2.slice(0, videos.length)
 
-  // Batch 2: updateTextStyle (bold nos labels) + updateTableCellStyle
+  // Batch 2: updateTextStyle (Poppins 11pt em tudo) + updateTableCellStyle
+  const POPPINS = { fontFamily: 'Poppins' }
+  const FONT_SIZE = { magnitude: 11, unit: 'PT' }
+  const DARK = { color: { rgbColor: { red: 0.1, green: 0.1, blue: 0.1 } } }
+
   const styleReqs2: object[] = []
   for (let vi = 0; vi < relevantTables2.length; vi++) {
     const table = relevantTables2[vi]
+    const video = videos[vi]
+    const values = [video.hook, video.referencia, video.produto, video.audio, video.obs, video.prazo]
+
     for (let r = 0; r < 6; r++) {
       const labelCell = table.rows[r]?.cells[0]
-      if (!labelCell) continue
+      const valueCell = table.rows[r]?.cells[1]
+      if (!labelCell || !valueCell) continue
+
       const labelText = LABELS[r]
+      const valueText = values[r] || '—'
+
+      // Coluna 1: maiúsculo + negrito + Poppins 11
       styleReqs2.push({
         updateTextStyle: {
           range: { startIndex: labelCell.startIndex + 1, endIndex: labelCell.startIndex + 1 + labelText.length },
           textStyle: {
             bold: true,
-            foregroundColor: { color: { rgbColor: { red: 0.2, green: 0.2, blue: 0.2 } } },
+            weightedFontFamily: POPPINS,
+            fontSize: FONT_SIZE,
+            foregroundColor: DARK,
           },
-          fields: 'bold,foregroundColor',
+          fields: 'bold,weightedFontFamily,fontSize,foregroundColor',
         },
       })
+
+      // Coluna 2: normal + Poppins 11 (+ link clicável na linha REFERÊNCIA)
+      const isRef = r === 1
+      const isUrl = isRef && valueText.startsWith('http')
+      styleReqs2.push({
+        updateTextStyle: {
+          range: { startIndex: valueCell.startIndex + 1, endIndex: valueCell.startIndex + 1 + valueText.length },
+          textStyle: {
+            bold: false,
+            weightedFontFamily: POPPINS,
+            fontSize: FONT_SIZE,
+            foregroundColor: DARK,
+            ...(isUrl ? { link: { url: valueText }, underline: true } : { underline: false }),
+          },
+          fields: isUrl
+            ? 'bold,weightedFontFamily,fontSize,foregroundColor,link,underline'
+            : 'bold,weightedFontFamily,fontSize,foregroundColor,underline',
+        },
+      })
+
+      // Background rosa na coluna 1
       styleReqs2.push({
         updateTableCellStyle: {
           tableCellStyle: { backgroundColor: { color: { rgbColor: PINK_BG } } },
@@ -278,6 +316,13 @@ async function initNewDoc(docs: ReturnType<typeof google.docs>, docId: string, c
       fields: 'namedStyleType',
     },
   })
+  requests.push({
+    updateTextStyle: {
+      range: { startIndex: idx, endIndex: idx + semLine.length - 1 },
+      textStyle: { bold: false, ...POPPINS_STYLE },
+      fields: 'bold,weightedFontFamily,fontSize',
+    },
+  })
   idx += semLine.length
 
   for (let vi = 0; vi < videos.length; vi++) {
@@ -289,6 +334,13 @@ async function initNewDoc(docs: ReturnType<typeof google.docs>, docId: string, c
         range: { startIndex: idx, endIndex: idx + h3.length },
         paragraphStyle: { namedStyleType: 'HEADING_3' },
         fields: 'namedStyleType',
+      },
+    })
+    requests.push({
+      updateTextStyle: {
+        range: { startIndex: idx, endIndex: idx + h3.length - 1 },
+        textStyle: { bold: false, ...POPPINS_STYLE },
+        fields: 'bold,weightedFontFamily,fontSize',
       },
     })
     idx += h3.length

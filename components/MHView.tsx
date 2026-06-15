@@ -990,14 +990,25 @@ export default function MHView({ onPostClick, allPosts = [], onPostsAdded, onPos
     setSyncing(true)
     try {
       const res = await fetch('/api/mh/dropbox-sync', { method: 'POST' })
-      const data = await res.json() as { updated?: string[]; error?: string }
+      type SyncedPost = { id: string; dropboxLink: string; videoLink: string | null; coverLink: string | null }
+      const data = await res.json() as { updated?: SyncedPost[]; error?: string }
       if (data.error) { setLastSyncResult({ found: 0 }); return }
-      const ids: string[] = data.updated ?? []
-      setLastSyncResult({ found: ids.length })
-      if (ids.length > 0) {
+      const synced: SyncedPost[] = data.updated ?? []
+      setLastSyncResult({ found: synced.length })
+      if (synced.length > 0) {
+        const syncedMap = new Map(synced.map(s => [s.id, s]))
         const updated = mhPosts
-          .filter(p => ids.includes(p.id))
-          .map(p => ({ ...p, status: 'entregue' as const, dropboxLink: `/MKT SOCIAL/CREATORS/${(p.owner ?? '').toUpperCase()}/Semana ${p.semana}` }))
+          .filter(p => syncedMap.has(p.id))
+          .map(p => {
+            const s = syncedMap.get(p.id)!
+            return {
+              ...p,
+              status: 'entregue' as const,
+              dropboxLink: s.dropboxLink,
+              videoLink: s.videoLink ?? p.videoLink,
+              coverLink: s.coverLink ?? p.coverLink,
+            }
+          })
         onPostsUpdated?.(updated)
       }
     } catch {

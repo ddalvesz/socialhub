@@ -6,6 +6,7 @@ import { todayISO } from '@/lib/types'
 import type { Story, StoryStatus } from '@/lib/types'
 import { dbToStory } from '@/lib/supabase/mappers'
 import { buildStoryUtm } from '@/lib/storiesUtils'
+import { useBrand } from '@/lib/brand-context'
 
 /* ── Constants ────────────────────────────────────────────── */
 
@@ -30,6 +31,7 @@ interface Props {
 
 export default function CreateStoryModal({ onClose, onSaved }: Props) {
   const supabase = createClient()
+  const { brand } = useBrand()
   const today = todayISO()
 
   const [date,     setDate]     = useState(today)
@@ -81,6 +83,7 @@ export default function CreateStoryModal({ onClose, onSaved }: Props) {
       rastreio_receita: utm?.campaign ?? null,
       receita:          null,
       origem:           'manual',
+      brand,
     }
 
     const { data, error } = await supabase.from('stories').insert(payload).select().single()

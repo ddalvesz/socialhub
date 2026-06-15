@@ -2,6 +2,73 @@ export type Platform = 'ig' | 'tiktok' | 'canal' | 'twitter' | 'youtube'
 export type PostStatus = 'prod' | 'sched' | 'pub' | 'cancel' | 'pauta' | 'entregue'
 export type PostSource = 'mh' | 'branding' | 'tiktok' | 'twitter' | 'canal' | 'copa'
 export type MHCreatorId = 'CARINA' | 'REBECA' | 'THA' | 'MARINA' | 'RECICLADO'
+export type Brand = 'gocase' | 'barbours' | 'kokeshi' | 'lescent'
+
+interface BrandTheme {
+  color: string
+  accent:          string
+  accentDeep:      string
+  accentSoft:      string
+  accentSofter:    string
+  accentGradient:  string
+  accentGradientSoft:   string
+  accentGradientSofter: string
+}
+
+export const BRANDS: { slug: Brand; name: string; color: string; theme: BrandTheme }[] = [
+  {
+    slug: 'gocase', name: 'Gocase', color: '#F97316',
+    theme: {
+      color:                  '#F97316',
+      accent:                 'oklch(0.72 0.16 55)',
+      accentDeep:             'oklch(0.62 0.18 50)',
+      accentSoft:             'oklch(0.94 0.05 60)',
+      accentSofter:           'oklch(0.975 0.025 65)',
+      accentGradient:         'linear-gradient(135deg, oklch(0.78 0.13 40) 0%, oklch(0.72 0.16 55) 100%)',
+      accentGradientSoft:     'linear-gradient(135deg, oklch(0.96 0.04 35) 0%, oklch(0.93 0.07 55) 100%)',
+      accentGradientSofter:   'linear-gradient(135deg, oklch(0.98 0.02 30) 0%, oklch(0.96 0.04 55) 100%)',
+    },
+  },
+  {
+    slug: 'barbours', name: "Barbour's", color: '#EF4444',
+    theme: {
+      color:                  '#EF4444',
+      accent:                 'oklch(0.63 0.21 27)',
+      accentDeep:             'oklch(0.53 0.23 27)',
+      accentSoft:             'oklch(0.94 0.05 25)',
+      accentSofter:           'oklch(0.975 0.02 25)',
+      accentGradient:         'linear-gradient(135deg, oklch(0.68 0.20 20) 0%, oklch(0.63 0.21 27) 100%)',
+      accentGradientSoft:     'linear-gradient(135deg, oklch(0.96 0.03 20) 0%, oklch(0.93 0.06 27) 100%)',
+      accentGradientSofter:   'linear-gradient(135deg, oklch(0.98 0.015 20) 0%, oklch(0.96 0.03 27) 100%)',
+    },
+  },
+  {
+    slug: 'kokeshi', name: 'Kokeshi', color: '#EC4899',
+    theme: {
+      color:                  '#EC4899',
+      accent:                 'oklch(0.65 0.22 350)',
+      accentDeep:             'oklch(0.55 0.24 350)',
+      accentSoft:             'oklch(0.94 0.05 350)',
+      accentSofter:           'oklch(0.975 0.02 350)',
+      accentGradient:         'linear-gradient(135deg, oklch(0.70 0.20 345) 0%, oklch(0.65 0.22 350) 100%)',
+      accentGradientSoft:     'linear-gradient(135deg, oklch(0.96 0.03 345) 0%, oklch(0.93 0.06 350) 100%)',
+      accentGradientSofter:   'linear-gradient(135deg, oklch(0.98 0.015 345) 0%, oklch(0.96 0.03 350) 100%)',
+    },
+  },
+  {
+    slug: 'lescent', name: 'Lescent', color: '#4B5563',
+    theme: {
+      color:                  '#4B5563',
+      accent:                 'oklch(0.45 0.02 255)',
+      accentDeep:             'oklch(0.35 0.025 255)',
+      accentSoft:             'oklch(0.93 0.01 255)',
+      accentSofter:           'oklch(0.97 0.005 255)',
+      accentGradient:         'linear-gradient(135deg, oklch(0.50 0.02 250) 0%, oklch(0.45 0.02 255) 100%)',
+      accentGradientSoft:     'linear-gradient(135deg, oklch(0.95 0.008 250) 0%, oklch(0.93 0.01 255) 100%)',
+      accentGradientSofter:   'linear-gradient(135deg, oklch(0.975 0.004 250) 0%, oklch(0.97 0.005 255) 100%)',
+    },
+  },
+]
 
 export interface Post {
   id: string           // uuid

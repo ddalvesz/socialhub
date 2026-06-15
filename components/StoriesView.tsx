@@ -3,11 +3,11 @@
 import { useState, useMemo, useCallback } from 'react'
 import {
   ComposedChart, Area, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, BarChart, LabelList,
+  ResponsiveContainer, BarChart, LabelList, Cell,
 } from 'recharts'
 import type { Story, DayAggregate } from '@/lib/types'
 import {
-  Period, filterByPeriod, storiesKpis, eficienciaAlcance,
+  storiesKpis, eficienciaAlcance,
   receitaComparacao, receitaVariacao, engajamentoDiario, correlacaoReceitaAlcance,
   projecaoMes, mediaPorDiaSemana, heatmapTiming, performancePorProduto, produtoColor,
   STORY_STATUS_META, fmtBRL, fmtBRLk, fmtNumk, fmtPct,
@@ -17,17 +17,13 @@ import CreateStoryModal from './CreateStoryModal'
 
 /* ── Constants ────────────────────────────────────────────── */
 
-const PERIOD_OPTS: { id: Period; label: string }[] = [
-  { id: '7d',   label: '7 dias'   },
-  { id: '30d',  label: '30 dias'  },
-  { id: '90d',  label: '90 dias'  },
-  { id: '12m',  label: '12 meses' },
-  { id: 'tudo', label: 'Tudo'     },
+type PeriodId = 'week' | 'month' | 90 | 'custom'
+const PERIOD_OPTS: { id: PeriodId; label: string }[] = [
+  { id: 'week',   label: 'Essa semana' },
+  { id: 'month',  label: 'Esse mês'   },
+  { id: 90,       label: '90 dias'    },
+  { id: 'custom', label: 'Período…'   },
 ]
-
-const PERIOD_DAYS: Record<Period, number | null> = {
-  '7d': 7, '30d': 30, '90d': 90, '12m': 365, tudo: null,
-}
 
 const WEEKDAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
 const SLOT_LABELS = ['7h–9h','9h–11h','11h–13h','13h–15h','15h–17h','17h–19h','19h–21h','21h–23h']
@@ -38,15 +34,16 @@ const ACCENT     = 'oklch(0.72 0.16 55)'
 const CHART_BLUE = 'oklch(0.52 0.16 250)'
 const CHART_CYAN = 'oklch(0.62 0.13 215)'
 
-/* ── Helpers ──────────────────────────────────────────────── */
-
-function periodLabel(period: Period): string {
-  const d = PERIOD_DAYS[period]
-  if (!d) return 'de todos os tempos'
-  return `nos últimos ${d < 365 ? d + ' dias' : '12 meses'}`
-}
-
 /* ── Sub-components ───────────────────────────────────────── */
+
+function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8, marginTop: 4 }}>
+      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.01em' }}>{title}</span>
+      <span style={{ fontSize: 11.5, color: AXIS_COLOR }}>{subtitle}</span>
+    </div>
+  )
+}
 
 function DashCard({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -153,21 +150,33 @@ function CopyUtmBtn({ code }: { code: string }) {
 
 /* ── Chart 1: Comparação de receita ──────────────────────── */
 
-function ReceitaComparacaoChart({ period, stories }: { period: Period; stories: Story[] }) {
+function ReceitaComparacaoChart({ period, stories }: { period: PeriodId; stories: Story[] }) {
   const today = todayISO()
-  const data = useMemo(() => receitaComparacao(stories, period, today), [stories, period, today])
+  const legacyPeriod: import('@/lib/storiesUtils').Period =
+    period === 'week' ? '7d' : period === 'month' ? '30d' : period === 90 ? '90d' : '30d'
+  const data = useMemo(() => receitaComparacao(stories, legacyPeriod, today), [stories, legacyPeriod, today])
   const delta = useMemo(() => receitaVariacao(data), [data])
-  const hasComparacao = period !== '12m' && period !== 'tudo'
+  const hasComparacao = period !== 'custom'
 
-  const title = period === '7d' ? 'Esta semana vs semana passada'
-    : period === '30d' ? 'Últimos 30 dias vs 30 anteriores'
-    : period === '90d' ? 'Últimos 90 dias vs 90 anteriores'
-    : 'Receita por semana'
+  const curTotal  = useMemo(() => data.reduce((s, d) => s + ((d as { atual?: number }).atual  || 0), 0), [data])
+  const prevTotal = useMemo(() => data.reduce((s, d) => s + ((d as { anterior?: number }).anterior || 0), 0), [data])
+
+  const title = period === 'week' ? 'Esta semana vs semana passada'
+    : period === 'month' ? 'Últimos 30 dias vs 30 anteriores'
+    : period === 90 ? 'Últimos 90 dias vs 90 anteriores'
+    : 'Receita no período'
+
+  const subtitle = hasComparacao
+    ? `${fmtBRLk(curTotal)} no período atual · ${fmtBRLk(prevTotal)} no anterior`
+    : `Total: ${fmtBRLk(curTotal)}`
 
   return (
     <div className="live-card" style={{ marginBottom: 20 }}>
-      <div className="live-card-head" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div className="live-card-title">{title}</div>
+      <div className="live-card-head" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div>
+          <div className="live-card-title">{title}</div>
+          <div style={{ fontSize: 11.5, color: AXIS_COLOR, marginTop: 3 }}>{subtitle}</div>
+        </div>
         {hasComparacao && <VariacaoBadge delta={delta} />}
       </div>
       <div className="live-card-body">
@@ -183,9 +192,9 @@ function ReceitaComparacaoChart({ period, stories }: { period: Period; stories: 
             <XAxis dataKey="label" tick={{ fontSize: 10.5, fill: AXIS_COLOR }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 10.5, fill: AXIS_COLOR }} axisLine={false} tickLine={false} tickFormatter={v => fmtBRLk(v)} width={60} />
             <Tooltip content={<LiveTip />} />
-            <Area dataKey="atual" name="Período atual" stroke={ACCENT} strokeWidth={2} fill="url(#atualGrad)" dot={false} activeDot={{ r: 4 }} />
+            <Area type="monotone" dataKey="atual" name="Período atual" stroke={ACCENT} strokeWidth={2} fill="url(#atualGrad)" dot={false} activeDot={{ r: 4 }} />
             {hasComparacao && (
-              <Line dataKey="anterior" name="Período anterior" stroke={AXIS_COLOR} strokeWidth={1.5} strokeDasharray="4 3" dot={false} activeDot={{ r: 3 }} />
+              <Line type="monotone" dataKey="anterior" name="Período anterior" stroke={AXIS_COLOR} strokeWidth={1.5} strokeDasharray="4 3" dot={false} activeDot={{ r: 3 }} />
             )}
           </ComposedChart>
         </ResponsiveContainer>
@@ -193,7 +202,7 @@ function ReceitaComparacaoChart({ period, stories }: { period: Period; stories: 
           <div className="cmp-legend" style={{ display: 'flex', gap: 18, borderTop: `1px dashed ${GRID_COLOR}`, paddingTop: 10, marginTop: 4 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: AXIS_COLOR }}>
               <span style={{ display: 'inline-block', width: 18, height: 3, borderRadius: 2, background: ACCENT }} />
-              Período atual
+              {period === 'week' ? 'Estes 7 dias' : period === 'month' ? 'Estes 30 dias' : 'Período atual'}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: AXIS_COLOR }}>
               <span style={{ display: 'inline-block', width: 18, borderTop: `2px dashed ${AXIS_COLOR}` }} />
@@ -213,7 +222,7 @@ function EngajamentoDiarioChart({ aggregates }: { aggregates: DayAggregate[] }) 
 
   if (aggregates.length === 0) {
     return (
-      <DashCard title="Engajamento diário">
+      <DashCard title="Alcance e Visualizações" hint="soma diária dos dados de engajamento da conta">
         <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: AXIS_COLOR, fontSize: 13 }}>
           Sem dados de alcance. Preencha os dados diários para ver este gráfico.
         </div>
@@ -222,7 +231,7 @@ function EngajamentoDiarioChart({ aggregates }: { aggregates: DayAggregate[] }) 
   }
 
   return (
-    <DashCard title="Engajamento diário">
+    <DashCard title="Alcance e Visualizações" hint="soma diária dos dados de engajamento da conta">
       <ResponsiveContainer width="100%" height={200}>
         <ComposedChart data={data} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
           <defs>
@@ -239,8 +248,8 @@ function EngajamentoDiarioChart({ aggregates }: { aggregates: DayAggregate[] }) 
           <XAxis dataKey="label" tick={{ fontSize: 10.5, fill: AXIS_COLOR }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
           <YAxis tick={{ fontSize: 10.5, fill: AXIS_COLOR }} axisLine={false} tickLine={false} tickFormatter={fmtNumk} width={48} />
           <Tooltip content={<LiveTip />} />
-          <Area dataKey="visualizacoes" name="Visualizações" stroke={CHART_CYAN} strokeWidth={1.5} fill="url(#viewGrad)" dot={false} />
-          <Area dataKey="alcance" name="Alcance" stroke={CHART_BLUE} strokeWidth={2} fill="url(#alcGrad)" dot={false} />
+          <Area type="monotone" dataKey="visualizacoes" name="Visualizações" stroke={CHART_CYAN} strokeWidth={1.5} fill="url(#viewGrad)" dot={false} />
+          <Area type="monotone" dataKey="alcance" name="Alcance" stroke={CHART_BLUE} strokeWidth={2} fill="url(#alcGrad)" dot={false} />
         </ComposedChart>
       </ResponsiveContainer>
       <div style={{ display: 'flex', gap: 18, borderTop: `1px dashed ${GRID_COLOR}`, paddingTop: 10, marginTop: 4 }}>
@@ -264,7 +273,7 @@ function CorrelacaoChart({ stories, aggregates }: { stories: Story[]; aggregates
   if (!data.length) return null
 
   return (
-    <DashCard title="Correlação receita × alcance" hint="barras = alcance (eixo esq.) · linha = receita via UTM (eixo dir.)">
+    <DashCard title="Receita vs Alcance" hint="barras = alcance (eixo esq.) · linha = receita via UTM (eixo dir.)">
       <ResponsiveContainer width="100%" height={200}>
         <ComposedChart data={data} margin={{ top: 4, right: 48, bottom: 0, left: 0 }}>
           <CartesianGrid stroke={GRID_COLOR} vertical={false} />
@@ -277,7 +286,7 @@ function CorrelacaoChart({ stories, aggregates }: { stories: Story[]; aggregates
             stroke={CHART_BLUE} strokeWidth={0.5}
             radius={[3, 3, 0, 0]}
           />
-          <Line yAxisId="right" dataKey="receita" name="Receita" stroke={ACCENT} strokeWidth={2} dot={false} activeDot={{ r: 5 }} />
+          <Line type="monotone" yAxisId="right" dataKey="receita" name="Receita" stroke={ACCENT} strokeWidth={2} dot={false} activeDot={{ r: 5 }} />
         </ComposedChart>
       </ResponsiveContainer>
     </DashCard>
@@ -434,21 +443,19 @@ function ProdutosChart({ stories }: { stories: Story[] }) {
     )
   }
 
-  const chartHeight = Math.max(160, 28 + data.length * 38)
-
   return (
     <DashCard title="Performance por produto foco">
-      <ResponsiveContainer width="100%" height={chartHeight}>
-        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 80, bottom: 0, left: 0 }}>
-          <CartesianGrid stroke={GRID_COLOR} horizontal={false} />
-          <XAxis type="number" tick={{ fontSize: 10.5, fill: AXIS_COLOR }} axisLine={false} tickLine={false} tickFormatter={fmtBRLk} />
-          <YAxis type="category" dataKey="produto" width={140} tick={{ fontSize: 11, fill: 'var(--ink)' }} axisLine={false} tickLine={false} />
+      <ResponsiveContainer width="100%" height={220}>
+        <BarChart data={data} margin={{ top: 16, right: 8, bottom: 48, left: 0 }}>
+          <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+          <XAxis dataKey="produto" tick={{ fontSize: 10.5, fill: AXIS_COLOR }} axisLine={false} tickLine={false} interval={0} angle={-30} textAnchor="end" />
+          <YAxis tick={{ fontSize: 10, fill: AXIS_COLOR }} axisLine={false} tickLine={false} tickFormatter={fmtBRLk} width={48} />
           <Tooltip content={<LiveTip />} />
-          <Bar dataKey="total" name="Receita total" barSize={18} radius={[0, 6, 6, 0]}>
+          <Bar dataKey="total" name="Receita total" barSize={32} radius={[6, 6, 0, 0]}>
             {data.map((entry, i) => (
-              <rect key={`bar-${i}`} fill={produtoColor(entry.produto, i)} />
+              <Cell key={`cell-${i}`} fill={produtoColor(entry.produto, i)} fillOpacity={0.85} />
             ))}
-            <LabelList dataKey="total" position="right" formatter={(v: unknown) => fmtBRLk(Number(v))} style={{ fontSize: 11, fill: 'var(--ink-2)', fontWeight: 600 }} />
+            <LabelList dataKey="total" position="top" formatter={(v: unknown) => fmtBRLk(Number(v))} style={{ fontSize: 10, fill: 'var(--ink-2)', fontWeight: 600 }} />
           </Bar>
         </BarChart>
       </ResponsiveContainer>
@@ -563,18 +570,61 @@ interface Props {
 
 export default function StoriesView({ stories, dayAggregates, onStoryCreated, onStoryClick }: Props) {
   const today = todayISO()
-  const [period, setPeriod] = useState<Period>('tudo')
+  const [period, setPeriod] = useState<PeriodId>('month')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
 
-  const filteredStories = useMemo(
-    () => filterByPeriod(stories, period, today),
-    [stories, period, today]
-  )
+  const filteredStories = useMemo(() => {
+    if (period === 'custom') {
+      const from = customFrom
+      const to   = customTo || today
+      return stories.filter(s => (!from || s.date >= from) && s.date <= to)
+    }
+    if (period === 'week') {
+      const d = new Date(today + 'T00:00:00')
+      const dow = d.getDay()
+      const monday = new Date(d); monday.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1))
+      const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6)
+      const from = monday.toISOString().slice(0, 10)
+      const to   = sunday.toISOString().slice(0, 10)
+      return stories.filter(s => s.date >= from && s.date <= to)
+    }
+    if (period === 'month') {
+      const from = today.slice(0, 7) + '-01'
+      return stories.filter(s => s.date >= from && s.date <= today)
+    }
+    // 90 days
+    const cutoff = new Date(today + 'T00:00:00')
+    cutoff.setDate(cutoff.getDate() - 90)
+    const cutoffStr = cutoff.toISOString().slice(0, 10)
+    return stories.filter(s => s.date >= cutoffStr && s.date <= today)
+  }, [stories, period, today, customFrom, customTo])
 
-  const filteredAggregates = useMemo(
-    () => filterByPeriod(dayAggregates, period, today),
-    [dayAggregates, period, today]
-  )
+  const filteredAggregates = useMemo(() => {
+    if (period === 'custom') {
+      const from = customFrom
+      const to   = customTo || today
+      return dayAggregates.filter(d => (!from || d.date >= from) && d.date <= to)
+    }
+    if (period === 'week') {
+      const d = new Date(today + 'T00:00:00')
+      const dow = d.getDay()
+      const monday = new Date(d); monday.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1))
+      const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6)
+      const from = monday.toISOString().slice(0, 10)
+      const to   = sunday.toISOString().slice(0, 10)
+      return dayAggregates.filter(d => d.date >= from && d.date <= to)
+    }
+    if (period === 'month') {
+      const from = today.slice(0, 7) + '-01'
+      return dayAggregates.filter(d => d.date >= from && d.date <= today)
+    }
+    const cutoff = new Date(today + 'T00:00:00')
+    cutoff.setDate(cutoff.getDate() - 90)
+    const cutoffStr = cutoff.toISOString().slice(0, 10)
+    return dayAggregates.filter(d => d.date >= cutoffStr && d.date <= today)
+  }, [dayAggregates, period, today, customFrom, customTo])
 
   const kpis = useMemo(
     () => storiesKpis(filteredStories, filteredAggregates),
@@ -586,17 +636,19 @@ export default function StoriesView({ stories, dayAggregates, onStoryCreated, on
     [kpis.receitaTotal, kpis.alcanceTotal]
   )
 
-  const days = PERIOD_DAYS[period]
-  const countLabel = `${kpis.count} stories ${periodLabel(period)}`
+  const periodHint = period === 'week' ? 'essa semana'
+    : period === 'month' ? 'esse mês'
+    : period === 'custom' ? `${customFrom || '?'} → ${customTo || 'hoje'}`
+    : 'últimos 90 dias'
 
   return (
     <div className="lives-wrap">
       {/* Period filter bar */}
-      <div className="lives-period-bar" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div className="lives-period-bar">
         <div className="view-toggle">
           {PERIOD_OPTS.map(opt => (
             <button
-              key={opt.id}
+              key={String(opt.id)}
               className={period === opt.id ? 'active' : ''}
               onClick={() => setPeriod(opt.id)}
             >
@@ -604,7 +656,18 @@ export default function StoriesView({ stories, dayAggregates, onStoryCreated, on
             </button>
           ))}
         </div>
-        <span className="st-period-info">{countLabel}</span>
+        {period === 'custom' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input type="date" className="field" style={{ fontSize: 12, padding: '3px 8px', width: 130 }}
+              value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
+            <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>até</span>
+            <input type="date" className="field" style={{ fontSize: 12, padding: '3px 8px', width: 130 }}
+              value={customTo} onChange={e => setCustomTo(e.target.value)} />
+          </div>
+        )}
+        <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
+          {kpis.count} stor{kpis.count === 1 ? 'y' : 'ies'} no período
+        </div>
         <div style={{ flex: 1 }} />
         <button className="btn btn-accent" style={{ fontSize: 13, padding: '8px 14px' }} onClick={() => setCreateOpen(true)}>
           <svg viewBox="0 0 16 16" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
@@ -650,15 +713,19 @@ export default function StoriesView({ stories, dayAggregates, onStoryCreated, on
       )}
 
       {/* Chart 1: Comparação de receita */}
+      <SectionHeader title="Comparação de receita" subtitle="receita rastreada via UTM · período atual vs anterior" />
       <ReceitaComparacaoChart period={period} stories={filteredStories} />
 
       {/* Chart 2: Engajamento diário */}
+      <SectionHeader title="Engajamento diário" subtitle="dados por dia · não vinculados a stories específicos após 24h" />
       <EngajamentoDiarioChart aggregates={filteredAggregates} />
 
       {/* Chart 3: Correlação */}
+      <SectionHeader title="Correlação receita × alcance" subtitle="a receita acompanha o alcance neste período?" />
       <CorrelacaoChart stories={filteredStories} aggregates={filteredAggregates} />
 
       {/* Charts 4 & 5: 2-col grid */}
+      <SectionHeader title="Análise do mês corrente" subtitle="projeção baseada no ritmo atual · médias por dia da semana" />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
         <ProjecaoMesCard stories={stories} aggregates={dayAggregates} />
         <MediaDiaSemana stories={filteredStories} aggregates={filteredAggregates} />

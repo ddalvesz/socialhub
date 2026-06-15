@@ -114,6 +114,8 @@ function PropostaPanel({ propostas, merchans, onApprove, onApproveAll, onDiscard
 }) {
   const byDate = [...propostas].sort((a, b) => a.date.localeCompare(b.date))
   const pendentes = byDate.filter(p => p.status === 'proposta').length
+  const allConfirmed = propostas.length > 0 && pendentes === 0
+  const [open, setOpen] = useState(!allConfirmed)
 
   if (propostas.length === 0) {
     return (
@@ -135,77 +137,82 @@ function PropostaPanel({ propostas, merchans, onApprove, onApproveAll, onDiscard
   }
 
   return (
-    <div className="proposta-panel">
-      <div className="proposta-head">
-        <div>
+    <div className={`proposta-panel ${open ? 'is-open' : 'is-closed'}`}>
+      <div className="proposta-head" onClick={() => setOpen(o => !o)} style={{ cursor: 'pointer' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div className="proposta-title">
             <span className="proposta-badge">🤖 skill</span>
             Proposta da próxima semana
+            <span className="proposta-chevron">{open ? '▲' : '▼'}</span>
           </div>
           <div className="proposta-sub">
             {pendentes > 0
-              ? <><strong>{pendentes}</strong> dia{pendentes === 1 ? '' : 's'} aguardando sua aprovação · {byDate.length - pendentes} já confirmado{byDate.length - pendentes === 1 ? '' : 's'}</>
-              : 'Todos os dias confirmados.'}
+              ? <><strong>{pendentes}</strong> dia{pendentes === 1 ? '' : 's'} aguardando aprovação · {byDate.length - pendentes} confirmado{byDate.length - pendentes === 1 ? '' : 's'}</>
+              : <span className="all-confirmed">✓ Todos os {byDate.length} dias confirmados</span>}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+
+        <div className="proposta-head-actions" onClick={e => e.stopPropagation()}>
           <button className="btn btn-ghost" onClick={onGenerate} disabled={generating}>
             {generating ? 'Gerando…' : '↺ Regerar'}
           </button>
-          {pendentes > 0 && (
+          {open && pendentes > 0 && (
             <button className="btn btn-accent" onClick={onApproveAll}>
               <Icon.check /> Aprovar tudo
             </button>
           )}
         </div>
       </div>
-      <div className="proposta-grid">
-        {byDate.map(p => {
-          const d = new Date(p.date + 'T00:00:00')
-          const m1 = merchans.find(m => m.nome === p.merchan1)
-          const m2 = merchans.find(m => m.nome === p.merchan2)
-          const confirmed = p.status === 'confirmada'
-          return (
-            <div key={p.id} className={`proposta-day ${confirmed ? 'confirmed' : ''}`} onClick={() => onEdit(p)}>
-              <div className="proposta-day-head">
-                <div className="proposta-day-date">
-                  <span className="num">{d.getDate()}</span>
-                  <span className="dow">{WEEKDAY_LABELS[d.getDay()]}</span>
+
+      {open && (
+        <div className="proposta-grid">
+          {byDate.map(p => {
+            const d = new Date(p.date + 'T00:00:00')
+            const m1 = merchans.find(m => m.nome === p.merchan1)
+            const m2 = merchans.find(m => m.nome === p.merchan2)
+            const confirmed = p.status === 'confirmada'
+            return (
+              <div key={p.id} className={`proposta-day ${confirmed ? 'confirmed' : ''}`} onClick={() => onEdit(p)}>
+                <div className="proposta-day-head">
+                  <div className="proposta-day-date">
+                    <span className="num">{d.getDate()}</span>
+                    <span className="dow">{WEEKDAY_LABELS[d.getDay()]}</span>
+                  </div>
+                  {confirmed
+                    ? <span className="status-pill s-conf"><span className="sdot" />confirmada</span>
+                    : <span className="status-pill s-prop"><span className="sdot" />proposta</span>}
                 </div>
-                {confirmed
-                  ? <span className="status-pill s-conf"><span className="sdot" />confirmada</span>
-                  : <span className="status-pill s-prop"><span className="sdot" />proposta</span>}
-              </div>
-              <div className="proposta-cupom proposta-cupom-1">
-                {m1 && <span className="dot" style={{ background: m1.color }} />}
-                <div className="cm-text">
-                  <div className="cm-merchan" title={p.merchan1}>{m1?.short || p.merchan1}</div>
-                  <div className="cm-nominal">{p.nominal1}</div>
-                </div>
-              </div>
-              {m2 && (
-                <div className="proposta-cupom proposta-cupom-2">
-                  <span className="dot" style={{ background: m2.color }} />
+                <div className="proposta-cupom proposta-cupom-1">
+                  {m1 && <span className="dot" style={{ background: m1.color }} />}
                   <div className="cm-text">
-                    <div className="cm-merchan" title={p.merchan2}>{m2?.short || p.merchan2}</div>
-                    <div className="cm-nominal">{p.nominal2}</div>
+                    <div className="cm-merchan" title={p.merchan1}>{m1?.short || p.merchan1}</div>
+                    <div className="cm-nominal">{p.nominal1}</div>
                   </div>
                 </div>
-              )}
-              <div className="proposta-actions" onClick={e => e.stopPropagation()}>
-                {!confirmed && (
-                  <button className="btn btn-mini btn-accent" onClick={() => onApprove(p)}>
-                    <Icon.check /> aprovar
-                  </button>
+                {m2 && (
+                  <div className="proposta-cupom proposta-cupom-2">
+                    <span className="dot" style={{ background: m2.color }} />
+                    <div className="cm-text">
+                      <div className="cm-merchan" title={p.merchan2}>{m2?.short || p.merchan2}</div>
+                      <div className="cm-nominal">{p.nominal2}</div>
+                    </div>
+                  </div>
                 )}
-                <button className="btn btn-mini btn-ghost danger" onClick={() => onDiscard(p)}>
-                  descartar
-                </button>
+                <div className="proposta-actions" onClick={e => e.stopPropagation()}>
+                  {!confirmed && (
+                    <button className="btn btn-mini btn-accent" onClick={() => onApprove(p)}>
+                      <Icon.check /> aprovar
+                    </button>
+                  )}
+                  <button className="btn btn-mini btn-ghost danger" onClick={() => onDiscard(p)}>
+                    descartar
+                  </button>
+                </div>
               </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -504,7 +511,9 @@ export default function LivesView({
     }
     if (period === 'month') {
       const from = today.slice(0, 7) + '-01'
-      return lives.filter(l => l.date >= from && l.date <= today)
+      const lastDay = new Date(Number(today.slice(0, 4)), Number(today.slice(5, 7)), 0)
+      const to = lastDay.toISOString().slice(0, 10)
+      return lives.filter(l => l.date >= from && l.date <= to)
     }
     return lives.filter(l => inPeriod(l.date, period, today))
   }, [lives, period, today, customFrom, customTo])

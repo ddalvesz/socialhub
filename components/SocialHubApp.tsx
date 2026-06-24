@@ -3,8 +3,8 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  Post, Platform, PostSource, AppView, CalendarMode, Campaign, Collection, Linking,
-  EventDate, FutebolEvent, Live, Merchan, LiveStatus, Story, DayAggregate,
+  Post, Platform, PostSource, AppView, CalendarMode, Campaign, CanalPost, Collection, Linking,
+  EventDate, FutebolEvent, Live, Merchan, LiveStatus, SiteLink, Story, DayAggregate,
   MONTHS, PLATFORMS, TAGS, STATUSES,
   addDaysISO, startOfWeekISO, todayISO, parseISO,
   CONTENT_TYPES_IG, CONTENT_TYPES_OTHER,
@@ -14,9 +14,11 @@ import {
 import type { TeamProfile } from '@/lib/types'
 import {
   campaignToDb, collectionToDb, postToDb, sourceToTable,
-  dbToPost, dbToCampaign, dbToCollection,
+  dbToPost, dbToCampaign, dbToCollection, dbToCanalPost,
   dbToLive, dbToMerchan, liveToDb, merchanToDb, dbToStory, storyToDb,
+  dbToStoryFromBeleza, storyToDbBeleza,
   dbToEventDate, dbToFutebolEvent, dbToDayAggregate,
+  dbToSiteLink, siteLinkToDb,
 } from '@/lib/supabase/mappers'
 import BrandSwitcher from './BrandSwitcher'
 import { WEEKDAY_NOMES } from '@/lib/livesUtils'
@@ -34,7 +36,9 @@ import ProfileView from './ProfileView'
 import ExportModal from './ExportModal'
 import MHView from './MHView'
 import ArchivedView from './ArchivedView'
+import CanalView from './CanalView'
 import LivesView from './LivesView'
+import SiteLinksView from './SiteLinksView'
 import LiveModal from './LiveModal'
 import MerchansModal from './MerchansModal'
 import StoryModal from './StoryModal'
@@ -183,6 +187,8 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   const [dayAggregates, setDayAggregates] = useState<DayAggregate[]>(initialDayAggregates)
   const [eventDates, setEventDates] = useState<EventDate[]>(initialEventDates)
   const [futebolEvents, setFutebolEvents] = useState<FutebolEvent[]>(initialFutebolEvents)
+  const [canalPosts, setCanalPosts] = useState<CanalPost[]>([])
+  const [siteLinks, setSiteLinks] = useState<SiteLink[]>([])
   const knownProducts = useMemo(() => {
     const seen = new Set<string>()
     const result: string[] = []
@@ -192,6 +198,8 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     }
     return result.sort((a, b) => a.localeCompare(b, 'pt-BR'))
   }, [stories])
+  const isBelezaBrand = (b: Brand) => b === 'barbours' || b === 'kokeshi' || b === 'lescent'
+
   const fetchForBrand = useCallback(async (b: Brand) => {
     setBrandLoading(true)
     try {
@@ -201,7 +209,8 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
         { data: campaignsData }, { data: collectionsData },
         { data: eventDatesData }, { data: futebolData },
         { data: productsData }, { data: livesData }, { data: merchansData },
-        { data: storiesData }, { data: dayAggData },
+        { data: storiesData, error: storiesError }, { data: dayAggData },
+        { data: siteLinksData },
       ] = await Promise.all([
         supabase.from('mh_posts').select('*').eq('brand', b).eq('archived', false).order('date', { ascending: true }),
         supabase.from('branding_posts').select('*').eq('brand', b).eq('archived', false).order('date', { ascending: true }),
@@ -216,8 +225,11 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
         supabase.from('products').select('name').eq('brand', b).order('name', { ascending: true }),
         supabase.from('lives').select('*').eq('brand', b).order('date', { ascending: true }),
         supabase.from('merchans').select('*').eq('brand', b).order('nome', { ascending: true }),
-        supabase.from('stories').select('*').eq('brand', b).order('date', { ascending: false }),
+        isBelezaBrand(b)
+          ? supabase.from('stories_beleza').select('*').eq('marca', b).order('date', { ascending: false })
+          : supabase.from('stories').select('*').eq('brand', b).order('date', { ascending: false }),
         supabase.from('stories_day_aggregates').select('*').eq('brand', b).order('date', { ascending: true }),
+        supabase.from('site_links').select('*').eq('brand', b).order('categoria', { ascending: true }),
       ])
       const allPosts: Post[] = [
         ...(mhData      ?? []).map(r => dbToPost(r as Record<string, unknown>, 'mh')),
@@ -235,8 +247,14 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
       setProducts((productsData ?? []).map(p => (p as { name: string }).name))
       setLives((livesData ?? []).map(r => dbToLive(r as Record<string, unknown>)))
       setMerchans((merchansData ?? []).map(r => dbToMerchan(r as Record<string, unknown>)))
-      setStories((storiesData ?? []).map(r => dbToStory(r as Record<string, unknown>)))
+
+      setStories(isBelezaBrand(b)
+        ? (storiesData ?? []).map(r => dbToStoryFromBeleza(r as Record<string, unknown>))
+        : (storiesData ?? []).map(r => dbToStory(r as Record<string, unknown>))
+      )
       setDayAggregates((dayAggData ?? []).map(r => dbToDayAggregate(r as Record<string, unknown>)))
+      setCanalPosts((canalData ?? []).map(r => dbToCanalPost(r as Record<string, unknown>)))
+      setSiteLinks((siteLinksData ?? []).map(r => dbToSiteLink(r as Record<string, unknown>)))
     } finally {
       setBrandLoading(false)
     }
@@ -264,11 +282,18 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     root.style.setProperty('--accent-gradient-softer',  theme.accentGradientSofter)
   }, [])
 
+  const BRAND_VIEWS: Record<Brand, AppView[]> = {
+    gocase:   ['calendar','branding','mh','comemorativas','futebol','campaigns','collections','archived','lives','stories','site_links','profile'],
+    barbours: ['calendar','canal','comemorativas','campaigns','archived','lives','stories','site_links','profile'],
+    kokeshi:  ['calendar','campaigns','lives','stories','site_links','profile'],
+    lescent:  ['calendar','campaigns','lives','stories','site_links','profile'],
+  }
   const handleBrandChange = (b: Brand) => {
     setBrandState(b)
     localStorage.setItem('activeBrand', b)
     applyBrandTheme(b)
     fetchForBrand(b)
+    setView(v => BRAND_VIEWS[b].includes(v) ? v : 'calendar')
   }
 
   const [activeLive, setActiveLive] = useState<Live | null>(null)
@@ -279,6 +304,13 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
 
   const today = todayISO()
   const todayDate = parseISO(today)
+  const storiesCount = (() => {
+    const d = new Date(today); d.setDate(d.getDate() - 30)
+    const cutoff = d.toISOString().slice(0, 10)
+    return isBelezaBrand(brand)
+      ? stories.filter(s => s.status === 'postado' && s.date >= cutoff).length
+      : stories.filter(s => s.status === 'feito').length
+  })()
 
   const [year, setYear] = useState(todayDate.getFullYear())
   const [month, setMonth] = useState(todayDate.getMonth())
@@ -396,6 +428,28 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'stories' }, ({ old: row }) => {
         setStories(arr => arr.filter(x => x.id !== String((row as Record<string, unknown>).id)))
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'stories_beleza' }, ({ new: row }) => {
+        const s = dbToStoryFromBeleza(row as Record<string, unknown>)
+        setStories(arr => arr.some(x => x.id === s.id) ? arr : [s, ...arr])
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'stories_beleza' }, ({ new: row }) => {
+        const s = dbToStoryFromBeleza(row as Record<string, unknown>)
+        setStories(arr => arr.map(x => x.id === s.id ? s : x))
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'stories_beleza' }, ({ old: row }) => {
+        setStories(arr => arr.filter(x => x.id !== String((row as Record<string, unknown>).id)))
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'site_links' }, ({ new: row }) => {
+        const sl = dbToSiteLink(row as Record<string, unknown>)
+        setSiteLinks(arr => arr.some(x => x.id === sl.id) ? arr : [...arr, sl])
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'site_links' }, ({ new: row }) => {
+        const sl = dbToSiteLink(row as Record<string, unknown>)
+        setSiteLinks(arr => arr.map(x => x.id === sl.id ? sl : x))
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'site_links' }, ({ old: row }) => {
+        setSiteLinks(arr => arr.filter(x => x.id !== String((row as Record<string, unknown>).id)))
       })
 
     ch.subscribe()
@@ -603,9 +657,10 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     const diaSemana = WEEKDAY_NOMES[dayIndex]
     const payload: Omit<Live, 'id'> = {
       date,
+      hora: '',
       diaSemana,
       cupomLigado: true,
-      criativo: false,
+      criativo: '',
       merchan1: '',
       nominal1: '',
       receita1: 0,
@@ -617,6 +672,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
       receitaTotal: 0,
       receitaUtm: 0,
       alcance: 0,
+      produto: '',
       linkUtm: '',
       utmCampaign: '',
       status: 'confirmada' as LiveStatus,
@@ -639,17 +695,45 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
 
   const approveLive = (l: Live) => saveLive({ ...l, status: 'confirmada' })
 
+  // ─── SiteLinks handlers ────────────────────────────────────────
+
+  const addSiteLink = async (sl: Omit<SiteLink, 'id'>): Promise<SiteLink> => {
+    const { data, error } = await supabase.from('site_links').insert(siteLinkToDb(sl)).select().single()
+    if (error || !data) throw new Error(error?.message ?? 'Erro ao salvar')
+    const created = dbToSiteLink(data as Record<string, unknown>)
+    setSiteLinks(arr => [...arr, created])
+    return created
+  }
+
+  const updateSiteLink = async (sl: SiteLink): Promise<void> => {
+    setSiteLinks(arr => arr.map(x => x.id === sl.id ? sl : x))
+    await supabase.from('site_links').update(siteLinkToDb(sl)).eq('id', sl.id)
+  }
+
+  const deleteSiteLink = async (id: string): Promise<void> => {
+    setSiteLinks(arr => arr.filter(x => x.id !== id))
+    await supabase.from('site_links').delete().eq('id', id)
+  }
+
   // ─── Stories handlers ──────────────────────────────────────────
 
   const saveStory = async (s: Story) => {
     setStories(arr => arr.map(x => x.id === s.id ? s : x))
     const { id, produtoSlug, ...rest } = s
-    await supabase.from('stories').update(storyToDb(rest)).eq('id', id)
+    if (isBelezaBrand(brand)) {
+      await supabase.from('stories_beleza').update(storyToDbBeleza(rest, brand)).eq('id', id)
+    } else {
+      await supabase.from('stories').update(storyToDb(rest)).eq('id', id)
+    }
   }
 
   const deleteStory = async (s: Story) => {
     setStories(arr => arr.filter(x => x.id !== s.id))
-    await supabase.from('stories').delete().eq('id', s.id)
+    if (isBelezaBrand(brand)) {
+      await supabase.from('stories_beleza').delete().eq('id', s.id)
+    } else {
+      await supabase.from('stories').delete().eq('id', s.id)
+    }
   }
 
   const approveAllPropostas = async () => {
@@ -858,6 +942,8 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     lives:         { title: 'Lives',                sub: 'Performance · Proposta semanal'        },
     profile:       { title: 'Perfil',               sub: profileId === meId ? 'Seu perfil' : 'Equipe' },
     archived:      { title: 'Arquivados',           sub: 'Itens arquivados'                      },
+    canal:         { title: 'Canal',                sub: 'Mensagens · WhatsApp / Telegram'       },
+    site_links:    { title: 'Links do Site',        sub: 'Catálogo de produtos e UTMs'            },
   }
   const { title, sub } = viewTitles[view]
   const isCalView = view === 'calendar' || view === 'branding'
@@ -887,47 +973,79 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
           <BrandSwitcher brand={brand} onChange={handleBrandChange} loading={brandLoading} />
         </div>
 
-        <div className="sb-section">
-          <div className="sb-label">Calendários</div>
-          {([
-            { id: 'calendar', label: 'Calendário do mês', icon: <Icon.cal />,      count: monthPosts.length },
-            { id: 'branding', label: 'Branding',          icon: <Icon.branding />, count: posts.filter(p => p.source === 'branding' && parseISO(p.date).getFullYear() === year && parseISO(p.date).getMonth() === month).length },
-            { id: 'mh',       label: 'Máquina de Hits',  icon: <Icon.mh />,       count: posts.filter(p => p.source === 'mh' && parseISO(p.date).getFullYear() === year && parseISO(p.date).getMonth() === month).length },
-          ] as const).map(item => (
-            <button key={item.id} className={`sb-item ${view === item.id ? 'active' : ''}`} onClick={() => setView(item.id)}>
-              {item.icon} <span>{item.label}</span>
-              <span className="sb-count">{item.count}</span>
+        {/* ── Sidebar: Gocase ─────────────────────────────── */}
+        {brand === 'gocase' && (<>
+          <div className="sb-section">
+            <div className="sb-label">Calendários</div>
+            <button className={`sb-item ${view === 'calendar' ? 'active' : ''}`} onClick={() => setView('calendar')}>
+              <Icon.cal /> <span>Calendário do mês</span>
+              <span className="sb-count">{monthPosts.length}</span>
             </button>
-          ))}
-        </div>
-
-        <div className="sb-section">
-          <div className="sb-label">Planejamento</div>
-          {([
-            { id: 'comemorativas', label: 'Datas comemorativas', icon: <Icon.events /> },
-            { id: 'futebol',       label: 'Futebol 2026',        icon: <Icon.ball />   },
-            { id: 'campaigns',     label: 'Campanhas',           icon: <Icon.campaign />, count: campaigns.length },
-            { id: 'collections',   label: 'Coleções',            icon: <Icon.collections />, count: collections.length },
-            { id: 'archived',      label: 'Arquivados',          icon: <Icon.trash /> },
-          ] as const).map(item => (
-            <button key={item.id} className={`sb-item ${view === item.id ? 'active' : ''}`} onClick={() => setView(item.id)}>
-              {item.icon} <span>{item.label}</span>
-              {'count' in item && <span className="sb-count">{item.count}</span>}
+            <button className={`sb-item ${view === 'branding' ? 'active' : ''}`} onClick={() => setView('branding')}>
+              <Icon.branding /> <span>Branding</span>
+              <span className="sb-count">{posts.filter(p => p.source === 'branding' && parseISO(p.date).getFullYear() === year && parseISO(p.date).getMonth() === month).length}</span>
             </button>
-          ))}
-        </div>
+            <button className={`sb-item ${view === 'mh' ? 'active' : ''}`} onClick={() => setView('mh')}>
+              <Icon.mh /> <span>Máquina de Hits</span>
+              <span className="sb-count">{posts.filter(p => p.source === 'mh' && parseISO(p.date).getFullYear() === year && parseISO(p.date).getMonth() === month).length}</span>
+            </button>
+          </div>
+          <div className="sb-section">
+            <div className="sb-label">Planejamento</div>
+            <button className={`sb-item ${view === 'comemorativas' ? 'active' : ''}`} onClick={() => setView('comemorativas')}><Icon.events /> <span>Datas comemorativas</span></button>
+            <button className={`sb-item ${view === 'futebol' ? 'active' : ''}`} onClick={() => setView('futebol')}><Icon.ball /> <span>Futebol 2026</span></button>
+            <button className={`sb-item ${view === 'campaigns' ? 'active' : ''}`} onClick={() => setView('campaigns')}><Icon.campaign /> <span>Campanhas</span><span className="sb-count">{campaigns.length}</span></button>
+            <button className={`sb-item ${view === 'collections' ? 'active' : ''}`} onClick={() => setView('collections')}><Icon.collections /> <span>Coleções</span><span className="sb-count">{collections.length}</span></button>
+            <button className={`sb-item ${view === 'site_links' ? 'active' : ''}`} onClick={() => setView('site_links')}><Icon.link /> <span>Links do Site</span></button>
+            <button className={`sb-item ${view === 'archived' ? 'active' : ''}`} onClick={() => setView('archived')}><Icon.trash /> <span>Arquivados</span></button>
+          </div>
+          <div className="sb-section">
+            <div className="sb-label">Performance</div>
+            <button className={`sb-item ${view === 'lives' ? 'active' : ''}`} onClick={() => setView('lives')}><Icon.live /> <span>Lives</span><span className="sb-count">{lives.filter(l => l.status === 'realizada').length}</span></button>
+            <button className={`sb-item ${view === 'stories' ? 'active' : ''}`} onClick={() => setView('stories')}><Icon.stories /> <span>Stories</span><span className="sb-count">{storiesCount}</span></button>
+          </div>
+        </>)}
 
-        <div className="sb-section">
-          <div className="sb-label">Performance</div>
-          <button className={`sb-item ${view === 'lives' ? 'active' : ''}`} onClick={() => setView('lives')}>
-            <Icon.mh /> <span>Lives</span>
-            <span className="sb-count">{lives.filter(l => l.status === 'realizada').length}</span>
-          </button>
-          <button className={`sb-item ${view === 'stories' ? 'active' : ''}`} onClick={() => setView('stories')}>
-            <Icon.stories /> <span>Stories</span>
-            <span className="sb-count">{stories.filter(s => s.status === 'feito').length}</span>
-          </button>
-        </div>
+        {/* ── Sidebar: Barbour's ──────────────────────────── */}
+        {brand === 'barbours' && (<>
+          <div className="sb-section">
+            <div className="sb-label">Calendários</div>
+            <button className={`sb-item ${view === 'calendar' ? 'active' : ''}`} onClick={() => setView('calendar')}>
+              <Icon.cal /> <span>Calendário do mês</span>
+              <span className="sb-count">{monthPosts.length}</span>
+            </button>
+            <button className={`sb-item ${view === 'canal' ? 'active' : ''}`} onClick={() => setView('canal')}>
+              <Icon.canal /> <span>Canal</span>
+              <span className="sb-count">{canalPosts.length}</span>
+            </button>
+          </div>
+          <div className="sb-section">
+            <div className="sb-label">Planejamento</div>
+            <button className={`sb-item ${view === 'comemorativas' ? 'active' : ''}`} onClick={() => setView('comemorativas')}><Icon.events /> <span>Datas comemorativas</span></button>
+            <button className={`sb-item ${view === 'campaigns' ? 'active' : ''}`} onClick={() => setView('campaigns')}><Icon.campaign /> <span>Campanhas</span><span className="sb-count">{campaigns.length}</span></button>
+            <button className={`sb-item ${view === 'site_links' ? 'active' : ''}`} onClick={() => setView('site_links')}><Icon.link /> <span>Links do Site</span></button>
+            <button className={`sb-item ${view === 'archived' ? 'active' : ''}`} onClick={() => setView('archived')}><Icon.trash /> <span>Arquivados</span></button>
+          </div>
+          <div className="sb-section">
+            <div className="sb-label">Performance</div>
+            <button className={`sb-item ${view === 'lives' ? 'active' : ''}`} onClick={() => setView('lives')}><Icon.live /> <span>Lives</span><span className="sb-count">{lives.filter(l => l.status === 'realizada').length}</span></button>
+            <button className={`sb-item ${view === 'stories' ? 'active' : ''}`} onClick={() => setView('stories')}><Icon.stories /> <span>Stories</span><span className="sb-count">{storiesCount}</span></button>
+          </div>
+        </>)}
+
+        {/* ── Sidebar: Kokeshi / Lescent ──────────────────── */}
+        {(brand === 'kokeshi' || brand === 'lescent') && (
+          <div className="sb-section">
+            <button className={`sb-item ${view === 'calendar' ? 'active' : ''}`} onClick={() => setView('calendar')}>
+              <Icon.cal /> <span>Calendário do mês</span>
+              <span className="sb-count">{monthPosts.length}</span>
+            </button>
+            <button className={`sb-item ${view === 'campaigns' ? 'active' : ''}`} onClick={() => setView('campaigns')}><Icon.campaign /> <span>Campanhas</span><span className="sb-count">{campaigns.length}</span></button>
+            <button className={`sb-item ${view === 'site_links' ? 'active' : ''}`} onClick={() => setView('site_links')}><Icon.link /> <span>Links do Site</span></button>
+            <button className={`sb-item ${view === 'lives' ? 'active' : ''}`} onClick={() => setView('lives')}><Icon.live /> <span>Lives</span><span className="sb-count">{lives.filter(l => l.status === 'realizada').length}</span></button>
+            <button className={`sb-item ${view === 'stories' ? 'active' : ''}`} onClick={() => setView('stories')}><Icon.stories /> <span>Stories</span><span className="sb-count">{storiesCount}</span></button>
+          </div>
+        )}
 
         <div
           className={`sb-user ${view === 'profile' ? 'active' : ''}`}
@@ -980,7 +1098,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             </div>
           )}
 
-          {view !== 'stories' && (
+          {view !== 'stories' && view !== 'canal' && (
             <button className="btn btn-accent" onClick={() => createPost({})}>
               <Icon.plus /> Novo post
             </button>
@@ -1152,6 +1270,16 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             onStoryClick={setActiveStory}
           />
         )}
+        {view === 'canal'         && (
+          <CanalView
+            posts={canalPosts}
+            brand={brand}
+            campaigns={campaigns}
+            onPostAdded={p   => setCanalPosts(arr => [...arr, p])}
+            onPostUpdated={p => setCanalPosts(arr => arr.map(x => x.id === p.id ? p : x))}
+            onPostDeleted={id => setCanalPosts(arr => arr.filter(x => x.id !== id))}
+          />
+        )}
         {view === 'comemorativas' && <ComemorativasView initialItems={eventDates} />}
         {view === 'futebol'       && <FutebolView initialItems={futebolEvents} />}
         {view === 'campaigns'     && (
@@ -1188,6 +1316,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             onDiscardProposta={discardProposta}
             onGenerateProposta={generateProposta}
             generatingProposta={generatingProposta}
+            onStatusChange={(live, newStatus) => saveLive({ ...live, status: newStatus as LiveStatus })}
           />
         )}
         {view === 'profile'       && (
@@ -1203,13 +1332,24 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
           />
         )}
         {view === 'archived' && <ArchivedView />}
+        {view === 'site_links' && (
+          <SiteLinksView
+            brand={brand}
+            siteLinks={siteLinks}
+            onAdd={addSiteLink}
+            onUpdate={updateSiteLink}
+            onDelete={deleteSiteLink}
+          />
+        )}
       </main>
 
       {/* Story modal */}
       {activeStory && (
         <StoryModal
           story={activeStory}
+          brand={brand}
           knownProducts={knownProducts}
+          siteLinks={siteLinks}
           onClose={() => setActiveStory(null)}
           onSave={s => { saveStory(s); setActiveStory(null) }}
           onDelete={s => { deleteStory(s); setActiveStory(null) }}
@@ -1220,6 +1360,8 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
       {activeLive && (
         <LiveModal
           live={activeLive}
+          brand={brand}
+          siteLinks={siteLinks}
           merchans={merchans}
           onClose={() => setActiveLive(null)}
           onSave={l => { saveLive(l); setActiveLive(null) }}

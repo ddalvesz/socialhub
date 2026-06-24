@@ -134,7 +134,8 @@ export function buildUtmForLive(
   baseLink?: string,
 ): { campaign: string; url: string } {
   const d = date.replace(/-/g, '')
-  const h = (hora ?? '').slice(0, 2).padStart(2, '0')
+  const hRaw = (hora ?? '').slice(0, 2)
+  const h = hRaw.length === 2 ? hRaw.padStart(2, '0') : ''
 
   if (brand === 'gocase') {
     const campaign = `live_${d}${h}`

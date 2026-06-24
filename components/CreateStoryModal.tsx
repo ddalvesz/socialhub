@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { todayISO } from '@/lib/types'
 import type { Story, StoryStatus } from '@/lib/types'
-import { dbToStory } from '@/lib/supabase/mappers'
+import { dbToStory, dbToStoryFromBeleza } from '@/lib/supabase/mappers'
 import { buildStoryUtm } from '@/lib/storiesUtils'
 import { useBrand } from '@/lib/brand-context'
 
@@ -62,31 +62,57 @@ export default function CreateStoryModal({ onClose, onSaved }: Props) {
     setTimeout(() => setUrlCopied(false), 2000)
   }
 
+  const isBeleza = brand === 'barbours' || brand === 'kokeshi' || brand === 'lescent'
+
   const handleSave = async () => {
     if (!date || !produto.trim()) return
     setSaving(true)
 
-    const d = new Date(date + 'T00:00:00')
-    const WEEKDAY_NOMES = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
-    const diaSemana = WEEKDAY_NOMES[d.getDay()]
+    let data: Record<string, unknown> | null = null
+    let error: { message?: string } | null = null
 
-    const payload: Record<string, unknown> = {
-      date,
-      hora,
-      dia_semana:       diaSemana,
-      utm:              utm?.campaign ?? '',
-      produto:          produto.trim(),
-      categoria,
-      status,
-      link_midia:       null,
-      link_utm:         utm?.url ?? null,
-      rastreio_receita: utm?.campaign ?? null,
-      receita:          null,
-      origem:           'manual',
-      brand,
+    if (isBeleza) {
+      const payload: Record<string, unknown> = {
+        date,
+        hora,
+        cod:              utm?.campaign ?? '',
+        page:             produto.trim(),
+        merchant:         categoria,
+        status:           'pendente',
+        link_conteudo:    null,
+        link_cta:         utm?.url ?? null,
+        rastreio_receita: utm?.campaign ?? null,
+        receita:          null,
+        origem:           'manual',
+        marca:            brand,
+      }
+      const res = await supabase.from('stories_beleza').insert(payload).select().single()
+      data = res.data as Record<string, unknown> | null
+      error = res.error
+    } else {
+      const d = new Date(date + 'T00:00:00')
+      const WEEKDAY_NOMES = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
+      const diaSemana = WEEKDAY_NOMES[d.getDay()]
+      const payload: Record<string, unknown> = {
+        date,
+        hora,
+        dia_semana:       diaSemana,
+        utm:              utm?.campaign ?? '',
+        produto:          produto.trim(),
+        categoria,
+        status,
+        link_midia:       null,
+        link_utm:         utm?.url ?? null,
+        rastreio_receita: utm?.campaign ?? null,
+        receita:          null,
+        origem:           'manual',
+        brand,
+      }
+      const res = await supabase.from('stories').insert(payload).select().single()
+      data = res.data as Record<string, unknown> | null
+      error = res.error
     }
 
-    const { data, error } = await supabase.from('stories').insert(payload).select().single()
     setSaving(false)
 
     if (error || !data) {
@@ -94,7 +120,9 @@ export default function CreateStoryModal({ onClose, onSaved }: Props) {
       return
     }
 
-    onSaved(dbToStory(data as Record<string, unknown>))
+    onSaved(isBeleza
+      ? dbToStoryFromBeleza(data)
+      : dbToStory(data))
   }
 
   return (

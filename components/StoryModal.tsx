@@ -1,14 +1,14 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import type { Story, StoryStatus } from '@/lib/types'
-import { STORY_STATUS_META, fmtBRL, buildStoryUtm } from '@/lib/storiesUtils'
+import type { Brand, SiteLink, Story, StoryStatus } from '@/lib/types'
+import { STORY_STATUS_META, buildUtmForStory } from '@/lib/storiesUtils'
 import { Popover } from './FormHelpers'
 import { Icon } from './Icons'
 
 /* ── Constants ────────────────────────────────────────────── */
 
-const CATEGORIAS = [
+const TIPOS_CONTEUDO = [
   'GOFLASH','LANÇAMENTOS','CAMPANHAS','INTERAÇÃO','PRODUTOS HIT',
   'NEUTRO','VOLTA ÀS AULAS','VAI DE TOTE','JOGA DO SEU JEITO',
   'CASE','COLEÇÃO','COPA','FUTEBOL',
@@ -53,7 +53,7 @@ function CopyBtn({ text }: { text: string }) {
   )
 }
 
-/* ── StoryStatusPill (clicável) ──────────────────────────── */
+/* ── StoryStatusPill ──────────────────────────────────────── */
 
 function StoryStatusPill({ value, onChange }: { value: StoryStatus; onChange: (v: StoryStatus) => void }) {
   const [open, setOpen] = useState(false)
@@ -79,7 +79,7 @@ function StoryStatusPill({ value, onChange }: { value: StoryStatus; onChange: (v
   )
 }
 
-/* ── ProdutoCombobox ─────────────────────────────────────── */
+/* ── ProdutoCombobox (fallback sem site_links) ─────────────── */
 
 function ProdutoCombobox({ value, onChange, knownProducts }: {
   value: string
@@ -98,11 +98,7 @@ function ProdutoCombobox({ value, onChange, knownProducts }: {
     return knownProducts.filter(p => p.toLowerCase().includes(trimmed)).slice(0, 12)
   }, [q, knownProducts])
 
-  const commit = (v: string) => {
-    onChange(v)
-    setQ(v)
-    setOpen(false)
-  }
+  const commit = (v: string) => { onChange(v); setQ(v); setOpen(false) }
 
   return (
     <div style={{ position: 'relative', width: '100%' }}>
@@ -138,17 +134,94 @@ function ProdutoCombobox({ value, onChange, knownProducts }: {
   )
 }
 
+/* ── SiteLinkSelector (quando site_links disponíveis) ──────── */
+
+function SiteLinkSelector({ value, siteLinks, onChange }: {
+  value: string
+  siteLinks: SiteLink[]
+  onChange: (produto: string, link: string) => void
+}) {
+  const categorias = useMemo(() =>
+    Array.from(new Set(siteLinks.map(sl => sl.categoria))).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+  [siteLinks])
+
+  const currentSiteLink = siteLinks.find(sl => sl.produto === value)
+  const [catSel, setCatSel] = useState(currentSiteLink?.categoria ?? '')
+
+  const produtosFiltrados = useMemo(() =>
+    catSel ? siteLinks.filter(sl => sl.categoria === catSel) : siteLinks,
+  [siteLinks, catSel])
+
+  const handleCat = (cat: string) => {
+    setCatSel(cat)
+    // Se o produto atual não está nesta categoria, limpa a seleção
+    const still = siteLinks.find(sl => sl.produto === value && sl.categoria === cat)
+    if (!still) onChange('', '')
+  }
+
+  const handleProduto = (sl: SiteLink) => {
+    onChange(sl.produto, sl.link)
+  }
+
+  const produtoNaoEncontrado = value.trim() && !currentSiteLink
+
+  return (
+    <div style={{ display: 'contents' }}>
+      <label>Categoria do produto</label>
+      <select
+        className="field"
+        value={catSel}
+        onChange={e => handleCat(e.target.value)}
+        style={{ paddingRight: 32 }}
+      >
+        <option value="">Todas as categorias</option>
+        {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+      </select>
+
+      <label>Produto foco</label>
+      <div>
+        <select
+          className="field"
+          value={value}
+          onChange={e => {
+            const sl = siteLinks.find(x => x.produto === e.target.value)
+            if (sl) handleProduto(sl)
+          }}
+          style={{ paddingRight: 32, width: '100%' }}
+        >
+          <option value="">Selecionar produto…</option>
+          {produtosFiltrados.map(sl => (
+            <option key={sl.id} value={sl.produto}>{sl.produto}</option>
+          ))}
+        </select>
+
+        {produtoNaoEncontrado && (
+          <div className="utm-aviso" style={{ marginTop: 6 }}>
+            <Icon.info />
+            <span>
+              &ldquo;{value}&rdquo; não encontrado nos Links do Site.{' '}
+              Adicione-o na aba <strong>Links do Site</strong> para gerar UTM automaticamente.
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /* ── StoryModal ──────────────────────────────────────────── */
 
 interface Props {
   story: Story
+  brand: Brand
   knownProducts: string[]
+  siteLinks: SiteLink[]
   onClose: () => void
   onSave: (s: Story) => void
   onDelete: (s: Story) => void
 }
 
-export default function StoryModal({ story, knownProducts, onClose, onSave, onDelete }: Props) {
+export default function StoryModal({ story, brand, knownProducts, siteLinks, onClose, onSave, onDelete }: Props) {
   const [draft, setDraft] = useState<Story>(story)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
@@ -162,18 +235,26 @@ export default function StoryModal({ story, knownProducts, onClose, onSave, onDe
 
   const set = <K extends keyof Story>(k: K, v: Story[K]) => setDraft(d => ({ ...d, [k]: v }))
 
+  // Resolve o baseLink do produto selecionado nos site_links
+  const currentSiteLink = useMemo(() =>
+    siteLinks.find(sl => sl.produto === draft.produto?.trim()),
+  [siteLinks, draft.produto])
+
+  // Gera UTM quando tem produto + site_link com link cadastrado
   const utm = useMemo(() => {
     if (!draft.date || !draft.produto?.trim()) return null
-    return buildStoryUtm(draft.date, draft.hora, draft.produto.trim())
-  }, [draft.date, draft.hora, draft.produto])
+    if (siteLinks.length > 0 && !currentSiteLink) return null  // produto não encontrado nos links
+    const baseLink = currentSiteLink?.link ?? ''
+    if (siteLinks.length > 0 && !baseLink) return null
+    return buildUtmForStory(brand, draft.date, draft.hora, draft.produto.trim(), baseLink)
+  }, [brand, draft.date, draft.hora, draft.produto, currentSiteLink, siteLinks.length])
 
   const dateObj = new Date(draft.date + 'T00:00:00')
   const diaSemanaLabel = WEEKDAY_NOMES_LONG[dateObj.getDay()]
-
   const [, mm, dd] = draft.date.split('-')
   const dateDisplay = `${dd}/${mm}/${draft.date.split('-')[0]}`
-
   const selectStyle = { paddingRight: 32 }
+  const usarSiteLinks = siteLinks.length > 0
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -238,22 +319,35 @@ export default function StoryModal({ story, knownProducts, onClose, onSave, onDe
                 ))}
               </select>
 
-              <label>Produto foco</label>
-              <ProdutoCombobox
-                value={draft.produto || ''}
-                onChange={v => set('produto', v)}
-                knownProducts={knownProducts}
-              />
+              {usarSiteLinks ? (
+                <SiteLinkSelector
+                  value={draft.produto || ''}
+                  siteLinks={siteLinks}
+                  onChange={(produto, link) => {
+                    set('produto', produto)
+                    if (link) set('linkUtm', link)
+                  }}
+                />
+              ) : (
+                <>
+                  <label>Produto foco</label>
+                  <ProdutoCombobox
+                    value={draft.produto || ''}
+                    onChange={v => set('produto', v)}
+                    knownProducts={knownProducts}
+                  />
+                </>
+              )}
 
-              <label>Categoria</label>
+              <label>Tipo de conteúdo</label>
               <select
                 className="field"
                 value={draft.categoria || ''}
                 onChange={e => set('categoria', e.target.value)}
                 style={selectStyle}
               >
-                <option value="">Sem categoria</option>
-                {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                <option value="">Sem tipo</option>
+                {TIPOS_CONTEUDO.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
           </div>
@@ -292,14 +386,14 @@ export default function StoryModal({ story, knownProducts, onClose, onSave, onDe
               />
             </div>
 
-            {/* UTM preview */}
+            {/* UTM preview — produto encontrado nos links */}
             {utm && (
               <div className="st-utm-block" style={{ marginTop: 16 }}>
                 <div className="st-utm-block-label">
                   <svg viewBox="0 0 16 16" width={12} height={12} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                     <circle cx="8" cy="8" r="6"/><polyline points="8 5 8 8 10 10"/>
                   </svg>
-                  UTM calculado (produto + data + hora)
+                  UTM gerada automaticamente
                 </div>
                 <div className="st-utm-row">
                   <div className="st-utm-field">
@@ -315,6 +409,17 @@ export default function StoryModal({ story, knownProducts, onClose, onSave, onDe
                   </div>
                   <CopyBtn text={utm.url} />
                 </div>
+              </div>
+            )}
+
+            {/* Aviso: produto digitado mas não cadastrado nos links */}
+            {usarSiteLinks && draft.produto?.trim() && !currentSiteLink && (
+              <div className="utm-aviso" style={{ marginTop: 16 }}>
+                <Icon.info />
+                <span>
+                  Produto não encontrado nos Links do Site. Adicione-o na aba{' '}
+                  <strong>Links do Site</strong> para gerar a UTM automaticamente.
+                </span>
               </div>
             )}
           </div>

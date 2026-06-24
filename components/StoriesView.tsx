@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import React, { useState, useMemo, useCallback } from 'react'
 import {
   ComposedChart, Area, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, LabelList, Cell,
@@ -12,7 +12,10 @@ import {
   projecaoMes, mediaPorDiaSemana, heatmapTiming, performancePorProduto, produtoColor,
   STORY_STATUS_META, fmtBRL, fmtBRLk, fmtNumk, fmtPct,
 } from '@/lib/storiesUtils'
-import { todayISO } from '@/lib/types'
+import {
+  todayISO, buildMonthGrid, addDaysISO, startOfWeekISO, parseISO,
+  MONTHS, WEEKDAYS as CAL_WEEKDAYS, WEEKDAYS_FULL, pad,
+} from '@/lib/types'
 import CreateStoryModal from './CreateStoryModal'
 
 /* ── Constants ────────────────────────────────────────────── */
@@ -121,7 +124,8 @@ function StoryStatusPill({ status }: { status: string }) {
 
 function CopyUtmBtn({ code }: { code: string }) {
   const [copied, setCopied] = useState(false)
-  const handleCopy = useCallback(() => {
+  const handleCopy = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
     navigator.clipboard.writeText(code)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -388,8 +392,8 @@ function HeatmapTiming({ stories }: { stories: Story[] }) {
           <div className="st-hm-corner" />
           {WEEKDAYS.map(d => <div key={d} className="st-hm-day-hdr">{d}</div>)}
           {SLOT_LABELS.map((slot, si) => (
-            <>
-              <div key={`lbl-${si}`} className="st-hm-slot-lbl">{slot}</div>
+            <React.Fragment key={si}>
+              <div className="st-hm-slot-lbl">{slot}</div>
               {WEEKDAYS.map((_, di) => {
                 const cell = cellMap.get(`${si}_${di}`)
                 return (
@@ -404,7 +408,7 @@ function HeatmapTiming({ stories }: { stories: Story[] }) {
                   </div>
                 )
               })}
-            </>
+            </React.Fragment>
           ))}
         </div>
         {tooltip && (
@@ -540,8 +544,8 @@ function StoriesTable({ stories, onRowClick }: { stories: Story[]; onRowClick: (
                     )}
                   </td>
                   <td className="st-td">
-                    {s.rastreioReceita
-                      ? <CopyUtmBtn code={s.rastreioReceita} />
+                    {s.linkUtm
+                      ? <CopyUtmBtn code={s.linkUtm} />
                       : <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>—</span>
                     }
                   </td>
@@ -558,6 +562,320 @@ function StoriesTable({ stories, onRowClick }: { stories: Story[]; onRowClick: (
   )
 }
 
+/* ── Story status color map ──────────────────────────────── */
+
+const STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  nao_iniciado: { bg: 'oklch(0.96 0.01 300)',  border: 'oklch(0.84 0.03 300)',  text: 'oklch(0.50 0.04 300)' },
+  em_andamento: { bg: 'oklch(0.97 0.05 70)',   border: 'oklch(0.88 0.10 60)',   text: 'oklch(0.52 0.14 55)'  },
+  feito:        { bg: 'oklch(0.93 0.05 265)',  border: 'oklch(0.80 0.10 265)',  text: 'oklch(0.45 0.14 265)' },
+  proposta:     { bg: 'oklch(0.94 0.05 150)',  border: 'oklch(0.82 0.09 150)',  text: 'oklch(0.42 0.13 150)' },
+  nao_postado:  { bg: 'oklch(0.95 0.05 25)',   border: 'oklch(0.84 0.09 25)',   text: 'oklch(0.50 0.15 25)'  },
+  postado:      { bg: 'oklch(0.93 0.05 290)',  border: 'oklch(0.78 0.12 290)',  text: 'oklch(0.42 0.15 290)' },
+}
+
+/* ── Stories Calendar — Month view ──────────────────────── */
+
+function StoryChip({ story, onClick }: { story: Story; onClick: () => void }) {
+  const col = STATUS_COLORS[story.status] ?? STATUS_COLORS.nao_iniciado
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onClick() }}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 4, width: '100%',
+        padding: '2px 5px', borderRadius: 5, border: `1px solid ${col.border}`,
+        background: col.bg, cursor: 'pointer', textAlign: 'left', lineHeight: 1.3,
+        fontSize: 10.5, fontWeight: 500, color: col.text,
+        overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+      }}
+      title={`${String(story.hora).padStart(2,'0')}:00 · ${story.produto || '—'}`}
+    >
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, flexShrink: 0, opacity: 0.75 }}>
+        {String(story.hora).padStart(2,'0')}h
+      </span>
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+        {story.produto || '—'}
+      </span>
+    </button>
+  )
+}
+
+function StoriesMonthView({ year, month, stories, onStoryClick, onNewStory }: {
+  year: number; month: number; stories: Story[]
+  onStoryClick: (s: Story) => void
+  onNewStory: (date: string) => void
+}) {
+  const cells = useMemo(() => buildMonthGrid(year, month), [year, month])
+  const today = todayISO()
+  const [expandedDay, setExpandedDay] = useState<string | null>(null)
+
+  const byDay = useMemo(() => {
+    const map: Record<string, Story[]> = {}
+    stories.forEach(s => { (map[s.date] = map[s.date] || []).push(s) })
+    Object.values(map).forEach(arr => arr.sort((a, b) => a.hora - b.hora))
+    return map
+  }, [stories])
+
+  const MAX_VISIBLE = 3
+
+  return (
+    <div className="cal-grid">
+      {CAL_WEEKDAYS.map(w => <div key={w} className="cal-head">{w}</div>)}
+      {cells.map((c, i) => {
+        const isToday = c.iso === today
+        const dayStories = byDay[c.iso] || []
+        const visible = dayStories.slice(0, MAX_VISIBLE)
+        const more = dayStories.length - visible.length
+        return (
+          <div
+            key={i}
+            className={`cal-cell ${c.other ? 'other' : ''} ${isToday ? 'today' : ''}`}
+            style={{ position: 'relative' }}
+            onClick={() => !c.other && onNewStory(c.iso)}
+          >
+            <div className="cal-num-row">
+              <span className="cal-num-box">{c.day}</span>
+            </div>
+            {visible.map(s => (
+              <div key={s.id} onClick={e => e.stopPropagation()} style={{ marginBottom: 2 }}>
+                <StoryChip story={s} onClick={() => onStoryClick(s)} />
+              </div>
+            ))}
+            {more > 0 && (
+              <div
+                className="cal-more"
+                style={{ cursor: 'pointer' }}
+                onClick={e => { e.stopPropagation(); setExpandedDay(c.iso === expandedDay ? null : c.iso) }}
+              >
+                +{more} mais
+              </div>
+            )}
+            {expandedDay === c.iso && (
+              <div
+                style={{
+                  position: 'absolute', zIndex: 50, top: '100%', left: 0,
+                  background: 'var(--surface)', border: '1px solid var(--line)',
+                  borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.12)',
+                  padding: '10px 8px', minWidth: 220, display: 'flex', flexDirection: 'column', gap: 4,
+                }}
+                onClick={e => e.stopPropagation()}
+              >
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-3)', padding: '0 4px 4px' }}>
+                  {c.day}/{month + 1} — {dayStories.length} stories
+                </div>
+                {dayStories.map(s => (
+                  <StoryChip key={s.id} story={s} onClick={() => { onStoryClick(s); setExpandedDay(null) }} />
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/* ── Stories Calendar — Week view ────────────────────────── */
+
+const WEEK_START_HOUR = 6
+const WEEK_END_HOUR = 24
+const HOUR_HEIGHT = 56
+
+function StoriesWeekView({ weekStart, stories, onStoryClick }: {
+  weekStart: string; stories: Story[]
+  onStoryClick: (s: Story) => void
+}) {
+  const days = Array.from({ length: 7 }, (_, i) => addDaysISO(weekStart, i))
+  const hours = Array.from({ length: WEEK_END_HOUR - WEEK_START_HOUR }, (_, i) => WEEK_START_HOUR + i)
+  const today = todayISO()
+
+  const now = new Date()
+  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  const nowOffset = ((nowMinutes / 60) - WEEK_START_HOUR) * HOUR_HEIGHT
+
+  const byDay = useMemo(() => {
+    const map: Record<string, Story[]> = {}
+    days.forEach(d => { map[d] = [] })
+    stories.forEach(s => { if (map[s.date] !== undefined) map[s.date].push(s) })
+    return map
+  }, [stories, weekStart])
+
+  return (
+    <div className="week-grid">
+      <div className="week-head">
+        <div className="week-tz">GMT-3</div>
+        {days.map(d => {
+          const dt = parseISO(d)
+          const isToday = d === today
+          return (
+            <div key={d} className={`week-day-head ${isToday ? 'today' : ''}`}>
+              <div className="wdh-dow">{WEEKDAYS_FULL[dt.getDay()]}</div>
+              <div className="wdh-num">{dt.getDate()}</div>
+            </div>
+          )
+        })}
+      </div>
+      <div className="week-body" style={{ '--hour-h': `${HOUR_HEIGHT}px` } as React.CSSProperties}>
+        <div className="week-time-col">
+          {hours.map(h => (
+            <div key={h} className="week-time-cell">
+              {h === WEEK_START_HOUR ? '' : `${pad(h)}:00`}
+            </div>
+          ))}
+        </div>
+        {days.map(d => {
+          const isToday = d === today
+          const dayStories = byDay[d] || []
+          return (
+            <div key={d} className={`week-day-col ${isToday ? 'today' : ''}`}>
+              {hours.map(h => <div key={h} className="week-hour-cell" />)}
+              {isToday && nowOffset >= 0 && (
+                <div className="week-now-line" style={{ top: `${nowOffset}px` }} />
+              )}
+              {dayStories.map(s => {
+                const top = (s.hora - WEEK_START_HOUR) * HOUR_HEIGHT
+                if (top < 0) return null
+                const col = STATUS_COLORS[s.status] ?? STATUS_COLORS.nao_iniciado
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => onStoryClick(s)}
+                    style={{
+                      position: 'absolute', top: `${top}px`, height: 62,
+                      left: 3, right: 3,
+                      background: col.bg, border: `1.5px solid ${col.border}`,
+                      borderRadius: 8, padding: '4px 7px', cursor: 'pointer',
+                      textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 2,
+                      overflow: 'hidden',
+                    }}
+                    title={`${pad(s.hora)}:00 · ${s.produto || '—'}`}
+                  >
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: col.text, opacity: 0.8 }}>
+                      {pad(s.hora)}:00
+                    </div>
+                    <div style={{ fontSize: 11.5, fontWeight: 600, color: col.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {s.produto || '—'}
+                    </div>
+                    {s.categoria && (
+                      <div style={{ fontSize: 10, color: col.text, opacity: 0.75, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {s.categoria}
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/* ── Stories Calendar — List view ────────────────────────── */
+
+function StoriesListView({ year, month, stories, onStoryClick }: {
+  year: number; month: number; stories: Story[]
+  onStoryClick: (s: Story) => void
+}) {
+  const today = todayISO()
+  const monthStories = stories
+    .filter(s => {
+      const [y, m] = s.date.split('-').map(Number)
+      return y === year && m - 1 === month
+    })
+    .sort((a, b) => a.date !== b.date ? a.date.localeCompare(b.date) : a.hora - b.hora)
+
+  const grouped: [string, Story[]][] = []
+  for (const s of monthStories) {
+    const last = grouped[grouped.length - 1]
+    if (last && last[0] === s.date) last[1].push(s)
+    else grouped.push([s.date, [s]])
+  }
+
+  if (!grouped.length) {
+    return (
+      <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--ink-3)' }}>
+        Nenhum story neste mês.
+      </div>
+    )
+  }
+
+  const weekdayShort = (iso: string) => {
+    const d = parseISO(iso)
+    return ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][d.getDay()]
+  }
+
+  return (
+    <div className="pautas-view" style={{ paddingTop: 16 }}>
+      {grouped.map(([date, dayStories]) => {
+        const isToday = date === today
+        const isPast = date < today
+        const [, mm, dd] = date.split('-')
+        return (
+          <div key={date} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', paddingBottom: 2 }}>
+            <div style={{
+              width: 64, flexShrink: 0, paddingTop: 10, textAlign: 'right',
+              fontFamily: 'var(--font-mono)', fontSize: 12.5, lineHeight: 1.3,
+              color: isToday ? 'var(--accent)' : isPast ? 'var(--ink-3)' : 'var(--ink-2)',
+              fontWeight: isToday ? 700 : 500,
+            }}>
+              <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1 }}>{dd}</div>
+              <div style={{ fontSize: 11, marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{weekdayShort(date)}/{mm}</div>
+              {isToday && <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 2, fontWeight: 700 }}>hoje</div>}
+            </div>
+            <div style={{ flex: 1, borderLeft: `2px solid ${isToday ? 'var(--accent-soft)' : 'var(--border)'}`, paddingLeft: 16, paddingTop: 8, paddingBottom: 8 }}>
+              {dayStories.map(s => {
+                const col = STATUS_COLORS[s.status] ?? STATUS_COLORS.nao_iniciado
+                const meta = STORY_STATUS_META[s.status]
+                return (
+                  <div
+                    key={s.id}
+                    onClick={() => onStoryClick(s)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', marginBottom: 4,
+                      borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)',
+                      cursor: 'pointer', transition: 'background 0.12s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = col.bg }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface)' }}
+                  >
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)', width: 40, flexShrink: 0 }}>
+                      {pad(s.hora)}:00
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {s.produto || '—'}
+                      </div>
+                      {s.categoria && (
+                        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>{s.categoria}</div>
+                      )}
+                    </div>
+                    {s.receita != null && (
+                      <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT, flexShrink: 0 }}>
+                        {fmtBRL(s.receita)}
+                      </div>
+                    )}
+                    <span className={`status-pill ${
+                      s.status === 'nao_iniciado' ? 's-st-ni'
+                      : s.status === 'em_andamento' ? 's-st-ea'
+                      : s.status === 'feito' ? 's-st-feito'
+                      : s.status === 'proposta' ? 's-st-post'
+                      : s.status === 'postado' ? 's-st-postado'
+                      : 's-st-np'
+                    }`} style={{ flexShrink: 0 }}>
+                      <span className="sdot" />{meta?.label ?? s.status}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 /* ── Main StoriesView ────────────────────────────────────── */
 
 interface Props {
@@ -570,6 +888,35 @@ interface Props {
 
 export default function StoriesView({ stories, dayAggregates, onStoryCreated, onStoryClick }: Props) {
   const today = todayISO()
+  const todayDate = parseISO(today)
+  const [viewMode, setViewMode] = useState<'analytics' | 'calendar'>('analytics')
+  const [calMode, setCalMode] = useState<'month' | 'week' | 'list'>('month')
+  const [year, setYear] = useState(todayDate.getFullYear())
+  const [month, setMonth] = useState(todayDate.getMonth())
+  const [weekStart, setWeekStart] = useState(() => startOfWeekISO(today))
+
+  const goPrev = () => {
+    if (calMode === 'week') { setWeekStart(w => addDaysISO(w, -7)); return }
+    if (month === 0) { setMonth(11); setYear(y => y - 1) } else setMonth(m => m - 1)
+  }
+  const goNext = () => {
+    if (calMode === 'week') { setWeekStart(w => addDaysISO(w, 7)); return }
+    if (month === 11) { setMonth(0); setYear(y => y + 1) } else setMonth(m => m + 1)
+  }
+  const goToday = () => {
+    const t = parseISO(today)
+    setYear(t.getFullYear()); setMonth(t.getMonth())
+    setWeekStart(startOfWeekISO(today))
+  }
+
+  const navLabel = calMode === 'week' ? (() => {
+    const s = parseISO(weekStart)
+    const e = parseISO(addDaysISO(weekStart, 6))
+    if (s.getMonth() === e.getMonth())
+      return `${s.getDate()} – ${e.getDate()} ${MONTHS[s.getMonth()]} ${s.getFullYear()}`
+    return `${s.getDate()} ${MONTHS[s.getMonth()].slice(0,3)} – ${e.getDate()} ${MONTHS[e.getMonth()].slice(0,3)} ${e.getFullYear()}`
+  })() : `${MONTHS[month]} ${year}`
+
   const [period, setPeriod] = useState<PeriodId>('month')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
@@ -643,31 +990,64 @@ export default function StoriesView({ stories, dayAggregates, onStoryCreated, on
 
   return (
     <div className="lives-wrap">
-      {/* Period filter bar */}
+      {/* Top bar */}
       <div className="lives-period-bar">
+        {/* Análise / Calendário toggle */}
         <div className="view-toggle">
-          {PERIOD_OPTS.map(opt => (
-            <button
-              key={String(opt.id)}
-              className={period === opt.id ? 'active' : ''}
-              onClick={() => setPeriod(opt.id)}
-            >
-              {opt.label}
-            </button>
-          ))}
+          <button className={viewMode === 'analytics' ? 'active' : ''} onClick={() => setViewMode('analytics')}>
+            Análise
+          </button>
+          <button className={viewMode === 'calendar' ? 'active' : ''} onClick={() => setViewMode('calendar')}>
+            Calendário
+          </button>
         </div>
-        {period === 'custom' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <input type="date" className="field" style={{ fontSize: 12, padding: '3px 8px', width: 130 }}
-              value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
-            <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>até</span>
-            <input type="date" className="field" style={{ fontSize: 12, padding: '3px 8px', width: 130 }}
-              value={customTo} onChange={e => setCustomTo(e.target.value)} />
-          </div>
+
+        {/* Calendar toolbar */}
+        {viewMode === 'calendar' && (
+          <>
+            <div className="month-nav" style={{ marginLeft: 8 }}>
+              <button onClick={goPrev}>‹</button>
+              <div className="label">{navLabel}</div>
+              <button onClick={goNext}>›</button>
+            </div>
+            <button className="today-btn" onClick={goToday}>Hoje</button>
+            <div className="view-toggle" style={{ marginLeft: 4 }}>
+              <button className={calMode === 'month' ? 'active' : ''} onClick={() => setCalMode('month')}>Mês</button>
+              <button className={calMode === 'week'  ? 'active' : ''} onClick={() => setCalMode('week')}>Semana</button>
+              <button className={calMode === 'list'  ? 'active' : ''} onClick={() => setCalMode('list')}>Lista</button>
+            </div>
+          </>
         )}
-        <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
-          {kpis.count} stor{kpis.count === 1 ? 'y' : 'ies'} no período
-        </div>
+
+        {/* Analytics period filter */}
+        {viewMode === 'analytics' && (
+          <>
+            <div className="view-toggle">
+              {PERIOD_OPTS.map(opt => (
+                <button
+                  key={String(opt.id)}
+                  className={period === opt.id ? 'active' : ''}
+                  onClick={() => setPeriod(opt.id)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {period === 'custom' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input type="date" className="field" style={{ fontSize: 12, padding: '3px 8px', width: 130 }}
+                  value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
+                <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>até</span>
+                <input type="date" className="field" style={{ fontSize: 12, padding: '3px 8px', width: 130 }}
+                  value={customTo} onChange={e => setCustomTo(e.target.value)} />
+              </div>
+            )}
+            <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
+              {kpis.count} stor{kpis.count === 1 ? 'y' : 'ies'} no período
+            </div>
+          </>
+        )}
+
         <div style={{ flex: 1 }} />
         <button className="btn btn-accent" style={{ fontSize: 13, padding: '8px 14px' }} onClick={() => setCreateOpen(true)}>
           <svg viewBox="0 0 16 16" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
@@ -677,68 +1057,92 @@ export default function StoriesView({ stories, dayAggregates, onStoryCreated, on
         </button>
       </div>
 
-      {/* KPI strip */}
-      <div className="lives-kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 12 }}>
-        <KpiCard
-          label="Receita rastreada"
-          value={fmtBRLk(kpis.receitaTotal)}
-          sub={`${kpis.countComUtm} stories com UTM postados`}
-          accent
-        />
-        <KpiCard
-          label="Alcance total"
-          value={fmtNumk(kpis.alcanceTotal)}
-          sub="soma dos dias no período"
-        />
-        <KpiCard
-          label="Visualizações"
-          value={fmtNumk(kpis.viewsTotal)}
-          sub="total de views dos stories"
-        />
-        <KpiCard
-          label="Stories criados"
-          value={String(kpis.count)}
-          sub={`postados no período`}
-        />
-      </div>
-
-      {/* Efficiency strip */}
-      {eficiencia !== null && (
-        <div className="lives-kpis-secondary" style={{ marginBottom: 20 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: AXIS_COLOR, textTransform: 'uppercase' }}>Eficiência</span>
-          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>
-            R$ {eficiencia.toFixed(2).replace('.', ',')} por 1k de alcance
-          </span>
+      {/* ── Calendar view ── */}
+      {viewMode === 'calendar' && calMode !== 'list' && (
+        <div className="cal-wrap">
+          {calMode === 'month' ? (
+            <StoriesMonthView
+              year={year}
+              month={month}
+              stories={stories}
+              onStoryClick={onStoryClick}
+              onNewStory={() => setCreateOpen(true)}
+            />
+          ) : (
+            <StoriesWeekView
+              weekStart={weekStart}
+              stories={stories}
+              onStoryClick={onStoryClick}
+            />
+          )}
         </div>
       )}
+      {viewMode === 'calendar' && calMode === 'list' && (
+        <StoriesListView
+          year={year}
+          month={month}
+          stories={stories}
+          onStoryClick={onStoryClick}
+        />
+      )}
 
-      {/* Chart 1: Comparação de receita */}
-      <SectionHeader title="Comparação de receita" subtitle="receita rastreada via UTM · período atual vs anterior" />
-      <ReceitaComparacaoChart period={period} stories={filteredStories} />
+      {/* ── Analytics view ── */}
+      {viewMode === 'analytics' && (
+        <>
+          {/* KPI strip */}
+          <div className="lives-kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 12 }}>
+            <KpiCard
+              label="Receita rastreada"
+              value={fmtBRLk(kpis.receitaTotal)}
+              sub={`${kpis.countComUtm} stories com UTM postados`}
+              accent
+            />
+            <KpiCard
+              label="Alcance total"
+              value={fmtNumk(kpis.alcanceTotal)}
+              sub="soma dos dias no período"
+            />
+            <KpiCard
+              label="Visualizações"
+              value={fmtNumk(kpis.viewsTotal)}
+              sub="total de views dos stories"
+            />
+            <KpiCard
+              label="Stories criados"
+              value={String(kpis.count)}
+              sub={`postados no período`}
+            />
+          </div>
 
-      {/* Chart 2: Engajamento diário */}
-      <SectionHeader title="Engajamento diário" subtitle="dados por dia · não vinculados a stories específicos após 24h" />
-      <EngajamentoDiarioChart aggregates={filteredAggregates} />
+          {eficiencia !== null && (
+            <div className="lives-kpis-secondary" style={{ marginBottom: 20 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: AXIS_COLOR, textTransform: 'uppercase' }}>Eficiência</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>
+                R$ {eficiencia.toFixed(2).replace('.', ',')} por 1k de alcance
+              </span>
+            </div>
+          )}
 
-      {/* Chart 3: Correlação */}
-      <SectionHeader title="Correlação receita × alcance" subtitle="a receita acompanha o alcance neste período?" />
-      <CorrelacaoChart stories={filteredStories} aggregates={filteredAggregates} />
+          <SectionHeader title="Comparação de receita" subtitle="receita rastreada via UTM · período atual vs anterior" />
+          <ReceitaComparacaoChart period={period} stories={filteredStories} />
 
-      {/* Charts 4 & 5: 2-col grid */}
-      <SectionHeader title="Análise do mês corrente" subtitle="projeção baseada no ritmo atual · médias por dia da semana" />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
-        <ProjecaoMesCard stories={stories} aggregates={dayAggregates} />
-        <MediaDiaSemana stories={filteredStories} aggregates={filteredAggregates} />
-      </div>
+          <SectionHeader title="Engajamento diário" subtitle="dados por dia · não vinculados a stories específicos após 24h" />
+          <EngajamentoDiarioChart aggregates={filteredAggregates} />
 
-      {/* Chart 6: Heatmap */}
-      <HeatmapTiming stories={filteredStories} />
+          <SectionHeader title="Correlação receita × alcance" subtitle="a receita acompanha o alcance neste período?" />
+          <CorrelacaoChart stories={filteredStories} aggregates={filteredAggregates} />
 
-      {/* Chart 7: Produtos */}
-      <ProdutosChart stories={filteredStories} />
+          <SectionHeader title="Análise do mês corrente" subtitle="projeção baseada no ritmo atual · médias por dia da semana" />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+            <ProjecaoMesCard stories={stories} aggregates={dayAggregates} />
+            <MediaDiaSemana stories={filteredStories} aggregates={filteredAggregates} />
+          </div>
 
-      {/* Table */}
-      <StoriesTable stories={filteredStories} onRowClick={onStoryClick} />
+          <HeatmapTiming stories={filteredStories} />
+          <ProdutosChart stories={filteredStories} />
+          <StoriesTable stories={filteredStories} onRowClick={onStoryClick} />
+        </>
+      )}
 
       {/* Create modal */}
       {createOpen && (

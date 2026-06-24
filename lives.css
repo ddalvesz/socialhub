@@ -677,7 +677,7 @@
 }
 .live-table-head, .live-table-row {
   display: grid;
-  grid-template-columns: 92px minmax(0, 1.4fr) minmax(0, 1.4fr) 120px 140px 110px;
+  grid-template-columns: 92px minmax(0, 1fr) minmax(0, 1fr) 120px 130px 148px;
   align-items: center;
   gap: 10px;
   padding: 11px 14px;

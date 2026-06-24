@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer, LabelList,
   ScatterChart, Scatter, ZAxis, ReferenceLine,
@@ -13,7 +13,10 @@ import {
   liveKpis, perMerchanMetrics, weeklyTrend, heatmapMatrix, monthVsPrev,
   WEEKDAY_LABELS,
 } from '@/lib/livesUtils'
-import { todayISO } from '@/lib/types'
+import {
+  todayISO, buildMonthGrid, addDaysISO, startOfWeekISO, parseISO,
+  MONTHS, WEEKDAYS as CAL_WEEKDAYS, WEEKDAYS_FULL,
+} from '@/lib/types'
 import { Icon } from './Icons'
 
 // ─── Chart palette ───────────────────────────────────────────
@@ -376,41 +379,470 @@ function Heatmap({ matrix, max, merchans }: { matrix: ReturnType<typeof heatmapM
   )
 }
 
+// ─── Calendar helpers ────────────────────────────────────────
+
+const LIVE_STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  proposta:   { bg: 'oklch(0.97 0.05 70)',  border: 'oklch(0.88 0.10 60)',  text: 'oklch(0.52 0.14 55)'  },
+  confirmada: { bg: 'oklch(0.93 0.05 265)', border: 'oklch(0.80 0.10 265)', text: 'oklch(0.45 0.14 265)' },
+  realizada:  { bg: 'oklch(0.94 0.05 150)', border: 'oklch(0.82 0.09 150)', text: 'oklch(0.42 0.13 150)' },
+}
+
+function LiveChip({ live, merchans, onClick }: { live: Live; merchans: Merchan[]; onClick: () => void }) {
+  const col = LIVE_STATUS_COLORS[live.status] ?? LIVE_STATUS_COLORS.confirmada
+  const m1 = merchans.find(m => m.nome === live.merchan1)
+  const label = m1 ? m1.short : (live.merchan1 || '—')
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onClick() }}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 4, width: '100%',
+        padding: '2px 5px', borderRadius: 5, border: `1px solid ${col.border}`,
+        background: col.bg, cursor: 'pointer', textAlign: 'left', lineHeight: 1.3,
+        fontSize: 10.5, fontWeight: 500, color: col.text,
+        overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+      }}
+      title={`${live.hora} · ${live.merchan1}${live.merchan2 ? ' + ' + live.merchan2 : ''}`}
+    >
+      {m1 && <span style={{ width: 6, height: 6, borderRadius: '50%', background: m1.color, flexShrink: 0 }} />}
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, flexShrink: 0, opacity: 0.75 }}>
+        {live.hora}
+      </span>
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+        {label}
+      </span>
+    </button>
+  )
+}
+
+function LivesMonthView({ year, month, lives, merchans, onLiveClick, onNewLive }: {
+  year: number; month: number; lives: Live[]; merchans: Merchan[]
+  onLiveClick: (l: Live) => void
+  onNewLive: (date: string) => void
+}) {
+  const cells = useMemo(() => buildMonthGrid(year, month), [year, month])
+  const today = todayISO()
+  const [expandedDay, setExpandedDay] = useState<string | null>(null)
+
+  const byDay = useMemo(() => {
+    const map: Record<string, Live[]> = {}
+    lives.forEach(l => { (map[l.date] = map[l.date] || []).push(l) })
+    Object.values(map).forEach(arr => arr.sort((a, b) => a.hora.localeCompare(b.hora)))
+    return map
+  }, [lives])
+
+  const MAX_VISIBLE = 3
+
+  return (
+    <div className="cal-grid">
+      {CAL_WEEKDAYS.map(w => <div key={w} className="cal-head">{w}</div>)}
+      {cells.map((c, i) => {
+        const isToday = c.iso === today
+        const dayLives = byDay[c.iso] || []
+        const visible = dayLives.slice(0, MAX_VISIBLE)
+        const more = dayLives.length - visible.length
+        return (
+          <div
+            key={i}
+            className={`cal-cell ${c.other ? 'other' : ''} ${isToday ? 'today' : ''}`}
+            style={{ position: 'relative' }}
+            onClick={() => !c.other && onNewLive(c.iso)}
+          >
+            <div className="cal-num-row">
+              <span className="cal-num-box">{c.day}</span>
+            </div>
+            {visible.map(l => (
+              <div key={l.id} onClick={e => e.stopPropagation()} style={{ marginBottom: 2 }}>
+                <LiveChip live={l} merchans={merchans} onClick={() => onLiveClick(l)} />
+              </div>
+            ))}
+            {more > 0 && (
+              <div
+                className="cal-more"
+                style={{ cursor: 'pointer' }}
+                onClick={e => { e.stopPropagation(); setExpandedDay(c.iso === expandedDay ? null : c.iso) }}
+              >
+                +{more} mais
+              </div>
+            )}
+            {expandedDay === c.iso && (
+              <div
+                style={{
+                  position: 'absolute', zIndex: 50, top: '100%', left: 0,
+                  background: 'var(--surface)', border: '1px solid var(--line)',
+                  borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.12)',
+                  padding: '10px 8px', minWidth: 220, display: 'flex', flexDirection: 'column', gap: 4,
+                }}
+                onClick={e => e.stopPropagation()}
+              >
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-3)', padding: '0 4px 4px' }}>
+                  {c.day}/{month + 1} — {dayLives.length} live{dayLives.length === 1 ? '' : 's'}
+                </div>
+                {dayLives.map(l => (
+                  <LiveChip key={l.id} live={l} merchans={merchans} onClick={() => { onLiveClick(l); setExpandedDay(null) }} />
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Lives Calendar — Week view ──────────────────────────────
+
+const WEEK_START_HOUR = 6
+const WEEK_END_HOUR = 24
+const HOUR_HEIGHT = 56
+
+function LivesWeekView({ weekStart, lives, merchans, onLiveClick }: {
+  weekStart: string; lives: Live[]; merchans: Merchan[]
+  onLiveClick: (l: Live) => void
+}) {
+  const days = Array.from({ length: 7 }, (_, i) => addDaysISO(weekStart, i))
+  const hours = Array.from({ length: WEEK_END_HOUR - WEEK_START_HOUR }, (_, i) => WEEK_START_HOUR + i)
+  const today = todayISO()
+
+  const now = new Date()
+  const nowOffset = ((now.getHours() + now.getMinutes() / 60) - WEEK_START_HOUR) * HOUR_HEIGHT
+
+  const byDay = useMemo(() => {
+    const map: Record<string, Live[]> = {}
+    days.forEach(d => { map[d] = [] })
+    lives.forEach(l => { if (map[l.date] !== undefined) map[l.date].push(l) })
+    return map
+  }, [lives, weekStart])
+
+  const pad2 = (n: number) => String(n).padStart(2, '0')
+
+  return (
+    <div className="week-grid">
+      <div className="week-head">
+        <div className="week-tz">GMT-3</div>
+        {days.map(d => {
+          const dt = parseISO(d)
+          const isToday = d === today
+          return (
+            <div key={d} className={`week-day-head ${isToday ? 'today' : ''}`}>
+              <div className="wdh-dow">{WEEKDAYS_FULL[dt.getDay()]}</div>
+              <div className="wdh-num">{dt.getDate()}</div>
+            </div>
+          )
+        })}
+      </div>
+      <div className="week-body" style={{ '--hour-h': `${HOUR_HEIGHT}px` } as React.CSSProperties}>
+        <div className="week-time-col">
+          {hours.map(h => (
+            <div key={h} className="week-time-cell">
+              {h === WEEK_START_HOUR ? '' : `${pad2(h)}:00`}
+            </div>
+          ))}
+        </div>
+        {days.map(d => {
+          const isToday = d === today
+          const dayLives = byDay[d] || []
+          return (
+            <div key={d} className={`week-day-col ${isToday ? 'today' : ''}`}>
+              {hours.map(h => <div key={h} className="week-hour-cell" />)}
+              {isToday && nowOffset >= 0 && (
+                <div className="week-now-line" style={{ top: `${nowOffset}px` }} />
+              )}
+              {dayLives.map(l => {
+                const [hh, mm] = l.hora.split(':').map(Number)
+                const top = ((hh + mm / 60) - WEEK_START_HOUR) * HOUR_HEIGHT
+                if (top < 0) return null
+                const col = LIVE_STATUS_COLORS[l.status] ?? LIVE_STATUS_COLORS.confirmada
+                const m1 = merchans.find(m => m.nome === l.merchan1)
+                const m2 = merchans.find(m => m.nome === l.merchan2)
+                return (
+                  <button
+                    key={l.id}
+                    onClick={() => onLiveClick(l)}
+                    style={{
+                      position: 'absolute', top: `${top}px`, height: 62,
+                      left: 3, right: 3,
+                      background: col.bg, border: `1.5px solid ${col.border}`,
+                      borderRadius: 8, padding: '4px 7px', cursor: 'pointer',
+                      textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 2,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: col.text, opacity: 0.8 }}>
+                      {l.hora}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden' }}>
+                      {m1 && <span style={{ width: 6, height: 6, borderRadius: '50%', background: m1.color, flexShrink: 0 }} />}
+                      <span style={{ fontSize: 11.5, fontWeight: 600, color: col.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {m1 ? m1.short : (l.merchan1 || '—')}
+                      </span>
+                    </div>
+                    {m2 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden' }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: m2.color, flexShrink: 0 }} />
+                        <span style={{ fontSize: 10, color: col.text, opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {m2.short}
+                        </span>
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Copy UTM button ─────────────────────────────────────────
+
+function CopyUtmBtn({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <button
+      className={`live-copy-utm ${copied ? 'copied' : ''}`}
+      title="Copiar UTM"
+      onClick={e => {
+        e.stopPropagation()
+        navigator.clipboard.writeText(url)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      }}
+    >
+      {copied ? (
+        <svg viewBox="0 0 16 16" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="3 8 6.5 12 13 4" />
+        </svg>
+      ) : (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="5" y="5" width="7.5" height="7.5" rx="1.5" />
+          <path d="M10 5V4A1.5 1.5 0 0 0 8.5 2.5h-5A1.5 1.5 0 0 0 2 4v8A1.5 1.5 0 0 0 3.5 13.5H5" />
+        </svg>
+      )}
+    </button>
+  )
+}
+
+// ─── StatusCell ──────────────────────────────────────────────
+
+function StatusCell({ live, onStatusChange }: { live: Live; onStatusChange?: (l: Live, id: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const s = LIVE_STATUS_BY_ID[live.status] ?? LIVE_STATUSES[0]
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const pick = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    if (onStatusChange) onStatusChange(live, id)
+    setOpen(false)
+  }
+
+  return (
+    <div className="live-status-cell" ref={ref}>
+      <button
+        className={`status-pill ${s.className} status-pill-btn`}
+        onClick={(e) => { e.stopPropagation(); setOpen(v => !v) }}
+      >
+        <span className="sdot" />
+        {s.label}
+      </button>
+      {open && (
+        <div className="status-dropdown" onClick={e => e.stopPropagation()}>
+          {LIVE_STATUSES.map(st => (
+            <button
+              key={st.id}
+              className={`status-opt ${st.className} ${live.status === st.id ? 'active' : ''}`}
+              onClick={e => pick(e, st.id)}
+            >
+              <span className="sdot" />{st.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Lives Calendar — List view ──────────────────────────────
+
+function LivesCalListView({ year, month, lives, merchans, onLiveClick }: {
+  year: number; month: number; lives: Live[]; merchans: Merchan[]
+  onLiveClick: (l: Live) => void
+}) {
+  const today = todayISO()
+  const monthLives = lives
+    .filter(l => {
+      const [y, m] = l.date.split('-').map(Number)
+      return y === year && m - 1 === month
+    })
+    .sort((a, b) => a.date !== b.date ? a.date.localeCompare(b.date) : a.hora.localeCompare(b.hora))
+
+  const grouped: [string, Live[]][] = []
+  for (const l of monthLives) {
+    const last = grouped[grouped.length - 1]
+    if (last && last[0] === l.date) last[1].push(l)
+    else grouped.push([l.date, [l]])
+  }
+
+  if (!grouped.length) {
+    return (
+      <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--ink-3)' }}>
+        Nenhuma live neste mês.
+      </div>
+    )
+  }
+
+  const weekdayShort = (iso: string) => {
+    const d = parseISO(iso)
+    return ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][d.getDay()]
+  }
+
+  return (
+    <div className="pautas-view" style={{ paddingTop: 16 }}>
+      {grouped.map(([date, dayLives]) => {
+        const isToday = date === today
+        const isPast = date < today
+        const [, mm, dd] = date.split('-')
+        return (
+          <div key={date} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', paddingBottom: 2 }}>
+            <div style={{
+              width: 64, flexShrink: 0, paddingTop: 10, textAlign: 'right',
+              fontFamily: 'var(--font-mono)', fontSize: 12.5, lineHeight: 1.3,
+              color: isToday ? 'var(--accent)' : isPast ? 'var(--ink-3)' : 'var(--ink-2)',
+              fontWeight: isToday ? 700 : 500,
+            }}>
+              <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1 }}>{dd}</div>
+              <div style={{ fontSize: 11, marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{weekdayShort(date)}/{mm}</div>
+              {isToday && <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 2, fontWeight: 700 }}>hoje</div>}
+            </div>
+            <div style={{ flex: 1, borderLeft: `2px solid ${isToday ? 'var(--accent-soft)' : 'var(--border)'}`, paddingLeft: 16, paddingTop: 8, paddingBottom: 8 }}>
+              {dayLives.map(l => {
+                const col = LIVE_STATUS_COLORS[l.status] ?? LIVE_STATUS_COLORS.confirmada
+                const s = LIVE_STATUS_BY_ID[l.status]
+                const m1 = merchans.find(m => m.nome === l.merchan1)
+                const m2 = merchans.find(m => m.nome === l.merchan2)
+                return (
+                  <div
+                    key={l.id}
+                    onClick={() => onLiveClick(l)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', marginBottom: 4,
+                      borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)',
+                      cursor: 'pointer', transition: 'background 0.12s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = col.bg }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface)' }}
+                  >
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)', width: 40, flexShrink: 0 }}>
+                      {l.hora}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                        {m1 && <span style={{ width: 8, height: 8, borderRadius: '50%', background: m1.color, flexShrink: 0 }} />}
+                        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {m1 ? m1.short : (l.merchan1 || '—')}
+                          {m2 && <span style={{ color: 'var(--ink-3)', fontWeight: 400 }}> + {m2.short}</span>}
+                        </span>
+                      </div>
+                      {(l.nominal1 || l.nominal2) && (
+                        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {[l.nominal1, l.nominal2].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
+                    </div>
+                    {l.receitaTotal > 0 && (
+                      <div style={{ fontSize: 12, fontWeight: 600, color: LIVES_ACCENT, flexShrink: 0 }}>
+                        {fmtBRL(l.receitaTotal)}
+                      </div>
+                    )}
+                    {s && (
+                      <span className={`status-pill ${s.className}`} style={{ flexShrink: 0 }}>
+                        <span className="sdot" />{s.label}
+                      </span>
+                    )}
+                    {l.linkUtm && <CopyUtmBtn url={l.linkUtm} />}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─── LivesTable ──────────────────────────────────────────────
 
-function LivesTable({ lives, merchans, onRowClick, limit }: {
-  lives: Live[]; merchans: Merchan[]; onRowClick: (l: Live) => void; limit?: number
+const MONTH_NAMES_BR = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                        'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+
+function LivesTable({ lives, merchans, onRowClick, onStatusChange, limit }: {
+  lives: Live[]; merchans: Merchan[]
+  onRowClick: (l: Live) => void
+  onStatusChange?: (l: Live, id: string) => void
+  limit?: number
 }) {
   const shown = limit ? lives.slice(0, limit) : lives
   const more  = limit && lives.length > limit ? lives.length - limit : 0
+
+  // Agrupar por mês
+  const grouped: ({ type: 'header'; key: string; label: string } | { type: 'row'; live: Live })[] = []
+  let lastKey: string | null = null
+  for (const l of shown) {
+    const d = new Date(l.date + 'T00:00:00')
+    const key = `${d.getFullYear()}-${d.getMonth()}`
+    if (key !== lastKey) {
+      grouped.push({ type: 'header', key, label: `${MONTH_NAMES_BR[d.getMonth()]} ${d.getFullYear()}` })
+      lastKey = key
+    }
+    grouped.push({ type: 'row', live: l })
+  }
+
   return (
     <div className="live-table">
       <div className="live-table-head">
         <div>Data</div>
         <div>Cupom 1</div>
         <div>Cupom 2</div>
-        <div>Status</div>
-        <div className="num">Receita</div>
-        <div className="num">UTM</div>
+        <div className="ctr">Receita cupom</div>
+        <div className="ctr">Receita utm</div>
+        <div className="ctr">Status</div>
+        <div />
       </div>
       {shown.length === 0 && (
         <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)' }}>Nenhuma live no período.</div>
       )}
-      {shown.map(l => {
+      {grouped.map(item => {
+        if (item.type === 'header') {
+          return <div key={item.key} className="live-table-month-header">{item.label}</div>
+        }
+        const l = item.live
         const m1 = merchans.find(x => x.nome === l.merchan1)
         const m2 = merchans.find(x => x.nome === l.merchan2)
-        const s  = LIVE_STATUS_BY_ID[l.status] ?? LIVE_STATUSES[0]
         const utmPct = l.receitaTotal > 0 && l.receitaUtm > 0 ? l.receitaUtm / l.receitaTotal : 0
         const d   = new Date(l.date + 'T00:00:00')
         const day = d.getDate()
-        const mon = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][d.getMonth()]
+        const splitTooltip = l.receita2 > 0
+          ? `${fmtBRLk(l.receita1)} (cupom 1) + ${fmtBRLk(l.receita2)} (cupom 2)`
+          : undefined
         return (
           <div key={l.id} className="live-table-row" onClick={() => onRowClick(l)}>
+            {/* 1. Data — só DD + dia da semana (mês já aparece no cabeçalho de grupo) */}
             <div className="live-table-date">
               <span className="day">{day}</span>
-              <span className="mon">{mon} {d.getFullYear().toString().slice(-2)}</span>
-              <span className="time">{WEEKDAY_LABELS[d.getDay()]}</span>
+              <span className="time">{WEEKDAY_LABELS[d.getDay()]}{l.hora ? ` • ${l.hora}` : ''}</span>
             </div>
+            {/* 2. Cupom 1 */}
             <div className="live-cupom-cell">
               {m1 ? (
                 <>
@@ -421,6 +853,7 @@ function LivesTable({ lives, merchans, onRowClick, limit }: {
                 </>
               ) : <span className="ink-4">—</span>}
             </div>
+            {/* 3. Cupom 2 */}
             <div className="live-cupom-cell">
               {m2 ? (
                 <>
@@ -429,26 +862,26 @@ function LivesTable({ lives, merchans, onRowClick, limit }: {
                   </span>
                   <span className="nominal-code">{l.nominal2}</span>
                 </>
-              ) : <span className="ink-4">só 1 cupom</span>}
+              ) : null}
             </div>
-            <div>
-              <span className={`status-pill ${s.className}`} style={{ pointerEvents: 'none' }}>
-                <span className="sdot" />{s.label}
-              </span>
+            {/* 4. Receita cupom */}
+            <div className="live-receita-cell" data-tooltip={splitTooltip}>
+              {l.receitaTotal > 0 ? fmtBRL(l.receitaTotal) : <span className="ink-4">—</span>}
             </div>
-            <div className="num">
-              {l.receitaTotal > 0 ? fmtBRL(l.receitaTotal) : '—'}
-              {l.receitaTotal > 0 && l.receita2 > 0 && (
-                <div className="num-split">{fmtBRLk(l.receita1)} + {fmtBRLk(l.receita2)}</div>
-              )}
-            </div>
-            <div className="num">
+            {/* 5. Receita utm */}
+            <div className="live-receita-cell">
               {utmPct > 0 ? (
                 <>
                   {fmtBRLk(l.receitaUtm)}
                   <div className="num-split">{fmtPct(utmPct)}</div>
                 </>
               ) : <span className="ink-4">—</span>}
+            </div>
+            {/* 6. Status */}
+            <StatusCell live={l} onStatusChange={onStatusChange} />
+            {/* 7. Botão UTM */}
+            <div className="live-utm-btn-cell" onClick={e => e.stopPropagation()}>
+              {l.linkUtm && <CopyUtmBtn url={l.linkUtm} />}
             </div>
           </div>
         )
@@ -473,6 +906,7 @@ interface Props {
   onDiscardProposta: (l: Live) => void
   onGenerateProposta: () => void
   generatingProposta: boolean
+  onStatusChange?: (l: Live, newStatus: string) => void
 }
 
 export default function LivesView({
@@ -480,8 +914,40 @@ export default function LivesView({
   onLiveClick, onNewLive, onOpenMerchans,
   onApproveProposta, onApproveAll, onDiscardProposta,
   onGenerateProposta, generatingProposta,
+  onStatusChange,
 }: Props) {
   const today = todayISO()
+  const todayDate = parseISO(today)
+
+  // ── view mode ──
+  const [viewMode, setViewMode] = useState<'analytics' | 'calendar'>('analytics')
+  const [calMode, setCalMode] = useState<'month' | 'week' | 'list'>('month')
+  const [year, setYear] = useState(todayDate.getFullYear())
+  const [month, setMonth] = useState(todayDate.getMonth())
+  const [weekStart, setWeekStart] = useState(() => startOfWeekISO(today))
+
+  const goPrev = () => {
+    if (calMode === 'week') { setWeekStart(w => addDaysISO(w, -7)); return }
+    if (month === 0) { setMonth(11); setYear(y => y - 1) } else setMonth(m => m - 1)
+  }
+  const goNext = () => {
+    if (calMode === 'week') { setWeekStart(w => addDaysISO(w, 7)); return }
+    if (month === 11) { setMonth(0); setYear(y => y + 1) } else setMonth(m => m + 1)
+  }
+  const goToday = () => {
+    const t = parseISO(today)
+    setYear(t.getFullYear()); setMonth(t.getMonth())
+    setWeekStart(startOfWeekISO(today))
+  }
+  const navLabel = calMode === 'week' ? (() => {
+    const s = parseISO(weekStart)
+    const e = parseISO(addDaysISO(weekStart, 6))
+    if (s.getMonth() === e.getMonth())
+      return `${s.getDate()} – ${e.getDate()} ${MONTHS[s.getMonth()]} ${s.getFullYear()}`
+    return `${s.getDate()} ${MONTHS[s.getMonth()].slice(0,3)} – ${e.getDate()} ${MONTHS[e.getMonth()].slice(0,3)} ${e.getFullYear()}`
+  })() : `${MONTHS[month]} ${year}`
+
+  // ── analytics state ──
   const [period, setPeriod] = useState<PeriodId>('month')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
@@ -554,7 +1020,7 @@ export default function LivesView({
 
   return (
     <div className="lives-wrap">
-      {/* Proposta da semana */}
+      {/* Proposta da semana — sempre visível */}
       <PropostaPanel
         propostas={propostas}
         merchans={merchans}
@@ -565,135 +1031,204 @@ export default function LivesView({
         onGenerate={onGenerateProposta}
         generating={generatingProposta} />
 
-      {/* Period bar */}
+      {/* Top bar */}
       <div className="lives-period-bar">
+        {/* Análise / Calendário toggle */}
         <div className="view-toggle">
-          {PERIODS.map(p => (
-            <button key={String(p.id)} className={period === p.id ? 'active' : ''} onClick={() => setPeriod(p.id)}>
-              {p.label}
-            </button>
-          ))}
+          <button className={viewMode === 'analytics' ? 'active' : ''} onClick={() => setViewMode('analytics')}>
+            Análise
+          </button>
+          <button className={viewMode === 'calendar' ? 'active' : ''} onClick={() => setViewMode('calendar')}>
+            Calendário
+          </button>
         </div>
-        {period === 'custom' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <input type="date" className="field" style={{ fontSize: 12, padding: '3px 8px', width: 130 }}
-              value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
-            <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>até</span>
-            <input type="date" className="field" style={{ fontSize: 12, padding: '3px 8px', width: 130 }}
-              value={customTo} onChange={e => setCustomTo(e.target.value)} />
-          </div>
+
+        {/* Calendar toolbar */}
+        {viewMode === 'calendar' && (
+          <>
+            <div className="month-nav" style={{ marginLeft: 8 }}>
+              <button onClick={goPrev}>‹</button>
+              <div className="label">{navLabel}</div>
+              <button onClick={goNext}>›</button>
+            </div>
+            <button className="today-btn" onClick={goToday}>Hoje</button>
+            <div className="view-toggle" style={{ marginLeft: 4 }}>
+              <button className={calMode === 'month' ? 'active' : ''} onClick={() => setCalMode('month')}>Mês</button>
+              <button className={calMode === 'week'  ? 'active' : ''} onClick={() => setCalMode('week')}>Semana</button>
+              <button className={calMode === 'list'  ? 'active' : ''} onClick={() => setCalMode('list')}>Lista</button>
+            </div>
+          </>
         )}
-        <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
-          {kpis.count} live{kpis.count === 1 ? '' : 's'} realizadas no período
-        </div>
+
+        {/* Analytics period filter */}
+        {viewMode === 'analytics' && (
+          <>
+            <div className="view-toggle">
+              {PERIODS.map(p => (
+                <button key={String(p.id)} className={period === p.id ? 'active' : ''} onClick={() => setPeriod(p.id)}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            {period === 'custom' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input type="date" className="field" style={{ fontSize: 12, padding: '3px 8px', width: 130 }}
+                  value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
+                <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>até</span>
+                <input type="date" className="field" style={{ fontSize: 12, padding: '3px 8px', width: 130 }}
+                  value={customTo} onChange={e => setCustomTo(e.target.value)} />
+              </div>
+            )}
+            <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
+              {kpis.count} live{kpis.count === 1 ? '' : 's'} realizadas no período
+            </div>
+          </>
+        )}
+
         <div style={{ flex: 1 }} />
         <button className="btn btn-ghost" onClick={onOpenMerchans}>
           <Icon.settings /> Gerenciar merchans
         </button>
+        <button className="btn btn-accent" onClick={() => onNewLive({})}>
+          <Icon.plus /> Nova live
+        </button>
       </div>
 
-      {/* KPIs */}
-      <div className="lives-kpis lives-kpis-3">
-        <KpiCard label="Receita total" value={fmtBRLk(kpis.total)} sub={`${kpis.count} live${kpis.count === 1 ? '' : 's'}`} />
-        <KpiCard label="Média por live" value={fmtBRLk(kpis.avg)} sub="ticket médio" />
-        <KpiCard
-          label="Melhor live"
-          value={kpis.best ? fmtBRLk(kpis.best.receitaTotal) : '—'}
-          sub={kpis.best ? `${new Date(kpis.best.date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: '2-digit' })} · ${kpis.best.nominal1}` : ''} />
-      </div>
-
-      {/* Métricas secundárias */}
-      {(kpis.utmCount > 0 || kpis.alcanceCount > 0) && (
-        <div className="lives-kpis-secondary">
-          <span className="lks-label">Secundário</span>
-          {kpis.utmCount > 0 && (
-            <span className="lks-item">
-              <strong>% UTM:</strong> {fmtPct(kpis.utmShareSum > 0 ? kpis.utmShareTotal / kpis.utmShareSum : 0)}
-              <span className="lks-foot">({kpis.utmCount} de {kpis.count} lives com dado de UTM)</span>
-            </span>
-          )}
-          {kpis.alcanceCount > 0 && (
-            <span className="lks-item">
-              <strong>Alcance:</strong> {(kpis.alcanceTotal / 1000).toFixed(0)}k
-              <span className="lks-foot">({kpis.alcanceCount} de {kpis.count} lives com alcance)</span>
-            </span>
+      {/* ── Calendar view ── */}
+      {viewMode === 'calendar' && calMode !== 'list' && (
+        <div className="cal-wrap">
+          {calMode === 'month' ? (
+            <LivesMonthView
+              year={year}
+              month={month}
+              lives={lives}
+              merchans={merchans}
+              onLiveClick={onLiveClick}
+              onNewLive={date => onNewLive({ date })}
+            />
+          ) : (
+            <LivesWeekView
+              weekStart={weekStart}
+              lives={lives}
+              merchans={merchans}
+              onLiveClick={onLiveClick}
+            />
           )}
         </div>
       )}
+      {viewMode === 'calendar' && calMode === 'list' && (
+        <LivesCalListView
+          year={year}
+          month={month}
+          lives={lives}
+          merchans={merchans}
+          onLiveClick={onLiveClick}
+        />
+      )}
 
-      {/* Performance por merchan */}
-      <div className="lives-section-title">
-        Performance por merchan
-        <span className="sub">cada cupom (1 ou 2) conta como uma observação · descobre qual cupom realmente puxa receita</span>
-      </div>
-      <div className="lives-grid">
-        <DashCard title="Receita média por cupom" hint={`${perMerchan.length} merchans usados no período · ordenado por R$ médio`}>
-          <MerchanBars data={perMerchan} />
-        </DashCard>
-        <DashCard title="Uso × receita média" hint="quadrante superior direito = grande hit · inferior direito = popular-mas-fraco">
-          <MerchanScatter data={perMerchan} />
-          <div className="quadrant-legend">
-            <div><span className="qchip qchip-up">↑→</span> hits</div>
-            <div><span className="qchip">↓→</span> overfit (usa muito, rende pouco)</div>
-            <div><span className="qchip qchip-up">↑←</span> subexplorado (rende, usa pouco)</div>
+      {/* ── Analytics view ── */}
+      {viewMode === 'analytics' && (
+        <>
+          {/* KPIs */}
+          <div className="lives-kpis lives-kpis-3">
+            <KpiCard label="Receita total" value={fmtBRLk(kpis.total)} sub={`${kpis.count} live${kpis.count === 1 ? '' : 's'}`} />
+            <KpiCard label="Média por live" value={fmtBRLk(kpis.avg)} sub="ticket médio" />
+            <KpiCard
+              label="Melhor live"
+              value={kpis.best ? fmtBRLk(kpis.best.receitaTotal) : '—'}
+              sub={kpis.best ? `${new Date(kpis.best.date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: '2-digit' })} · ${kpis.best.nominal1}` : ''} />
           </div>
-        </DashCard>
-      </div>
 
-      <DashCard
-        title="Heatmap — dia da semana × merchan"
-        hint={`top ${heatMerchans.length} merchans por uso · scroll horizontal pra ver tudo · '—' = combinação não testada`}
-        full>
-        <Heatmap matrix={heat.matrix} max={heat.max} merchans={heatMerchans} />
-      </DashCard>
+          {(kpis.utmCount > 0 || kpis.alcanceCount > 0) && (
+            <div className="lives-kpis-secondary">
+              <span className="lks-label">Secundário</span>
+              {kpis.utmCount > 0 && (
+                <span className="lks-item">
+                  <strong>% UTM:</strong> {fmtPct(kpis.utmShareSum > 0 ? kpis.utmShareTotal / kpis.utmShareSum : 0)}
+                  <span className="lks-foot">({kpis.utmCount} de {kpis.count} lives com dado de UTM)</span>
+                </span>
+              )}
+              {kpis.alcanceCount > 0 && (
+                <span className="lks-item">
+                  <strong>Alcance:</strong> {(kpis.alcanceTotal / 1000).toFixed(0)}k
+                  <span className="lks-foot">({kpis.alcanceCount} de {kpis.count} lives com alcance)</span>
+                </span>
+              )}
+            </div>
+          )}
 
-      {/* Tendência */}
-      <div className="lives-section-title">
-        Tendência temporal
-        <span className="sub">receita semana a semana · mês até hoje vs mesmo período do mês anterior</span>
-      </div>
-      <div className="lives-grid lives-grid-trend">
-        <DashCard title="Receita semanal" hint={`período: ${period === 'week' ? 'essa semana' : period === 'month' ? 'esse mês' : period === 'custom' ? `${customFrom || '?'} → ${customTo || 'hoje'}` : `últimos ${period} dias`}`}>
-          <WeeklyTrend data={weekly} />
-        </DashCard>
-        <DashCard title="Mês atual vs anterior" hint={`comparativo justo · dia 1–${mvp.dayOfMonth} de cada mês`}>
-          <MonthVsPrev mvp={mvp} today={today} />
-        </DashCard>
-      </div>
+          <div className="lives-section-title">
+            Performance por merchan
+            <span className="sub">cada cupom (1 ou 2) conta como uma observação · descobre qual cupom realmente puxa receita</span>
+          </div>
+          <div className="lives-grid">
+            <DashCard title="Receita média por cupom" hint={`${perMerchan.length} merchans usados no período · ordenado por R$ médio`}>
+              <MerchanBars data={perMerchan} />
+            </DashCard>
+            <DashCard title="Uso × receita média" hint="quadrante superior direito = grande hit · inferior direito = popular-mas-fraco">
+              <MerchanScatter data={perMerchan} />
+              <div className="quadrant-legend">
+                <div><span className="qchip qchip-up">↑→</span> hits</div>
+                <div><span className="qchip">↓→</span> overfit (usa muito, rende pouco)</div>
+                <div><span className="qchip qchip-up">↑←</span> subexplorado (rende, usa pouco)</div>
+              </div>
+            </DashCard>
+          </div>
 
-      {/* Tabela */}
-      <div className="lives-section-title">
-        Histórico de lives
-        <span className="sub">clica numa linha pra editar · {tableLives.length} no recorte atual</span>
-      </div>
-      <div className="live-table-filters">
-        <div className="search-box" style={{ minWidth: 240 }}>
-          <Icon.search />
-          <input
-            placeholder="Buscar código de cupom ou merchan..."
-            value={search}
-            onChange={e => setSearch(e.target.value)} />
-        </div>
-        <div className="filter-mini">
-          <span className="lbl">Merchan</span>
-          <select className="field" value={merchanFilter} onChange={e => setMerchanFilter(e.target.value)} style={{ minWidth: 180, maxWidth: 240 }}>
-            <option value="all">Todos</option>
-            {merchans.filter(m => m.ativo).map(m => <option key={m.id} value={m.nome}>{m.short} — {m.nome}</option>)}
-          </select>
-        </div>
-        <div className="filter-mini">
-          <span className="lbl">Status</span>
-          <select className="field" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ minWidth: 130 }}>
-            <option value="all">Todos</option>
-            {LIVE_STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-          </select>
-        </div>
-        <div style={{ flex: 1 }} />
-        <span className="count-pill">{tableLives.length} live{tableLives.length === 1 ? '' : 's'}</span>
-      </div>
-      <DashCard full>
-        <LivesTable lives={tableLives} merchans={merchans} onRowClick={onLiveClick} limit={60} />
-      </DashCard>
+          <DashCard
+            title="Heatmap — dia da semana × merchan"
+            hint={`top ${heatMerchans.length} merchans por uso · scroll horizontal pra ver tudo · '—' = combinação não testada`}
+            full>
+            <Heatmap matrix={heat.matrix} max={heat.max} merchans={heatMerchans} />
+          </DashCard>
+
+          <div className="lives-section-title">
+            Tendência temporal
+            <span className="sub">receita semana a semana · mês até hoje vs mesmo período do mês anterior</span>
+          </div>
+          <div className="lives-grid lives-grid-trend">
+            <DashCard title="Receita semanal" hint={`período: ${period === 'week' ? 'essa semana' : period === 'month' ? 'esse mês' : period === 'custom' ? `${customFrom || '?'} → ${customTo || 'hoje'}` : `últimos ${period} dias`}`}>
+              <WeeklyTrend data={weekly} />
+            </DashCard>
+            <DashCard title="Mês atual vs anterior" hint={`comparativo justo · dia 1–${mvp.dayOfMonth} de cada mês`}>
+              <MonthVsPrev mvp={mvp} today={today} />
+            </DashCard>
+          </div>
+
+          <div className="lives-section-title">
+            Histórico de lives
+            <span className="sub">clica numa linha pra editar · {tableLives.length} no recorte atual</span>
+          </div>
+          <div className="live-table-filters">
+            <div className="search-box" style={{ minWidth: 240 }}>
+              <Icon.search />
+              <input
+                placeholder="Buscar código de cupom ou merchan..."
+                value={search}
+                onChange={e => setSearch(e.target.value)} />
+            </div>
+            <div className="filter-mini">
+              <span className="lbl">Merchan</span>
+              <select className="field" value={merchanFilter} onChange={e => setMerchanFilter(e.target.value)} style={{ minWidth: 180, maxWidth: 240 }}>
+                <option value="all">Todos</option>
+                {merchans.filter(m => m.ativo).map(m => <option key={m.id} value={m.nome}>{m.short} — {m.nome}</option>)}
+              </select>
+            </div>
+            <div className="filter-mini">
+              <span className="lbl">Status</span>
+              <select className="field" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ minWidth: 130 }}>
+                <option value="all">Todos</option>
+                {LIVE_STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: 1 }} />
+            <span className="count-pill">{tableLives.length} live{tableLives.length === 1 ? '' : 's'}</span>
+          </div>
+          <DashCard full>
+            <LivesTable lives={tableLives} merchans={merchans} onRowClick={onLiveClick} onStatusChange={onStatusChange} limit={60} />
+          </DashCard>
+        </>
+      )}
     </div>
   )
 }

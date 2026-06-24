@@ -1,11 +1,31 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import type { Live, Merchan } from '@/lib/types'
+import { useState, useEffect, useMemo } from 'react'
+import type { Brand, Live, Merchan, SiteLink } from '@/lib/types'
 import { LIVE_STATUSES, LIVE_STATUS_BY_ID } from '@/lib/types'
 import { fmtBRL, fmtPct } from '@/lib/livesUtils'
+import { buildUtmForLive } from '@/lib/storiesUtils'
 import { Icon } from './Icons'
 import { Popover } from './FormHelpers'
+
+/* ── CopyBtn ─────────────────────────────────────────────── */
+
+function CopyBtn({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <button
+      className={`btn-copy-utm ${copied ? 'copied' : ''}`}
+      style={{ alignSelf: 'flex-end', flexShrink: 0 }}
+      onClick={() => {
+        navigator.clipboard.writeText(text)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      }}
+    >
+      {copied ? 'Copiado!' : 'Copiar'}
+    </button>
+  )
+}
 
 // ─── LiveStatusSelect ────────────────────────────────────────
 
@@ -127,14 +147,16 @@ export function MerchanSelect({ value, merchans, onChange, onAddMerchan, placeho
 
 interface Props {
   live: Live
+  brand: Brand
   merchans: Merchan[]
+  siteLinks: SiteLink[]
   onClose: () => void
   onSave: (l: Live) => void
   onDelete: (l: Live) => void
   onAddMerchan: (nome: string) => Promise<Merchan>
 }
 
-export default function LiveModal({ live, merchans, onClose, onSave, onDelete, onAddMerchan }: Props) {
+export default function LiveModal({ live, brand, merchans, siteLinks, onClose, onSave, onDelete, onAddMerchan }: Props) {
   const [draft, setDraft] = useState<Live>(live)
 
   useEffect(() => { setDraft(live) }, [live.id])
@@ -149,6 +171,44 @@ export default function LiveModal({ live, merchans, onClose, onSave, onDelete, o
   const setMany = (obj: Partial<Live>) => setDraft(d => ({ ...d, ...obj }))
 
   const total = (draft.receita1 || 0) + (draft.receita2 || 0)
+
+  // ── UTM automática ──────────────────────────────────────────
+  const isGocase = brand === 'gocase'
+
+  const currentSiteLink = useMemo(() =>
+    siteLinks.find(sl => sl.produto === draft.produto?.trim()),
+  [siteLinks, draft.produto])
+
+  const utm = useMemo(() => {
+    if (!draft.date) return null
+    if (isGocase) {
+      return buildUtmForLive('gocase', draft.date, draft.hora ?? '')
+    }
+    // Gobeauté: precisa de hora + produto com link cadastrado
+    if (!draft.hora || !draft.produto?.trim() || !currentSiteLink) return null
+    return buildUtmForLive(brand, draft.date, draft.hora, draft.produto.trim(), currentSiteLink.link)
+  }, [brand, isGocase, draft.date, draft.hora, draft.produto, currentSiteLink])
+
+  // Sincroniza linkUtm e utmCampaign no draft quando UTM muda
+  useEffect(() => {
+    if (utm) {
+      setDraft(d => ({ ...d, linkUtm: utm.url, utmCampaign: utm.campaign }))
+    }
+  }, [utm?.url, utm?.campaign])
+
+  const categorias = useMemo(() =>
+    Array.from(new Set(siteLinks.map(sl => sl.categoria))).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+  [siteLinks])
+
+  const [catSel, setCatSel] = useState(() =>
+    siteLinks.find(sl => sl.produto === live.produto)?.categoria ?? ''
+  )
+
+  const produtosFiltrados = useMemo(() =>
+    catSel ? siteLinks.filter(sl => sl.categoria === catSel) : siteLinks,
+  [siteLinks, catSel])
+
+  const produtoNaoEncontrado = !isGocase && draft.produto?.trim() && !currentSiteLink
   useEffect(() => {
     if (total !== draft.receitaTotal) set('receitaTotal', total)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -210,6 +270,14 @@ export default function LiveModal({ live, merchans, onClose, onSave, onDelete, o
                 value={draft.date}
                 onChange={e => set('date', e.target.value)}
                 style={{ maxWidth: 200 }} />
+
+              <label>Hora</label>
+              <input
+                className="field"
+                type="time"
+                value={draft.hora || ''}
+                onChange={e => set('hora', e.target.value)}
+                style={{ maxWidth: 120 }} />
             </div>
 
             {/* CUPOM 1 */}
@@ -315,10 +383,6 @@ export default function LiveModal({ live, merchans, onClose, onSave, onDelete, o
                     <input type="checkbox" checked={!!draft.cupomLigado} onChange={e => set('cupomLigado', e.target.checked)} />
                     <span>cupom ligado</span>
                   </label>
-                  <label className="flag-toggle">
-                    <input type="checkbox" checked={!!draft.criativo} onChange={e => set('criativo', e.target.checked)} />
-                    <span>tinha criativo</span>
-                  </label>
                 </div>
               </div>
             </div>
@@ -329,8 +393,83 @@ export default function LiveModal({ live, merchans, onClose, onSave, onDelete, o
             <div className="modal-col-head">
               <Icon.branding /> Métricas secundárias
             </div>
+
+            {/* Seletor de produto — apenas gobeauté */}
+            {!isGocase && siteLinks.length > 0 && (
+              <div className="modal-grid" style={{ marginBottom: 16 }}>
+                <label>Categoria do produto</label>
+                <select
+                  className="field"
+                  value={catSel}
+                  onChange={e => {
+                    setCatSel(e.target.value)
+                    const still = siteLinks.find(sl => sl.produto === draft.produto && sl.categoria === e.target.value)
+                    if (!still) set('produto', '')
+                  }}
+                  style={{ paddingRight: 32 }}
+                >
+                  <option value="">Todas as categorias</option>
+                  {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+
+                <label>Produto da live</label>
+                <div>
+                  <select
+                    className="field"
+                    value={draft.produto || ''}
+                    onChange={e => {
+                      const sl = siteLinks.find(x => x.produto === e.target.value)
+                      set('produto', e.target.value)
+                      if (sl) set('linkUtm', sl.link)
+                    }}
+                    style={{ paddingRight: 32, width: '100%' }}
+                  >
+                    <option value="">Selecionar produto…</option>
+                    {produtosFiltrados.map(sl => (
+                      <option key={sl.id} value={sl.produto}>{sl.produto}</option>
+                    ))}
+                  </select>
+                  {produtoNaoEncontrado && (
+                    <div className="utm-aviso" style={{ marginTop: 6 }}>
+                      <Icon.info />
+                      <span>
+                        Produto não encontrado nos Links do Site. Adicione-o na aba{' '}
+                        <strong>Links do Site</strong> para gerar UTM automaticamente.
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* UTM gerada */}
+            {utm && (
+              <div className="st-utm-block" style={{ marginBottom: 16 }}>
+                <div className="st-utm-block-label">
+                  <svg viewBox="0 0 16 16" width={12} height={12} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <circle cx="8" cy="8" r="6"/><polyline points="8 5 8 8 10 10"/>
+                  </svg>
+                  UTM gerada automaticamente
+                </div>
+                <div className="st-utm-row">
+                  <div className="st-utm-field">
+                    <div className="st-utm-field-lbl">Código</div>
+                    <div className="st-utm-code">{utm.campaign}</div>
+                  </div>
+                  <CopyBtn text={utm.campaign} />
+                </div>
+                <div className="st-utm-row">
+                  <div className="st-utm-field">
+                    <div className="st-utm-field-lbl">URL</div>
+                    <div className="st-utm-url-text">{utm.url}</div>
+                  </div>
+                  <CopyBtn text={utm.url} />
+                </div>
+              </div>
+            )}
+
             <div className="live-modal-hint">
-              UTM e alcance são opcionais — a maior parte do histórico não tem esses dados.
+              Alcance e receita UTM são opcionais — a maior parte do histórico não tem esses dados.
             </div>
 
             <div className="modal-grid">
@@ -359,10 +498,19 @@ export default function LiveModal({ live, merchans, onClose, onSave, onDelete, o
             </div>
 
             <div className="stacked" style={{ marginTop: 18 }}>
+              <label>Criativo</label>
+              <input
+                className="field"
+                placeholder="Link ou descrição do criativo usado na live"
+                value={draft.criativo || ''}
+                onChange={e => set('criativo', e.target.value)} />
+            </div>
+
+            <div className="stacked" style={{ marginTop: 12 }}>
               <label>Observações</label>
               <textarea
                 className="field"
-                rows={5}
+                rows={4}
                 placeholder="Notas sobre a live, performance, contexto..."
                 value={draft.notes || ''}
                 onChange={e => set('notes', e.target.value)} />

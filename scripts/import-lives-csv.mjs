@@ -130,7 +130,7 @@ async function run() {
       date:          isoDate,
       dia_semana:    r.diaSemana,
       cupom_ligado:  r.cupomLigado,
-      criativo:      r.criativo.trim() !== '',
+      criativo:      r.criativo.trim(),
       merchan1:      r.merchan1 || null,
       nominal1:      r.nominal1 || null,
       receita1:      parseBRL(r.receita1),

@@ -185,7 +185,7 @@ export async function POST(req: NextRequest) {
         date:          p.date,
         dia_semana:    p.diaSemana,
         cupom_ligado:  true,
-        criativo:      false,
+        criativo:      '',
         merchan1:      p.merchan1 || null,
         nominal1:      p.nominal1 || null,
         receita1:      0,

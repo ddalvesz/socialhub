@@ -1,4 +1,4 @@
-import type { Story, DayAggregate } from '@/lib/types'
+import type { Brand, Story, DayAggregate } from '@/lib/types'
 
 // ─── Formatting ───────────────────────────────────────────────
 
@@ -73,19 +73,80 @@ export function eficienciaAlcance(receita: number, alcance: number): number | nu
 
 // ─── UTM generation ───────────────────────────────────────────
 
+// Mantida para compatibilidade com código existente (gocase stories legado)
 export function buildStoryUtm(date: string, hora: number, produtoNome: string) {
-  const d = date.replace(/-/g, '')               // "20260101"
-  const h = String(hora).padStart(2, '0')        // "14"
-
+  const d = date.replace(/-/g, '')
+  const h = String(hora).padStart(2, '0')
   const norm = produtoNome.normalize('NFD').replace(/[̀-ͯ]/g, '')
   const pascalCase = norm.split(/\s+/)
     .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join('')
-
   const slug = pascalCase.toLowerCase().replace(/[^a-z0-9]/g, '')
   const campaign = `stories_${d}${h}_${pascalCase}`
   const url = `https://www.gocase.com.br/${slug}?utm_source=instagram&utm_medium=organic_social&utm_campaign=${campaign}`
   return { campaign, url, slug }
+}
+
+function removerAcentos(str: string): string {
+  return str.normalize('NFD').replace(/[̀-ͯ]/g, '')
+}
+
+function toPascalCase(nome: string): string {
+  return removerAcentos(nome)
+    .split(/\s+/)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join('')
+}
+
+function toSlug(nome: string): string {
+  return removerAcentos(nome).toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+export function buildUtmForStory(
+  brand: Brand,
+  date: string,
+  hora: number,
+  produtoNome: string,
+  baseLink: string,
+): { campaign: string; url: string } {
+  const d = date.replace(/-/g, '')
+  const h = String(hora).padStart(2, '0')
+
+  if (brand === 'gocase') {
+    const pascal = toPascalCase(produtoNome)
+    const campaign = `stories_${d}${h}_${pascal}`
+    const url = `${baseLink}?utm_source=instagram&utm_medium=organic_social&utm_campaign=${campaign}`
+    return { campaign, url }
+  }
+
+  // Gobeauté (barbours, kokeshi, lescent)
+  const slug = toSlug(produtoNome)
+  const campaign = `${d}${h}_stories${slug}`
+  const url = `${baseLink}?utm_source=instagram&utm_medium=stories&utm_campaign=${campaign}`
+  return { campaign, url }
+}
+
+export function buildUtmForLive(
+  brand: Brand,
+  date: string,
+  hora: string,        // "HH:mm"
+  produtoNome?: string,
+  baseLink?: string,
+): { campaign: string; url: string } {
+  const d = date.replace(/-/g, '')
+  const h = (hora ?? '').slice(0, 2).padStart(2, '0')
+
+  if (brand === 'gocase') {
+    const campaign = `live_${d}${h}`
+    const url = `https://www.gocase.com.br/?utm_source=instagram&utm_medium=organic_live&utm_campaign=${campaign}`
+    return { campaign, url }
+  }
+
+  // Gobeauté (barbours, kokeshi, lescent)
+  const slug = toSlug(produtoNome ?? '')
+  const campaign = `${d}${h}_live${slug}`
+  const url = `${baseLink ?? ''}?utm_source=instagram&utm_medium=live&utm_campaign=${campaign}`
+  return { campaign, url }
 }
 
 // ─── Chart 1: Comparação de receita ──────────────────────────

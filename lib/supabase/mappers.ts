@@ -1,4 +1,4 @@
-import type { Campaign, Collection, DayAggregate, EventDate, FutebolEvent, Live, LiveStatus, Merchan, Post, PostSource, PostStatus, Platform, Story, StoryStatus, TeamProfile } from '@/lib/types'
+import type { Brand, Campaign, CanalPost, Collection, DayAggregate, EventDate, FutebolEvent, Live, LiveStatus, Merchan, Post, PostSource, PostStatus, Platform, SiteLink, Story, StoryBeleza, StoryBelezaStatus, StoryStatus, TeamProfile } from '@/lib/types'
 import { colorFromName, shortLabel } from '@/lib/livesUtils'
 
 function normalizeTags(tags: string[]): string[] {
@@ -77,6 +77,48 @@ export function postToDb(p: Omit<Post, 'id' | 'source'>, source?: PostSource): R
     base.briefing_file= p.briefingFile ?? null
   }
   return base
+}
+
+export function dbToCanalPost(row: Record<string, unknown>): CanalPost {
+  const tags = normalizeTags(row.tags as string[])
+  return {
+    id:        String(row.id),
+    date:      (row.date as string) ?? '',
+    time:      (row.time as string) ?? '',
+    title:     (row.title as string) ?? '',
+    content:   (row.caption as string) ?? '',
+    tag:       tags[0] ?? '',
+    campaign:  (row.campaign as string) ?? '',
+    cupom:     (row.cupom as string) ?? '',
+    cupomUtm:   (row.cupom_utm as string) ?? '',
+    revenue:    row.revenue != null ? Number(row.revenue) : null,
+    receitaUtm: row.receita_utm != null ? Number(row.receita_utm) : null,
+    status:     (row.status as PostStatus) ?? 'prod',
+    obs:        (row.obs as string) ?? '',
+    owner:      (row.owner as string) ?? '',
+    brand:      (row.brand as Brand) ?? 'gocase',
+  }
+}
+
+export function canalPostToDb(p: CanalPost): Record<string, unknown> {
+  return {
+    id:          p.id,
+    date:        p.date,
+    time:        p.time || '',
+    title:       p.title,
+    caption:     p.content,
+    tags:        p.tag ? [p.tag] : [],
+    campaign:    p.campaign || null,
+    cupom:       p.cupom || '',
+    cupom_utm:   p.cupomUtm || '',
+    revenue:     p.revenue ?? null,
+    receita_utm: p.receitaUtm ?? null,
+    status:      p.status,
+    obs:         p.obs || '',
+    owner:       p.owner || '',
+    brand:       p.brand,
+    archived:    false,
+  }
 }
 
 export function sourceToTable(source: PostSource): string {
@@ -229,9 +271,10 @@ export function dbToLive(row: Record<string, unknown>): Live {
   return {
     id:           String(row.id),
     date:         (row.date as string) ?? '',
+    hora:         (row.hora as string) ?? '',
     diaSemana:    (row.dia_semana as string) ?? '',
     cupomLigado:  (row.cupom_ligado as boolean) ?? true,
-    criativo:     (row.criativo as boolean) ?? false,
+    criativo:     (row.criativo as string) ?? '',
     merchan1:     (row.merchan1 as string) ?? '',
     nominal1:     (row.nominal1 as string) ?? '',
     receita1:     Number(row.receita1 ?? 0),
@@ -243,6 +286,7 @@ export function dbToLive(row: Record<string, unknown>): Live {
     receitaTotal: Number(row.receita_total ?? 0),
     receitaUtm:   Number(row.receita_utm ?? 0),
     alcance:      Number(row.alcance ?? 0),
+    produto:      (row.produto as string) ?? '',
     linkUtm:      (row.link_utm as string) ?? '',
     utmCampaign:  (row.utm_campaign as string) ?? '',
     status:       ((row.status as string) ?? 'proposta') as LiveStatus,
@@ -254,6 +298,7 @@ export function dbToLive(row: Record<string, unknown>): Live {
 export function liveToDb(l: Omit<Live, 'id'>): Record<string, unknown> {
   return {
     date:          l.date,
+    hora:          l.hora || null,
     dia_semana:    l.diaSemana,
     cupom_ligado:  l.cupomLigado,
     criativo:      l.criativo,
@@ -268,6 +313,7 @@ export function liveToDb(l: Omit<Live, 'id'>): Record<string, unknown> {
     receita_total: l.receitaTotal,
     receita_utm:   l.receitaUtm,
     alcance:       l.alcance || null,
+    produto:       l.produto || null,
     link_utm:      l.linkUtm || null,
     utm_campaign:  l.utmCampaign || null,
     status:        l.status,
@@ -344,6 +390,92 @@ export function storyToDb(s: Omit<Story, 'id' | 'produtoSlug'>): Record<string, 
   }
 }
 
+// ─── Stories Beleza ──────────────────────────────────────────
+
+export function dbToStoryBeleza(row: Record<string, unknown>): StoryBeleza {
+  return {
+    id:              String(row.id),
+    date:            (row.date as string) ?? '',
+    hora:            (row.hora as number) ?? 12,
+    cod:             (row.cod as string) ?? '',
+    page:            (row.page as string) ?? '',
+    merchant:        (row.merchant as string) ?? '',
+    status:          ((row.status as string) ?? 'pendente') as StoryBelezaStatus,
+    linkConteudo:    (row.link_conteudo as string) ?? null,
+    linkCta:         (row.link_cta as string) ?? null,
+    rastreioReceita: (row.rastreio_receita as string) ?? null,
+    receita:         row.receita != null ? Number(row.receita) : null,
+    marca:           (row.marca as Brand) ?? 'barbours',
+    origem:          (row.origem as string) ?? 'manual',
+  }
+}
+
+export function storyBelezaToDb(s: Omit<StoryBeleza, 'id'>): Record<string, unknown> {
+  return {
+    date:             s.date,
+    hora:             s.hora,
+    cod:              s.cod,
+    page:             s.page,
+    merchant:         s.merchant,
+    status:           s.status,
+    link_conteudo:    s.linkConteudo || null,
+    link_cta:         s.linkCta || null,
+    rastreio_receita: s.rastreioReceita || null,
+    receita:          s.receita,
+    marca:            s.marca,
+    origem:           s.origem,
+  }
+}
+
+// Adapta um row de stories_beleza para o tipo Story usado pela StoriesView
+export function dbToStoryFromBeleza(row: Record<string, unknown>): Story {
+  const belezaStatus = (row.status as string) ?? 'pendente'
+  const storyStatus: StoryStatus =
+    belezaStatus === 'postado'    ? 'postado'
+    : belezaStatus === 'nao_postado' ? 'nao_postado'
+    : 'nao_iniciado'
+  const page     = (row.page as string) ?? ''
+  const merchant = (row.merchant as string) ?? ''
+  return {
+    id:              String(row.id),
+    date:            (row.date as string) ?? '',
+    hora:            (row.hora as number) ?? 12,
+    diaSemana:       '',
+    utm:             (row.cod as string) ?? '',
+    produto:         page,
+    produtoSlug:     slugify(page),
+    categoria:       merchant,
+    status:          storyStatus,
+    linkMidia:       (row.link_conteudo as string) ?? null,
+    linkUtm:         (row.link_cta as string) ?? null,
+    rastreioReceita: (row.rastreio_receita as string) ?? null,
+    receita:         row.receita != null ? Number(row.receita) : null,
+    origem:          (row.origem as string) ?? 'manual',
+  }
+}
+
+// Converte Story de volta para o formato stories_beleza (usado no save)
+export function storyToDbBeleza(s: Omit<Story, 'id' | 'produtoSlug'>, marca: Brand): Record<string, unknown> {
+  const belezaStatus =
+    s.status === 'postado'     ? 'postado'
+    : s.status === 'nao_postado' ? 'nao_postado'
+    : 'pendente'
+  return {
+    date:             s.date,
+    hora:             s.hora,
+    cod:              s.utm,
+    page:             s.produto,
+    merchant:         s.categoria,
+    status:           belezaStatus,
+    link_conteudo:    s.linkMidia || null,
+    link_cta:         s.linkUtm || null,
+    rastreio_receita: s.rastreioReceita || null,
+    receita:          s.receita,
+    marca,
+    origem:           s.origem,
+  }
+}
+
 // ─── Profile ─────────────────────────────────────────────────
 
 export function dbToProfile(row: Record<string, unknown>): TeamProfile {
@@ -371,5 +503,26 @@ export function dbToDayAggregate(row: Record<string, unknown>): DayAggregate {
     respostas:         (row.respostas as number) ?? 0,
     compartilhamentos: (row.compartilhamentos as number) ?? 0,
     visitasPerfil:     (row.visitas_perfil as number) ?? 0,
+  }
+}
+
+// ─── SiteLink ─────────────────────────────────────────────────
+
+export function dbToSiteLink(row: Record<string, unknown>): SiteLink {
+  return {
+    id:        String(row.id),
+    brand:     (row.brand as Brand),
+    categoria: (row.categoria as string) ?? '',
+    produto:   (row.produto as string) ?? '',
+    link:      (row.link as string) ?? '',
+  }
+}
+
+export function siteLinkToDb(sl: Omit<SiteLink, 'id'>): Record<string, unknown> {
+  return {
+    brand:     sl.brand,
+    categoria: sl.categoria,
+    produto:   sl.produto,
+    link:      sl.link,
   }
 }

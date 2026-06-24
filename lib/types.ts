@@ -104,6 +104,27 @@ export interface Post {
   briefingFile?: string
 }
 
+// ─── Canal (WhatsApp/Telegram) ───────────────────────────────
+export type CanalTag = 'Engajamento' | 'Lançamento' | 'Promocional' | 'Institucional' | string
+
+export interface CanalPost {
+  id: string
+  date: string         // YYYY-MM-DD
+  time: string         // HH:mm
+  title: string
+  content: string      // mensagem completa (caption no DB)
+  tag: CanalTag
+  campaign: string
+  cupom: string
+  cupomUtm: string
+  revenue: number | null
+  receitaUtm: number | null
+  status: PostStatus
+  obs: string
+  owner: string
+  brand: Brand
+}
+
 // Mantido para retrocompatibilidade com o briefing API (MHView usa MHPayload)
 export interface MHRepostTT {
   date: string
@@ -347,7 +368,17 @@ export const WEEKDAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 export const WEEKDAYS_FULL = ['Dom.','Seg.','Ter.','Qua.','Qui.','Sex.','Sáb.']
 export const MONTH_ABBR = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ']
 
-export type AppView = 'calendar' | 'stories' | 'branding' | 'mh' | 'comemorativas' | 'futebol' | 'campaigns' | 'collections' | 'profile' | 'lives' | 'archived'
+export type AppView = 'calendar' | 'stories' | 'branding' | 'mh' | 'comemorativas' | 'futebol' | 'campaigns' | 'collections' | 'profile' | 'lives' | 'archived' | 'canal' | 'site_links'
+
+// ─── Site Links ───────────────────────────────────────────────
+
+export interface SiteLink {
+  id: string
+  brand: Brand
+  categoria: string
+  produto: string
+  link: string
+}
 
 // ─── Lives ────────────────────────────────────────────────────
 
@@ -356,9 +387,10 @@ export type LiveStatus = 'realizada' | 'confirmada' | 'proposta'
 export interface Live {
   id: string           // uuid
   date: string         // YYYY-MM-DD
+  hora: string         // HH:mm
   diaSemana: string
   cupomLigado: boolean
-  criativo: boolean
+  criativo: string
   merchan1: string
   nominal1: string
   receita1: number
@@ -370,6 +402,7 @@ export interface Live {
   receitaTotal: number
   receitaUtm: number
   alcance: number
+  produto: string
   linkUtm: string
   utmCampaign: string
   status: LiveStatus
@@ -543,6 +576,32 @@ export interface DayAggregate {
   respostas: number
   compartilhamentos: number
   visitasPerfil: number
+}
+
+// ---- Stories Beleza (barbours / kokeshi / lescent) ----
+
+export type StoryBelezaStatus = 'postado' | 'nao_postado' | 'pendente'
+
+export interface StoryBeleza {
+  id: string
+  date: string          // YYYY-MM-DD
+  hora: number
+  cod: string           // ex: "2026050812"
+  page: string          // ex: "home", "bodysplash", "lançamentos"
+  merchant: string      // descrição do conteúdo
+  status: StoryBelezaStatus
+  linkConteudo: string | null
+  linkCta: string | null
+  rastreioReceita: string | null
+  receita: number | null
+  marca: Brand
+  origem: string
+}
+
+export const STORY_BELEZA_STATUS_META: Record<StoryBelezaStatus, { label: string }> = {
+  postado:    { label: 'Postado'    },
+  nao_postado: { label: 'Não postado' },
+  pendente:   { label: 'Pendente'  },
 }
 
 export type RenderJobStatus = 'queued' | 'running' | 'done' | 'error'

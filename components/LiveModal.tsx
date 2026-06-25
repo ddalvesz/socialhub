@@ -170,7 +170,7 @@ export default function LiveModal({ live, brand, merchans, siteLinks, onClose, o
   const set = <K extends keyof Live>(k: K, v: Live[K]) => setDraft(d => ({ ...d, [k]: v }))
   const setMany = (obj: Partial<Live>) => setDraft(d => ({ ...d, ...obj }))
 
-  const total = (draft.receita1 || 0) + (draft.receita2 || 0)
+  const total = (draft.receita1 || 0) + (draft.receita2 || 0) + (draft.receitaUtm || 0)
 
   // ── UTM automática ──────────────────────────────────────────
   const isGocase = brand === 'gocase'
@@ -216,7 +216,6 @@ export default function LiveModal({ live, brand, merchans, siteLinks, onClose, o
 
   const m1 = merchans.find(m => m.nome === draft.merchan1)
   const m2 = merchans.find(m => m.nome === draft.merchan2)
-  const utmPct = total > 0 && draft.receitaUtm > 0 ? draft.receitaUtm / total : 0
 
   const dateObj = new Date(draft.date + 'T00:00:00')
   const WEEKDAY_NOMES_LOCAL = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado']
@@ -247,6 +246,10 @@ export default function LiveModal({ live, brand, merchans, siteLinks, onClose, o
                   {draft.origem === 'skill' ? '🤖' : '📥'} import
                 </span>
               )}
+              <label className="flag-toggle">
+                <input type="checkbox" checked={!!draft.cupomLigado} onChange={e => set('cupomLigado', e.target.checked)} />
+                <span>cupom ligado</span>
+              </label>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', marginLeft: 'auto' }}>
                 #{String(draft.id).padStart(4, '0')}
               </span>
@@ -310,6 +313,16 @@ export default function LiveModal({ live, brand, merchans, siteLinks, onClose, o
                     value={draft.receita1 || 0}
                     onChange={e => set('receita1', Number(e.target.value))} />
                 </div>
+
+                <label>Orders cupom</label>
+                <input
+                  className="field"
+                  type="number"
+                  min="0"
+                  style={{ maxWidth: 120 }}
+                  value={draft.ordersCupom ?? ''}
+                  onChange={e => set('ordersCupom', e.target.value === '' ? null : Number(e.target.value))}
+                  placeholder="—" />
               </div>
             </div>
 
@@ -369,20 +382,47 @@ export default function LiveModal({ live, brand, merchans, siteLinks, onClose, o
                 <Icon.branding /> Resultado total
               </div>
               <div className="live-total-row">
-                <div>
-                  <div className="live-total-label">Receita total (auto)</div>
-                  <div className="live-total-val">{fmtBRL(total)}</div>
-                  {draft.receita1 > 0 && draft.receita2 > 0 && (
-                    <div className="live-total-split">
-                      {fmtBRL(draft.receita1)} <span>+</span> {fmtBRL(draft.receita2)}
+                <div className="live-recap" style={{ flex: 1 }}>
+                  <div className="live-recap-row">
+                    <span>Receita total</span>
+                    <strong>{fmtBRL(total)}</strong>
+                  </div>
+                  {m1 && draft.receita1 > 0 && (
+                    <div className="live-recap-row">
+                      <span className="recap-cupom">
+                        <span className="dot" style={{ background: m1.color }} />
+                        Cupom 1
+                      </span>
+                      <strong>{fmtBRL(draft.receita1)}{total > 0 ? <span className="live-recap-sub"> · {fmtPct(draft.receita1 / total)}</span> : ''}</strong>
                     </div>
                   )}
-                </div>
-                <div className="live-flags">
-                  <label className="flag-toggle">
-                    <input type="checkbox" checked={!!draft.cupomLigado} onChange={e => set('cupomLigado', e.target.checked)} />
-                    <span>cupom ligado</span>
-                  </label>
+                  {m2 && draft.receita2 > 0 && (
+                    <div className="live-recap-row">
+                      <span className="recap-cupom">
+                        <span className="dot" style={{ background: m2.color }} />
+                        Cupom 2
+                      </span>
+                      <strong>{fmtBRL(draft.receita2)}<span className="live-recap-sub"> · {fmtPct(draft.receita2 / total)}</span></strong>
+                    </div>
+                  )}
+                  {draft.receitaUtm > 0 && (
+                    <div className="live-recap-row">
+                      <span>UTM</span>
+                      <strong>{fmtBRL(draft.receitaUtm)}<span className="live-recap-sub"> · {fmtPct(draft.receitaUtm / total)}</span></strong>
+                    </div>
+                  )}
+                  {draft.ordersTotal != null && (
+                    <div className="live-recap-row">
+                      <span>Orders totais</span>
+                      <strong>{draft.ordersTotal}</strong>
+                    </div>
+                  )}
+                  {draft.ordersTotal != null && draft.ordersTotal > 0 && total > 0 && (
+                    <div className="live-recap-row">
+                      <span>Ticket médio</span>
+                      <strong>{fmtBRL(total / draft.ordersTotal)}</strong>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -483,8 +523,15 @@ export default function LiveModal({ live, brand, merchans, siteLinks, onClose, o
                   onChange={e => set('receitaUtm', Number(e.target.value))} />
               </div>
 
-              <label>% UTM</label>
-              <div className="readonly-cell">{utmPct > 0 ? fmtPct(utmPct) : '—'}</div>
+              <label>Orders UTM</label>
+              <input
+                className="field"
+                type="number"
+                min="0"
+                style={{ maxWidth: 120 }}
+                value={draft.ordersUtm ?? ''}
+                onChange={e => set('ordersUtm', e.target.value === '' ? null : Number(e.target.value))}
+                placeholder="—" />
 
               <label>Alcance</label>
               <input
@@ -516,41 +563,6 @@ export default function LiveModal({ live, brand, merchans, siteLinks, onClose, o
                 onChange={e => set('notes', e.target.value)} />
             </div>
 
-            {draft.status === 'realizada' && total > 0 && (
-              <div className="stacked" style={{ marginTop: 18 }}>
-                <label>Resumo</label>
-                <div className="live-recap">
-                  <div className="live-recap-row">
-                    <span>Receita total</span>
-                    <strong>{fmtBRL(total)}</strong>
-                  </div>
-                  {m1 && (
-                    <div className="live-recap-row">
-                      <span className="recap-cupom">
-                        <span className="dot" style={{ background: m1.color }} />
-                        Cupom 1
-                      </span>
-                      <strong>{fmtBRL(draft.receita1)} <span className="live-recap-sub">{total > 0 ? `· ${fmtPct(draft.receita1 / total)}` : ''}</span></strong>
-                    </div>
-                  )}
-                  {m2 && draft.receita2 > 0 && (
-                    <div className="live-recap-row">
-                      <span className="recap-cupom">
-                        <span className="dot" style={{ background: m2.color }} />
-                        Cupom 2
-                      </span>
-                      <strong>{fmtBRL(draft.receita2)} <span className="live-recap-sub">· {fmtPct(draft.receita2 / total)}</span></strong>
-                    </div>
-                  )}
-                  {utmPct > 0 && (
-                    <div className="live-recap-row">
-                      <span>UTM</span>
-                      <strong>{fmtBRL(draft.receitaUtm)} <span className="live-recap-sub">· {fmtPct(utmPct)}</span></strong>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         </div>
 

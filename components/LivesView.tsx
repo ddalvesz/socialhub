@@ -781,6 +781,21 @@ function LivesCalListView({ year, month, lives, merchans, onLiveClick }: {
   )
 }
 
+// ─── PropBar ─────────────────────────────────────────────────
+
+function PropBar({ cupom, utm }: { cupom: number; utm: number }) {
+  const total = cupom + utm
+  if (!total) return null
+  const pC = (cupom / total) * 100
+  const pU = (utm   / total) * 100
+  return (
+    <div className="prop-bar" title={`${Math.round(pC)}% cupom · ${Math.round(pU)}% utm`}>
+      <div className="prop-seg-c" style={{ width: `${pC}%` }} />
+      {utm > 0 && <div className="prop-seg-u" style={{ width: `${pU}%` }} />}
+    </div>
+  )
+}
+
 // ─── LivesTable ──────────────────────────────────────────────
 
 const MONTH_NAMES_BR = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
@@ -795,94 +810,141 @@ function LivesTable({ lives, merchans, onRowClick, onStatusChange, limit }: {
   const shown = limit ? lives.slice(0, limit) : lives
   const more  = limit && lives.length > limit ? lives.length - limit : 0
 
-  // Agrupar por mês
-  const grouped: ({ type: 'header'; key: string; label: string } | { type: 'row'; live: Live })[] = []
-  let lastKey: string | null = null
+  // Agrupar por mês com rows acessíveis para subtotal
+  type Group = { key: string; label: string; rows: Live[] }
+  const groups: Group[] = []
+  let curGroup: Group | null = null
   for (const l of shown) {
     const d = new Date(l.date + 'T00:00:00')
     const key = `${d.getFullYear()}-${d.getMonth()}`
-    if (key !== lastKey) {
-      grouped.push({ type: 'header', key, label: `${MONTH_NAMES_BR[d.getMonth()]} ${d.getFullYear()}` })
-      lastKey = key
+    if (!curGroup || curGroup.key !== key) {
+      curGroup = { key, label: `${MONTH_NAMES_BR[d.getMonth()]} ${d.getFullYear()}`, rows: [] }
+      groups.push(curGroup)
     }
-    grouped.push({ type: 'row', live: l })
+    curGroup.rows.push(l)
   }
 
   return (
     <div className="live-table">
       <div className="live-table-head">
         <div>Data</div>
-        <div>Cupom 1</div>
-        <div>Cupom 2</div>
-        <div className="ctr">Receita cupom</div>
-        <div className="ctr">Receita utm</div>
+        <div>Cupons</div>
+        <div className="r">Rec. cupom</div>
+        <div className="r">Rec. UTM</div>
+        <div className="r">Ticket médio</div>
+        <div className="col-total">Receita total</div>
         <div className="ctr">Status</div>
         <div />
       </div>
       {shown.length === 0 && (
         <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)' }}>Nenhuma live no período.</div>
       )}
-      {grouped.map(item => {
-        if (item.type === 'header') {
-          return <div key={item.key} className="live-table-month-header">{item.label}</div>
-        }
-        const l = item.live
-        const m1 = merchans.find(x => x.nome === l.merchan1)
-        const m2 = merchans.find(x => x.nome === l.merchan2)
-        const utmPct = l.receitaTotal > 0 && l.receitaUtm > 0 ? l.receitaUtm / l.receitaTotal : 0
-        const d   = new Date(l.date + 'T00:00:00')
-        const day = d.getDate()
-        const splitTooltip = l.receita2 > 0
-          ? `${fmtBRLk(l.receita1)} (cupom 1) + ${fmtBRLk(l.receita2)} (cupom 2)`
-          : undefined
+      {groups.map(group => {
+        const withRevenue = group.rows.filter(l => (l.receita1 || 0) + (l.receita2 || 0) + (l.receitaUtm || 0) > 0)
+        const mCupom       = withRevenue.reduce((s, l) => s + (l.receita1 || 0) + (l.receita2 || 0), 0)
+        const mUtm         = withRevenue.reduce((s, l) => s + (l.receitaUtm || 0), 0)
+        const mTotal       = mCupom + mUtm
+        const mOrdersTotal = withRevenue.reduce((s, l) => s + (l.ordersTotal ?? 0), 0)
+        const mTicket      = mOrdersTotal > 0 ? mTotal / mOrdersTotal : null
+
         return (
-          <div key={l.id} className="live-table-row" onClick={() => onRowClick(l)}>
-            {/* 1. Data — só DD + dia da semana (mês já aparece no cabeçalho de grupo) */}
-            <div className="live-table-date">
-              <span className="day">{day}</span>
-              <span className="time">{WEEKDAY_LABELS[d.getDay()]}{l.hora ? ` • ${l.hora}` : ''}</span>
-            </div>
-            {/* 2. Cupom 1 */}
-            <div className="live-cupom-cell">
-              {m1 ? (
-                <>
-                  <span className="live-merchan-chip" title={m1.nome}>
-                    <span className="dot" style={{ background: m1.color }} />{m1.short}
-                  </span>
-                  <span className="nominal-code">{l.nominal1}</span>
-                </>
-              ) : <span className="ink-4">—</span>}
-            </div>
-            {/* 3. Cupom 2 */}
-            <div className="live-cupom-cell">
-              {m2 ? (
-                <>
-                  <span className="live-merchan-chip" title={m2.nome}>
-                    <span className="dot" style={{ background: m2.color }} />{m2.short}
-                  </span>
-                  <span className="nominal-code">{l.nominal2}</span>
-                </>
-              ) : null}
-            </div>
-            {/* 4. Receita cupom */}
-            <div className="live-receita-cell" data-tooltip={splitTooltip}>
-              {l.receitaTotal > 0 ? fmtBRL(l.receitaTotal) : <span className="ink-4">—</span>}
-            </div>
-            {/* 5. Receita utm */}
-            <div className="live-receita-cell">
-              {utmPct > 0 ? (
-                <>
-                  {fmtBRLk(l.receitaUtm)}
-                  <div className="num-split">{fmtPct(utmPct)}</div>
-                </>
-              ) : <span className="ink-4">—</span>}
-            </div>
-            {/* 6. Status */}
-            <StatusCell live={l} onStatusChange={onStatusChange} />
-            {/* 7. Botão UTM */}
-            <div className="live-utm-btn-cell" onClick={e => e.stopPropagation()}>
-              {l.linkUtm && <CopyUtmBtn url={l.linkUtm} />}
-            </div>
+          <div key={group.key}>
+            <div className="live-table-month-header">{group.label}</div>
+
+            {group.rows.map(l => {
+              const m1 = merchans.find(x => x.nome === l.merchan1)
+              const m2 = merchans.find(x => x.nome === l.merchan2)
+              const receitaCupom = (l.receita1 || 0) + (l.receita2 || 0)
+              const receitaTotal = receitaCupom + (l.receitaUtm || 0)
+              const ticketMedio = l.ordersTotal && l.ordersTotal > 0 && receitaTotal > 0
+                ? receitaTotal / l.ordersTotal
+                : null
+
+              const d = new Date(l.date + 'T00:00:00')
+              const day = d.getDate()
+              const isWeekend = d.getDay() === 0 || d.getDay() === 6
+              const splitTooltip = l.receita2 > 0
+                ? `${fmtBRLk(l.receita1)} (cupom 1) + ${fmtBRLk(l.receita2)} (cupom 2)`
+                : undefined
+
+              return (
+                <div key={l.id} className={`live-table-row${isWeekend ? ' weekend' : ''}`} onClick={() => onRowClick(l)}>
+                  {/* 1. Data */}
+                  <div className="live-table-date">
+                    <span className="day">{day}</span>
+                    <span className="time">{WEEKDAY_LABELS[d.getDay()]}{l.hora ? ` • ${l.hora}` : ''}</span>
+                  </div>
+                  {/* 2. Cupons (unificado) */}
+                  <div className="live-cupons-cell">
+                    <div className="live-cupom-row">
+                      {m1 ? (
+                        <>
+                          <span className="live-merchan-chip" title={m1.nome}>
+                            <span className="dot" style={{ background: m1.color }} />{m1.short}
+                          </span>
+                          <span className="nominal-code">{l.nominal1}</span>
+                        </>
+                      ) : <span className="ink-4">—</span>}
+                    </div>
+                    {m2 && (
+                      <div className="live-cupom-row">
+                        <span className="live-merchan-chip" title={m2.nome}>
+                          <span className="dot" style={{ background: m2.color }} />{m2.short}
+                        </span>
+                        <span className="nominal-code">{l.nominal2}</span>
+                      </div>
+                    )}
+                  </div>
+                  {/* 3. Receita cupom */}
+                  <div className="live-receita-sec" data-tooltip={splitTooltip}>
+                    {receitaCupom > 0
+                      ? <span className="val has-data">{fmtBRL(receitaCupom)}</span>
+                      : <span className="ink-4">—</span>}
+                  </div>
+                  {/* 4. Receita UTM */}
+                  <div className="live-receita-sec">
+                    {l.receitaUtm > 0
+                      ? <span className="val has-data">{fmtBRL(l.receitaUtm)}</span>
+                      : <span className="ink-4">—</span>}
+                  </div>
+                  {/* 5. Ticket médio */}
+                  <div className="live-receita-sec">
+                    {ticketMedio != null
+                      ? <span className="val has-data">{fmtBRL(ticketMedio)}</span>
+                      : <span className="ink-4">—</span>}
+                  </div>
+                  {/* 6. Receita total */}
+                  <div className="live-receita-total">
+                    {receitaTotal > 0 ? (
+                      <>
+                        <PropBar cupom={receitaCupom} utm={l.receitaUtm || 0} />
+                        <span className="val">{fmtBRL(receitaTotal)}</span>
+                      </>
+                    ) : <span className="ink-4" style={{ fontSize: 12 }}>sem dados</span>}
+                  </div>
+                  {/* 6. Status */}
+                  <StatusCell live={l} onStatusChange={onStatusChange} />
+                  {/* 7. Botão UTM */}
+                  <div className="live-utm-btn-cell" onClick={e => e.stopPropagation()}>
+                    {l.linkUtm && <CopyUtmBtn url={l.linkUtm} />}
+                  </div>
+                </div>
+              )
+            })}
+
+            {mTotal > 0 && (
+              <div className="live-table-summary">
+                <div className="summary-label">
+                  <span className="summary-label-title">Subtotal {group.label}</span>
+                  <span className="summary-label-count">{withRevenue.length} live{withRevenue.length !== 1 ? 's' : ''} com receita</span>
+                </div>
+                <div className="summary-val">{fmtBRLk(mCupom)}</div>
+                <div className="summary-val">{fmtBRLk(mUtm)}</div>
+                <div className="summary-val">{mTicket != null ? fmtBRLk(mTicket) : '—'}</div>
+                <div className="summary-val total">{fmtBRLk(mTotal)}</div>
+                <div /><div />
+              </div>
+            )}
           </div>
         )
       })}
@@ -1130,9 +1192,13 @@ export default function LivesView({
       {viewMode === 'analytics' && (
         <>
           {/* KPIs */}
-          <div className="lives-kpis lives-kpis-3">
+          <div className="lives-kpis">
             <KpiCard label="Receita total" value={fmtBRLk(kpis.total)} sub={`${kpis.count} live${kpis.count === 1 ? '' : 's'}`} />
-            <KpiCard label="Média por live" value={fmtBRLk(kpis.avg)} sub="ticket médio" />
+            <KpiCard label="Média por live" value={fmtBRLk(kpis.avg)} sub="receita média por live" />
+            <KpiCard
+              label="Ticket médio"
+              value={kpis.ticketMedio != null ? fmtBRLk(kpis.ticketMedio) : '—'}
+              sub={kpis.ordersTotal > 0 ? `${kpis.ordersTotal} pedidos no período` : 'sem dados de pedidos'} />
             <KpiCard
               label="Melhor live"
               value={kpis.best ? fmtBRLk(kpis.best.receitaTotal) : '—'}

@@ -17,3 +17,11 @@ posts_sync.csv
 
 dev-server.log
 LIVES_HANDOFF.md
+
+# MCP config (contém tokens)
+.mcp.json
+
+# Arquivos de handoff de design
+design_handoff_canal/
+handover-stories/
+design-reference/

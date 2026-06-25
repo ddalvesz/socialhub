@@ -401,6 +401,9 @@ export interface Live {
   receitaExtra: number
   receitaTotal: number
   receitaUtm: number
+  ordersCupom: number | null
+  ordersUtm: number | null
+  ordersTotal: number | null
   alcance: number
   produto: string
   linkUtm: string

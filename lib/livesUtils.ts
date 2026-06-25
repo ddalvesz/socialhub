@@ -94,12 +94,14 @@ export interface LiveKpis {
   utmCount: number
   utmShareTotal: number
   utmShareSum: number
+  ordersTotal: number
+  ticketMedio: number | null
 }
 
 export function liveKpis(lives: Live[]): LiveKpis {
   const real = lives.filter(l => l.status === 'realizada')
   if (real.length === 0) {
-    return { count: 0, total: 0, avg: 0, best: null, alcanceCount: 0, alcanceTotal: 0, utmCount: 0, utmShareTotal: 0, utmShareSum: 0 }
+    return { count: 0, total: 0, avg: 0, best: null, alcanceCount: 0, alcanceTotal: 0, utmCount: 0, utmShareTotal: 0, utmShareSum: 0, ordersTotal: 0, ticketMedio: null }
   }
   const total = real.reduce((s, l) => s + l.receitaTotal, 0)
   const best = real.reduce((m, l) => l.receitaTotal > (m?.receitaTotal ?? -1) ? l : m, null as Live | null)
@@ -115,6 +117,11 @@ export function liveKpis(lives: Live[]): LiveKpis {
     utmCount:      withUtm.length,
     utmShareTotal: withUtm.reduce((s, l) => s + l.receitaUtm, 0),
     utmShareSum:   withUtm.reduce((s, l) => s + l.receitaTotal, 0),
+    ordersTotal:   real.reduce((s, l) => s + (l.ordersTotal ?? 0), 0),
+    ticketMedio:   (() => {
+      const ord = real.reduce((s, l) => s + (l.ordersTotal ?? 0), 0)
+      return ord > 0 ? real.reduce((s, l) => s + l.receitaTotal, 0) / ord : null
+    })(),
   }
 }
 

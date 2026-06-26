@@ -82,8 +82,8 @@ export function buildStoryUtm(date: string, hora: number, produtoNome: string) {
     .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join('')
   const slug = pascalCase.toLowerCase().replace(/[^a-z0-9]/g, '')
-  const campaign = `stories_${d}${h}_${pascalCase}`
-  const url = `https://www.gocase.com.br/${slug}?utm_source=instagram&utm_medium=organic_social&utm_campaign=${campaign}`
+  const campaign = pascalCase ? `stories_${d}${h}_${pascalCase}` : `stories_${d}${h}`
+  const url = `https://www.gocase.com.br/${slug || ''}?utm_source=instagram&utm_medium=organic_social&utm_campaign=${campaign}`
   return { campaign, url, slug }
 }
 

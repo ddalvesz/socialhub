@@ -2,17 +2,12 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import type { Brand, SiteLink, Story, StoryStatus } from '@/lib/types'
-import { STORY_STATUS_META, buildUtmForStory } from '@/lib/storiesUtils'
+import { STORY_STATUS_META, buildUtmForStory, fmtBRL } from '@/lib/storiesUtils'
 import { Popover } from './FormHelpers'
 import { Icon } from './Icons'
 
 /* ── Constants ────────────────────────────────────────────── */
 
-const TIPOS_CONTEUDO = [
-  'GOFLASH','LANÇAMENTOS','CAMPANHAS','INTERAÇÃO','PRODUTOS HIT',
-  'NEUTRO','VOLTA ÀS AULAS','VAI DE TOTE','JOGA DO SEU JEITO',
-  'CASE','COLEÇÃO','COPA','FUTEBOL',
-]
 
 const STATUS_OPTS: { id: StoryStatus; label: string }[] = [
   { id: 'nao_iniciado', label: 'Não iniciado' },
@@ -81,55 +76,73 @@ function StoryStatusPill({ value, onChange }: { value: StoryStatus; onChange: (v
 
 /* ── ProdutoCombobox (fallback sem site_links) ─────────────── */
 
-function ProdutoCombobox({ value, onChange, knownProducts }: {
+function FreeCombobox({ value, onChange, suggestions: allSuggestions, placeholder }: {
   value: string
   onChange: (v: string) => void
-  knownProducts: string[]
+  suggestions: string[]
+  placeholder?: string
 }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState(value)
+  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { setQ(value) }, [value])
 
   const suggestions = useMemo(() => {
     const trimmed = q.trim().toLowerCase()
-    if (!trimmed) return knownProducts.slice(0, 12)
-    return knownProducts.filter(p => p.toLowerCase().includes(trimmed)).slice(0, 12)
-  }, [q, knownProducts])
+    if (!trimmed) return allSuggestions.slice(0, 12)
+    return allSuggestions.filter(p => p.toLowerCase().includes(trimmed)).slice(0, 12)
+  }, [q, allSuggestions])
 
   const commit = (v: string) => { onChange(v); setQ(v); setOpen(false) }
 
+  const openDropdown = () => {
+    if (inputRef.current) {
+      const r = inputRef.current.getBoundingClientRect()
+      setRect({ top: r.bottom + 4, left: r.left, width: r.width })
+    }
+    setOpen(true)
+  }
+
+  const showDropdown = open && suggestions.length > 0
+
   return (
-    <div style={{ position: 'relative', width: '100%' }}>
+    <div style={{ width: '100%' }}>
       <input
         ref={inputRef}
         className="field"
         value={q}
-        placeholder="Ex: Garrafinha Mini"
-        onChange={e => { setQ(e.target.value); onChange(e.target.value); setOpen(true) }}
-        onFocus={() => setOpen(true)}
+        placeholder={placeholder ?? ''}
+        onChange={e => { setQ(e.target.value); onChange(e.target.value); openDropdown() }}
+        onFocus={openDropdown}
         onKeyDown={e => { if (e.key === 'Escape') setOpen(false); if (e.key === 'Enter') { setOpen(false); inputRef.current?.blur() } }}
         autoComplete="off"
       />
-      <Popover open={open && suggestions.length > 0} onClose={() => setOpen(false)}>
-        <div className="po-scroll">
-          {suggestions.map(p => (
-            <button key={p} className="po-item" onMouseDown={e => { e.preventDefault(); commit(p) }}>
-              {p}
-              {p === value && <span className="check"><Icon.check /></span>}
-            </button>
-          ))}
-          {q.trim() && !knownProducts.includes(q.trim()) && (
-            <>
-              <div className="po-divider" />
-              <button className="po-item po-item-add" onMouseDown={e => { e.preventDefault(); commit(q.trim()) }}>
-                <Icon.plus /> Usar &ldquo;{q.trim()}&rdquo;
+      {showDropdown && rect && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 55 }} onClick={() => setOpen(false)} />
+          <div className="popover" style={{
+            position: 'fixed', top: rect.top, left: rect.left, width: rect.width,
+            zIndex: 56, maxHeight: 220, overflowY: 'auto',
+          }}>
+            {suggestions.map(p => (
+              <button key={p} className="po-item" onMouseDown={e => { e.preventDefault(); commit(p) }}>
+                {p}
+                {p === value && <span className="check"><Icon.check /></span>}
               </button>
-            </>
-          )}
-        </div>
-      </Popover>
+            ))}
+            {q.trim() && !allSuggestions.includes(q.trim()) && (
+              <>
+                <div className="po-divider" />
+                <button className="po-item po-item-add" onMouseDown={e => { e.preventDefault(); commit(q.trim()) }}>
+                  <Icon.plus /> Usar &ldquo;{q.trim()}&rdquo;
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -215,13 +228,14 @@ interface Props {
   story: Story
   brand: Brand
   knownProducts: string[]
+  knownCategorias: string[]
   siteLinks: SiteLink[]
   onClose: () => void
   onSave: (s: Story) => void
   onDelete: (s: Story) => void
 }
 
-export default function StoryModal({ story, brand, knownProducts, siteLinks, onClose, onSave, onDelete }: Props) {
+export default function StoryModal({ story, brand, knownProducts, knownCategorias, siteLinks, onClose, onSave, onDelete }: Props) {
   const [draft, setDraft] = useState<Story>(story)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
@@ -234,6 +248,7 @@ export default function StoryModal({ story, brand, knownProducts, siteLinks, onC
   }, [onClose])
 
   const set = <K extends keyof Story>(k: K, v: Story[K]) => setDraft(d => ({ ...d, [k]: v }))
+  const setMany = (obj: Partial<Story>) => setDraft(d => ({ ...d, ...obj }))
 
   // Resolve o baseLink do produto selecionado nos site_links
   const currentSiteLink = useMemo(() =>
@@ -248,6 +263,13 @@ export default function StoryModal({ story, brand, knownProducts, siteLinks, onC
     if (siteLinks.length > 0 && !baseLink) return null
     return buildUtmForStory(brand, draft.date, draft.hora, draft.produto.trim(), baseLink)
   }, [brand, draft.date, draft.hora, draft.produto, currentSiteLink, siteLinks.length])
+
+  // Sincroniza UTM no draft quando produto/data/hora mudam
+  useEffect(() => {
+    if (utm) {
+      setDraft(d => ({ ...d, linkUtm: utm.url, rastreioReceita: utm.campaign }))
+    }
+  }, [utm?.url, utm?.campaign])
 
   const dateObj = new Date(draft.date + 'T00:00:00')
   const diaSemanaLabel = WEEKDAY_NOMES_LONG[dateObj.getDay()]
@@ -279,11 +301,6 @@ export default function StoryModal({ story, brand, knownProducts, siteLinks, onC
               <span className="modal-date-pill">
                 {dateDisplay} · {diaSemanaLabel}
               </span>
-              {draft.origem && (
-                <span className="origem-pill" title="Origem do registro">
-                  {draft.origem === 'manual' ? '✏️' : '📥'} {draft.origem}
-                </span>
-              )}
             </div>
           </div>
           <button className="modal-close" onClick={onClose}><Icon.x /></button>
@@ -323,72 +340,68 @@ export default function StoryModal({ story, brand, knownProducts, siteLinks, onC
                 <SiteLinkSelector
                   value={draft.produto || ''}
                   siteLinks={siteLinks}
-                  onChange={(produto, link) => {
-                    set('produto', produto)
-                    if (link) set('linkUtm', link)
-                  }}
+                  onChange={(produto, link) => setMany({ produto, ...(link ? { linkUtm: link } : {}) })}
                 />
               ) : (
                 <>
                   <label>Produto foco</label>
-                  <ProdutoCombobox
+                  <FreeCombobox
                     value={draft.produto || ''}
-                    onChange={v => set('produto', v)}
-                    knownProducts={knownProducts}
+                    onChange={v => setMany({ produto: v })}
+                    suggestions={knownProducts}
+                    placeholder="Ex: Garrafinha Mini"
                   />
                 </>
               )}
 
               <label>Tipo de conteúdo</label>
-              <select
-                className="field"
+              <FreeCombobox
                 value={draft.categoria || ''}
-                onChange={e => set('categoria', e.target.value)}
-                style={selectStyle}
-              >
-                <option value="">Sem tipo</option>
-                {TIPOS_CONTEUDO.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+                onChange={v => set('categoria', v)}
+                suggestions={knownCategorias}
+                placeholder="Ex: GOFLASH"
+              />
             </div>
+
+            {/* Resultado total */}
+            {(draft.receita != null || draft.orders != null) && (
+              <div className="mh-section" style={{ marginTop: 20 }}>
+                <div className="mh-section-head">
+                  <Icon.branding /> Resultado total
+                </div>
+                <div className="live-recap">
+                  {draft.receita != null && (
+                    <div className="live-recap-row">
+                      <span>Receita rastreada</span>
+                      <strong>{fmtBRL(draft.receita)}</strong>
+                    </div>
+                  )}
+                  {draft.orders != null && (
+                    <div className="live-recap-row">
+                      <span>Orders totais</span>
+                      <strong>{draft.orders}</strong>
+                    </div>
+                  )}
+                  {draft.receita != null && draft.orders != null && draft.orders > 0 && (
+                    <div className="live-recap-row">
+                      <span>Ticket médio</span>
+                      <strong>{fmtBRL(draft.receita / draft.orders)}</strong>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* RIGHT */}
           <div className="col right">
             <div className="modal-col-head">
-              <Icon.branding /> Rastreamento & Receita
+              <Icon.branding /> Rastreamento
             </div>
 
-            <div className="modal-grid">
-              <label>Receita</label>
-              <div className="live-money-input" style={{ maxWidth: 200 }}>
-                <span className="prefix">R$</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={draft.receita ?? ''}
-                  onChange={e => set('receita', e.target.value === '' ? null : Number(e.target.value))}
-                  placeholder="0,00"
-                />
-              </div>
-
-              <label>UTM código</label>
-              <div className="readonly-cell" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, wordBreak: 'break-all' }}>
-                {draft.rastreioReceita || utm?.campaign || '—'}
-              </div>
-
-              <label>Link mídia</label>
-              <input
-                className="field"
-                value={draft.linkMidia || ''}
-                onChange={e => set('linkMidia', e.target.value || null)}
-                placeholder="URL do banner/vídeo"
-              />
-            </div>
-
-            {/* UTM preview — produto encontrado nos links */}
+            {/* UTM — topo da coluna */}
             {utm && (
-              <div className="st-utm-block" style={{ marginTop: 16 }}>
+              <div className="st-utm-block" style={{ marginBottom: 16 }}>
                 <div className="st-utm-block-label">
                   <svg viewBox="0 0 16 16" width={12} height={12} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                     <circle cx="8" cy="8" r="6"/><polyline points="8 5 8 8 10 10"/>
@@ -414,7 +427,7 @@ export default function StoryModal({ story, brand, knownProducts, siteLinks, onC
 
             {/* Aviso: produto digitado mas não cadastrado nos links */}
             {usarSiteLinks && draft.produto?.trim() && !currentSiteLink && (
-              <div className="utm-aviso" style={{ marginTop: 16 }}>
+              <div className="utm-aviso" style={{ marginBottom: 16 }}>
                 <Icon.info />
                 <span>
                   Produto não encontrado nos Links do Site. Adicione-o na aba{' '}
@@ -422,12 +435,59 @@ export default function StoryModal({ story, brand, knownProducts, siteLinks, onC
                 </span>
               </div>
             )}
+
+            <div className="modal-grid">
+              <label>Receita</label>
+              <div className="live-money-input" style={{ maxWidth: 200 }}>
+                <span className="prefix">R$</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={draft.receita ?? ''}
+                  onChange={e => set('receita', e.target.value === '' ? null : Number(e.target.value))}
+                  placeholder="0,00"
+                />
+              </div>
+
+              <label>Orders</label>
+              <input
+                className="field"
+                type="number"
+                min="0"
+                style={{ maxWidth: 120 }}
+                value={draft.orders ?? ''}
+                onChange={e => set('orders', e.target.value === '' ? null : Number(e.target.value))}
+                placeholder="—"
+              />
+            </div>
+
+            <div className="stacked" style={{ marginTop: 18 }}>
+              <label>Criativo</label>
+              <input
+                className="field"
+                placeholder="Link ou descrição do criativo do story"
+                value={draft.linkMidia || ''}
+                onChange={e => set('linkMidia', e.target.value || null)}
+              />
+            </div>
+
+            <div className="stacked" style={{ marginTop: 12 }}>
+              <label>Observações</label>
+              <textarea
+                className="field"
+                rows={4}
+                placeholder="Notas sobre o story, performance, contexto..."
+                value={draft.notes || ''}
+                onChange={e => set('notes', e.target.value || null)}
+              />
+            </div>
           </div>
         </div>
 
         {/* Footer */}
         <div className="modal-foot">
-          {!confirmDelete ? (
+          {story.id !== '__new__' && (!confirmDelete ? (
             <button className="danger" onClick={() => setConfirmDelete(true)}>
               <Icon.trash /> Excluir
             </button>
@@ -437,11 +497,11 @@ export default function StoryModal({ story, brand, knownProducts, siteLinks, onC
               <button className="danger" onClick={() => { onDelete(draft); onClose() }}>Sim, excluir</button>
               <button className="btn btn-ghost" onClick={() => setConfirmDelete(false)}>Não</button>
             </div>
-          )}
+          ))}
           <div style={{ flex: 1 }} />
           <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
           <button className="btn btn-accent" onClick={() => onSave(draft)}>
-            Salvar alterações
+            {story.id === '__new__' ? 'Criar story' : 'Salvar alterações'}
           </button>
         </div>
       </div>

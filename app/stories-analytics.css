@@ -77,74 +77,81 @@
 .status-pill.s-st-postado .sdot { background: oklch(0.42 0.15 145) }
 
 /* ============================================================
-   TABELA DE STORIES
+   TABELA DE STORIES — div-based, espelha live-table
    ============================================================ */
+
+/* barra de filtros acima da tabela */
 .st-table-filters {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--line);
   margin-bottom: 2px;
 }
-
-/* pequeno dot colorido dentro dos filtros de status */
 .st-filter-dot {
-  width: 7px;
-  height: 7px;
+  width: 7px; height: 7px;
   border-radius: 50%;
   flex: 0 0 7px;
   display: inline-block;
 }
 
-.st-table-wrap {
-  overflow-x: auto;
-  scrollbar-width: thin;
+/* grid principal */
+.st-table-head,
+.st-table-row {
+  display: grid;
+  grid-template-columns: 100px 160px 1fr 1fr 1fr 1fr 155px 44px;
+  align-items: center;
+  padding: 0 16px;
+  column-gap: 12px;
 }
-
-.st-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12.5px;
-  color: var(--ink);
-}
-
-.st-table thead tr {
-  border-bottom: 1px solid var(--line);
-}
-
-.st-table thead th {
-  text-align: left;
-  padding: 8px 12px 10px;
-  font-size: 11px;
+.st-table-head {
+  font-size: 10.5px;
   font-weight: 600;
   color: var(--ink-3);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.st-row {
+  padding-top: 10px;
+  padding-bottom: 8px;
+  background: var(--surface-2);
   border-bottom: 1px solid var(--line);
+}
+.st-table-row {
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  cursor: pointer;
   transition: background .1s;
 }
-.st-row:last-child { border-bottom: none }
-.st-row:hover { background: var(--surface-2) }
+.st-table-row:last-child { border-bottom: none }
+.st-table-row:hover { background: oklch(0.985 0.012 300) }
 
-.st-td {
-  padding: 10px 12px;
-  vertical-align: middle;
+/* cabeçalhos numéricos */
+.st-table-head .r,
+.st-table-head .col-total {
+  text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.st-table-head .col-total {
+  color: oklch(0.52 0.12 50);
+  font-weight: 700;
 }
 
-.st-td-num { text-align: right }
+/* células */
+.st-cell {
+  padding: 10px 12px;
+  min-width: 0;
+  overflow: hidden;
+}
+.st-cell-r { padding: 10px 12px; text-align: right; font-variant-numeric: tabular-nums; min-width: 0; }
 
-/* Data + hora */
+/* Data */
 .st-date-cell {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 54px;
 }
 .st-day {
   font-size: 12.5px;
@@ -160,7 +167,7 @@
   letter-spacing: 0.04em;
 }
 
-/* Produto foco */
+/* Produto */
 .st-produto-cell {
   display: flex;
   align-items: center;
@@ -168,11 +175,12 @@
   font-size: 12.5px;
   font-weight: 500;
   color: var(--ink);
+  overflow: hidden;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .st-dot {
-  width: 8px;
-  height: 8px;
+  width: 8px; height: 8px;
   border-radius: 2px;
   flex: 0 0 8px;
 }
@@ -187,20 +195,96 @@
   font-size: 11px;
   font-weight: 500;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
-/* Receita */
+/* Receita + orders */
 .st-receita {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
   white-space: nowrap;
 }
-.st-no-rev {
-  color: var(--ink-4);
+.st-no-rev { color: var(--ink-4); }
+
+/* agrupamento por mês */
+.st-month-header {
+  padding: 8px 14px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  border-top: 1px solid var(--line);
+  margin-top: 2px;
+}
+.st-month-header:first-child { margin-top: 0; border-top: none; }
+
+/* subtotal por mês */
+.st-month-summary {
+  display: grid;
+  grid-template-columns: 100px 160px 1fr 1fr 1fr 1fr 155px 44px;
+  align-items: center;
+  padding: 7px 16px;
+  background: oklch(0.97 0.025 300);
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+}
+.st-month-summary .summary-label {
+  grid-column: 1 / 4;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.st-month-summary .summary-label-title {
+  font-weight: 700;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.st-month-summary .summary-label-count {
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+.st-month-summary .summary-val {
+  text-align: right;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+}
+.st-month-summary .summary-val.total {
+  color: oklch(0.45 0.14 50);
+  font-size: 13.5px;
 }
 
-/* Botão copiar UTM */
+/* dropdown de status inline */
+.st-status-cell {
+  position: relative;
+  padding: 10px 12px;
+}
+
+/* "use filtros pra ver tudo" */
+.st-table-more {
+  padding: 10px 16px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  text-align: center;
+  border-top: 1px solid var(--line);
+}
+
+/* footer legado (mantido por compatibilidade) */
+.st-table-footer {
+  padding: 10px 2px 4px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  text-align: right;
+}
+
+/* botão copiar UTM compacto (ícone só) — usa live-copy-utm de lives.css */
+/* mantém btn-copy-utm para compatibilidade com CreateStoryModal */
 .btn-copy-utm {
   display: inline-flex;
   align-items: center;
@@ -217,24 +301,8 @@
   transition: background .12s, border-color .12s, color .12s;
   white-space: nowrap;
 }
-.btn-copy-utm:hover {
-  border-color: var(--accent);
-  color: var(--accent-deep);
-  background: oklch(0.97 0.03 60);
-}
-.btn-copy-utm.copied {
-  background: oklch(0.95 0.04 150);
-  border-color: oklch(0.86 0.08 150);
-  color: oklch(0.42 0.13 150);
-}
-
-/* Footer da tabela */
-.st-table-footer {
-  padding: 10px 2px 4px;
-  font-size: 11.5px;
-  color: var(--ink-3);
-  text-align: right;
-}
+.btn-copy-utm:hover { border-color: var(--accent); color: var(--accent-deep); background: oklch(0.97 0.03 60); }
+.btn-copy-utm.copied { background: oklch(0.95 0.04 150); border-color: oklch(0.86 0.08 150); color: oklch(0.42 0.13 150); }
 
 /* ============================================================
    HEATMAP TIMING

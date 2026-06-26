@@ -568,6 +568,8 @@ export interface Story {
   linkUtm: string | null
   rastreioReceita: string | null
   receita: number | null
+  orders: number | null
+  notes: string | null
   origem: string
 }
 
@@ -581,31 +583,6 @@ export interface DayAggregate {
   visitasPerfil: number
 }
 
-// ---- Stories Beleza (barbours / kokeshi / lescent) ----
-
-export type StoryBelezaStatus = 'postado' | 'nao_postado' | 'pendente'
-
-export interface StoryBeleza {
-  id: string
-  date: string          // YYYY-MM-DD
-  hora: number
-  cod: string           // ex: "2026050812"
-  page: string          // ex: "home", "bodysplash", "lançamentos"
-  merchant: string      // descrição do conteúdo
-  status: StoryBelezaStatus
-  linkConteudo: string | null
-  linkCta: string | null
-  rastreioReceita: string | null
-  receita: number | null
-  marca: Brand
-  origem: string
-}
-
-export const STORY_BELEZA_STATUS_META: Record<StoryBelezaStatus, { label: string }> = {
-  postado:    { label: 'Postado'    },
-  nao_postado: { label: 'Não postado' },
-  pendente:   { label: 'Pendente'  },
-}
 
 export type RenderJobStatus = 'queued' | 'running' | 'done' | 'error'
 

@@ -1,4 +1,4 @@
-import type { Brand, Campaign, CanalPost, Collection, DayAggregate, EventDate, FutebolEvent, Live, LiveStatus, Merchan, Post, PostSource, PostStatus, Platform, SiteLink, Story, StoryBeleza, StoryBelezaStatus, StoryStatus, TeamProfile } from '@/lib/types'
+import type { Brand, Campaign, CanalPost, Collection, DayAggregate, EventDate, FutebolEvent, Live, LiveStatus, Merchan, Post, PostSource, PostStatus, Platform, SiteLink, Story, StoryStatus, TeamProfile } from '@/lib/types'
 import { colorFromName, shortLabel } from '@/lib/livesUtils'
 
 function normalizeTags(tags: string[]): string[] {
@@ -340,16 +340,17 @@ export function dbToMerchan(row: Record<string, unknown>): Merchan {
     forte:         (row.forte as boolean) ?? false,
     sempreSozinho: (row.sempre_sozinho as boolean) ?? false,
     color:         colorFromName(nome),
-    short:         shortLabel(nome),
+    short:         (row.short as string | null) || shortLabel(nome),
   }
 }
 
-export function merchanToDb(m: Pick<Merchan, 'nome' | 'ativo' | 'forte' | 'sempreSozinho'>): Record<string, unknown> {
+export function merchanToDb(m: Pick<Merchan, 'nome' | 'ativo' | 'forte' | 'sempreSozinho' | 'short'>): Record<string, unknown> {
   return {
     nome:           m.nome,
     ativo:          m.ativo,
     forte:          m.forte,
     sempre_sozinho: m.sempreSozinho,
+    short:          m.short || null,
   }
 }
 
@@ -375,6 +376,8 @@ export function dbToStory(row: Record<string, unknown>): Story {
     linkUtm:         (row.link_utm as string) ?? null,
     rastreioReceita: (row.rastreio_receita as string) ?? null,
     receita:         (row.receita as number) ?? null,
+    orders:          row.orders != null ? Number(row.orders) : null,
+    notes:           (row.notes as string) ?? null,
     origem:          (row.origem as string) ?? 'manual',
   }
 }
@@ -392,95 +395,12 @@ export function storyToDb(s: Omit<Story, 'id' | 'produtoSlug'>): Record<string, 
     link_utm:         s.linkUtm,
     rastreio_receita: s.rastreioReceita,
     receita:          s.receita,
+    orders:           s.orders ?? null,
+    notes:            s.notes ?? null,
     origem:           s.origem,
   }
 }
 
-// ─── Stories Beleza ──────────────────────────────────────────
-
-export function dbToStoryBeleza(row: Record<string, unknown>): StoryBeleza {
-  return {
-    id:              String(row.id),
-    date:            (row.date as string) ?? '',
-    hora:            (row.hora as number) ?? 12,
-    cod:             (row.cod as string) ?? '',
-    page:            (row.page as string) ?? '',
-    merchant:        (row.merchant as string) ?? '',
-    status:          ((row.status as string) ?? 'pendente') as StoryBelezaStatus,
-    linkConteudo:    (row.link_conteudo as string) ?? null,
-    linkCta:         (row.link_cta as string) ?? null,
-    rastreioReceita: (row.rastreio_receita as string) ?? null,
-    receita:         row.receita != null ? Number(row.receita) : null,
-    marca:           (row.marca as Brand) ?? 'barbours',
-    origem:          (row.origem as string) ?? 'manual',
-  }
-}
-
-export function storyBelezaToDb(s: Omit<StoryBeleza, 'id'>): Record<string, unknown> {
-  return {
-    date:             s.date,
-    hora:             s.hora,
-    cod:              s.cod,
-    page:             s.page,
-    merchant:         s.merchant,
-    status:           s.status,
-    link_conteudo:    s.linkConteudo || null,
-    link_cta:         s.linkCta || null,
-    rastreio_receita: s.rastreioReceita || null,
-    receita:          s.receita,
-    marca:            s.marca,
-    origem:           s.origem,
-  }
-}
-
-// Adapta um row de stories_beleza para o tipo Story usado pela StoriesView
-export function dbToStoryFromBeleza(row: Record<string, unknown>): Story {
-  const belezaStatus = (row.status as string) ?? 'pendente'
-  const storyStatus: StoryStatus =
-    belezaStatus === 'postado'    ? 'postado'
-    : belezaStatus === 'nao_postado' ? 'nao_postado'
-    : 'nao_iniciado'
-  const page     = (row.page as string) ?? ''
-  const merchant = (row.merchant as string) ?? ''
-  return {
-    id:              String(row.id),
-    date:            (row.date as string) ?? '',
-    hora:            (row.hora as number) ?? 12,
-    diaSemana:       '',
-    utm:             (row.cod as string) ?? '',
-    produto:         page,
-    produtoSlug:     slugify(page),
-    categoria:       merchant,
-    status:          storyStatus,
-    linkMidia:       (row.link_conteudo as string) ?? null,
-    linkUtm:         (row.link_cta as string) ?? null,
-    rastreioReceita: (row.rastreio_receita as string) ?? null,
-    receita:         row.receita != null ? Number(row.receita) : null,
-    origem:          (row.origem as string) ?? 'manual',
-  }
-}
-
-// Converte Story de volta para o formato stories_beleza (usado no save)
-export function storyToDbBeleza(s: Omit<Story, 'id' | 'produtoSlug'>, marca: Brand): Record<string, unknown> {
-  const belezaStatus =
-    s.status === 'postado'     ? 'postado'
-    : s.status === 'nao_postado' ? 'nao_postado'
-    : 'pendente'
-  return {
-    date:             s.date,
-    hora:             s.hora,
-    cod:              s.utm,
-    page:             s.produto,
-    merchant:         s.categoria,
-    status:           belezaStatus,
-    link_conteudo:    s.linkMidia || null,
-    link_cta:         s.linkUtm || null,
-    rastreio_receita: s.rastreioReceita || null,
-    receita:          s.receita,
-    marca,
-    origem:           s.origem,
-  }
-}
 
 // ─── Profile ─────────────────────────────────────────────────
 

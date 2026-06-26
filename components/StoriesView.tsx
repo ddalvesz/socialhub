@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo, useCallback } from 'react'
+import React, { useState, useMemo, useCallback, useRef } from 'react'
 import {
   ComposedChart, Area, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, LabelList, Cell,
@@ -16,7 +16,6 @@ import {
   todayISO, buildMonthGrid, addDaysISO, startOfWeekISO, parseISO,
   MONTHS, WEEKDAYS as CAL_WEEKDAYS, WEEKDAYS_FULL, pad,
 } from '@/lib/types'
-import CreateStoryModal from './CreateStoryModal'
 
 /* ── Constants ────────────────────────────────────────────── */
 
@@ -122,31 +121,25 @@ function StoryStatusPill({ status }: { status: string }) {
   )
 }
 
-function CopyUtmBtn({ code }: { code: string }) {
+function CopyUtmBtn({ url }: { url: string }) {
   const [copied, setCopied] = useState(false)
   const handleCopy = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
-    navigator.clipboard.writeText(code)
+    navigator.clipboard.writeText(url)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
-  }, [code])
+  }, [url])
   return (
-    <button className={`btn-copy-utm ${copied ? 'copied' : ''}`} onClick={handleCopy}>
+    <button className={`live-copy-utm ${copied ? 'copied' : ''}`} title="Copiar UTM" onClick={handleCopy}>
       {copied ? (
-        <>
-          <svg viewBox="0 0 16 16" width={12} height={12} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="3 8 6.5 12 13 4" />
-          </svg>
-          Copiado!
-        </>
+        <svg viewBox="0 0 16 16" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="3 8 6.5 12 13 4" />
+        </svg>
       ) : (
-        <>
-          <svg viewBox="0 0 16 16" width={12} height={12} fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="5" y="5" width="9" height="9" rx="2"/>
-            <path d="M11 5V3a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/>
-          </svg>
-          Copiar UTM
-        </>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="5" y="5" width="7.5" height="7.5" rx="1.5" />
+          <path d="M10 5V4A1.5 1.5 0 0 0 8.5 2.5h-5A1.5 1.5 0 0 0 2 4v8A1.5 1.5 0 0 0 3.5 13.5H5" />
+        </svg>
       )}
     </button>
   )
@@ -469,94 +462,246 @@ function ProdutosChart({ stories }: { stories: Story[] }) {
 
 /* ── Stories Table ───────────────────────────────────────── */
 
-const STATUS_FILTERS = [
-  { id: 'all',         label: 'Todos os status', dot: AXIS_COLOR },
-  { id: 'nao_iniciado', label: 'Não iniciado',   dot: 'oklch(0.72 0.02 300)' },
-  { id: 'em_andamento', label: 'Em andamento',   dot: 'oklch(0.72 0.16 55)' },
-  { id: 'feito',        label: 'Feito',           dot: 'oklch(0.6 0.13 265)' },
-  { id: 'proposta',     label: 'Proposta',        dot: 'oklch(0.6 0.13 150)' },
-  { id: 'nao_postado',  label: 'Não postado',     dot: 'oklch(0.5 0.15 25)' },
-]
+const STORY_STATUSES_LIST = Object.entries(STORY_STATUS_META).map(([id, m]) => ({ id, ...m }))
 
-function StoriesTable({ stories, onRowClick }: { stories: Story[]; onRowClick: (s: Story) => void }) {
+const MONTH_NAMES_BR = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                        'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+
+function StoryStatusCell({ story, onStatusChange }: { story: Story; onStatusChange?: (s: Story, id: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const meta = STORY_STATUS_META[story.status]
+
+  React.useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const cls = story.status === 'nao_iniciado' ? 's-st-ni'
+    : story.status === 'em_andamento' ? 's-st-ea'
+    : story.status === 'feito' ? 's-st-feito'
+    : story.status === 'proposta' ? 's-st-post'
+    : story.status === 'postado' ? 's-st-postado'
+    : 's-st-np'
+
+  return (
+    <div className="st-status-cell" ref={ref}>
+      <button
+        className={`status-pill ${cls} status-pill-btn`}
+        onClick={e => { e.stopPropagation(); setOpen(v => !v) }}
+      >
+        <span className="sdot" />
+        {meta?.label ?? story.status}
+      </button>
+      {open && (
+        <div className="status-dropdown" onClick={e => e.stopPropagation()}>
+          {STORY_STATUSES_LIST.map(st => {
+            const sCls = st.id === 'nao_iniciado' ? 's-st-ni'
+              : st.id === 'em_andamento' ? 's-st-ea'
+              : st.id === 'feito' ? 's-st-feito'
+              : st.id === 'proposta' ? 's-st-post'
+              : st.id === 'postado' ? 's-st-postado'
+              : 's-st-np'
+            return (
+              <button
+                key={st.id}
+                className={`status-opt ${sCls} ${story.status === st.id ? 'active' : ''}`}
+                onClick={e => { e.stopPropagation(); onStatusChange?.(story, st.id); setOpen(false) }}
+              >
+                <span className="sdot" />{st.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StoriesTable({ stories, onRowClick, onStatusChange }: {
+  stories: Story[]
+  onRowClick: (s: Story) => void
+  onStatusChange?: (s: Story, newStatus: string) => void
+}) {
   const [statusFilt, setStatusFilt] = useState('all')
+  const [search, setSearch] = useState('')
 
   const filtered = useMemo(() => {
-    const base = statusFilt === 'all' ? stories : stories.filter(s => s.status === statusFilt)
-    return base.slice(0, 100)
-  }, [stories, statusFilt])
+    let arr = statusFilt === 'all' ? stories : stories.filter(s => s.status === statusFilt)
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      arr = arr.filter(s =>
+        (s.produto || '').toLowerCase().includes(q) ||
+        (s.categoria || '').toLowerCase().includes(q)
+      )
+    }
+    return arr
+  }, [stories, statusFilt, search])
+
+  const LIMIT = 80
+  const shown = filtered.slice(0, LIMIT)
+  const more  = filtered.length > LIMIT ? filtered.length - LIMIT : 0
+
+  // agrupar por mês
+  type Group = { key: string; label: string; rows: Story[] }
+  const groups: Group[] = []
+  let cur: Group | null = null
+  for (const s of shown) {
+    const d = new Date(s.date + 'T00:00:00')
+    const key = `${d.getFullYear()}-${d.getMonth()}`
+    if (!cur || cur.key !== key) {
+      cur = { key, label: `${MONTH_NAMES_BR[d.getMonth()]} ${d.getFullYear()}`, rows: [] }
+      groups.push(cur)
+    }
+    cur.rows.push(s)
+  }
+
+  // produto → index fixo (para cor consistente)
+  const produtoIdx = useMemo(() => {
+    const m = new Map<string, number>()
+    stories.forEach(s => { if (!m.has(s.produto)) m.set(s.produto, m.size) })
+    return m
+  }, [stories])
 
   return (
     <DashCard title="Histórico de stories">
+      {/* barra de filtros */}
       <div className="st-table-filters">
-        {STATUS_FILTERS.map(sf => (
-          <button
-            key={sf.id}
-            className={`platform-pill ${statusFilt === sf.id ? 'active' : ''}`}
-            onClick={() => setStatusFilt(sf.id)}
-          >
-            <span className="st-filter-dot" style={{ background: sf.dot }} />
-            {sf.label}
-          </button>
-        ))}
+        <div className="search-box" style={{ minWidth: 220 }}>
+          <svg viewBox="0 0 16 16" width={13} height={13} fill="none" stroke="currentColor" strokeWidth="1.8">
+            <circle cx="6.5" cy="6.5" r="4.5" /><line x1="10" y1="10" x2="14" y2="14" />
+          </svg>
+          <input
+            placeholder="Buscar produto ou categoria..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="filter-mini">
+          <span className="lbl">Status</span>
+          <select className="field" value={statusFilt} onChange={e => setStatusFilt(e.target.value)} style={{ minWidth: 150 }}>
+            <option value="all">Todos</option>
+            {STORY_STATUSES_LIST.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+          </select>
+        </div>
+        <div style={{ flex: 1 }} />
+        <span className="count-pill">{filtered.length} stor{filtered.length === 1 ? 'y' : 'ies'}</span>
       </div>
-      <div className="st-table-wrap">
-        <table className="st-table">
-          <thead>
-            <tr>
-              <th>Data / Hora</th>
-              <th>Produto foco</th>
-              <th>Categoria</th>
-              <th>Status</th>
-              <th className="st-td-num">Receita</th>
-              <th>UTM</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((s, i) => {
+
+      {/* cabeçalho */}
+      <div className="st-table-head">
+        <div>Data / Hora</div>
+        <div>Produto foco</div>
+        <div>Tipo de conteúdo</div>
+        <div className="r">Orders</div>
+        <div className="r">Receita</div>
+        <div className="r col-total">Ticket médio</div>
+        <div>Status</div>
+        <div />
+      </div>
+
+      {shown.length === 0 && (
+        <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)' }}>
+          Nenhum story encontrado.
+        </div>
+      )}
+
+      {groups.map(group => {
+        const withRevenue = group.rows.filter(s => s.receita != null && s.receita > 0)
+        const mReceita  = withRevenue.reduce((sum, s) => sum + (s.receita ?? 0), 0)
+        const mOrders   = withRevenue.reduce((sum, s) => sum + (s.orders ?? 0), 0)
+        const mTicket   = mOrders > 0 ? mReceita / mOrders : null
+
+        return (
+          <div key={group.key}>
+            <div className="st-month-header">{group.label}</div>
+
+            {group.rows.map(s => {
               const [, mm, dd] = s.date.split('-')
               const hh = String(s.hora).padStart(2, '0')
+              const idx = produtoIdx.get(s.produto) ?? 0
+              const ticket = s.receita != null && s.orders != null && s.orders > 0
+                ? s.receita / s.orders
+                : null
+
               return (
-                <tr key={s.id} className="st-row" style={{ cursor: 'pointer' }} onClick={() => onRowClick(s)}>
-                  <td className="st-td">
+                <div key={s.id} className="st-table-row" onClick={() => onRowClick(s)}>
+                  {/* 1. Data */}
+                  <div className="st-cell">
                     <div className="st-date-cell">
                       <span className="st-day">{dd}/{mm}</span>
                       <span className="st-time">{hh}:00</span>
                     </div>
-                  </td>
-                  <td className="st-td">
+                  </div>
+                  {/* 2. Produto */}
+                  <div className="st-cell">
                     <div className="st-produto-cell">
-                      <span className="st-dot" style={{ background: produtoColor(s.produto, i) }} />
+                      <span className="st-dot" style={{ background: produtoColor(s.produto, idx) }} />
                       {s.produto || '—'}
                     </div>
-                  </td>
-                  <td className="st-td">
-                    {s.categoria && <span className="st-cat-chip">{s.categoria}</span>}
-                  </td>
-                  <td className="st-td">
-                    <StoryStatusPill status={s.status} />
-                  </td>
-                  <td className="st-td st-td-num">
-                    {s.receita ? (
-                      <span className="st-receita">{fmtBRL(s.receita)}</span>
-                    ) : (
-                      <span className="st-no-rev">—</span>
-                    )}
-                  </td>
-                  <td className="st-td">
-                    {s.linkUtm
-                      ? <CopyUtmBtn code={s.linkUtm} />
-                      : <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>—</span>
-                    }
-                  </td>
-                </tr>
+                  </div>
+                  {/* 3. Categoria */}
+                  <div className="st-cell">
+                    {s.categoria
+                      ? <span className="st-cat-chip">{s.categoria}</span>
+                      : <span style={{ color: 'var(--ink-4)', fontSize: 12 }}>—</span>}
+                  </div>
+                  {/* 4. Orders */}
+                  <div className="st-cell-r">
+                    {s.orders != null
+                      ? <span className="st-receita">{s.orders}</span>
+                      : <span className="st-no-rev">—</span>}
+                  </div>
+                  {/* 5. Receita */}
+                  <div className="st-cell-r">
+                    {s.receita != null
+                      ? <span className="st-receita">{fmtBRL(s.receita)}</span>
+                      : <span className="st-no-rev">—</span>}
+                  </div>
+                  {/* 6. Ticket médio */}
+                  <div className="st-cell-r">
+                    {ticket != null
+                      ? <span className="st-receita">{fmtBRL(ticket)}</span>
+                      : <span className="st-no-rev">—</span>}
+                  </div>
+                  {/* 7. Status dropdown */}
+                  <StoryStatusCell story={s} onStatusChange={onStatusChange} />
+                  {/* 8. UTM */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                       onClick={e => e.stopPropagation()}>
+                    {s.linkUtm && <CopyUtmBtn url={s.linkUtm} />}
+                  </div>
+                </div>
               )
             })}
-          </tbody>
-        </table>
-      </div>
-      {stories.length > 100 && (
-        <div className="st-table-footer">Exibindo 100 de {stories.length} stories</div>
+
+            {mReceita > 0 && (
+              <div className="st-month-summary">
+                {/* grid-column 1–3 via CSS */}
+                <div className="summary-label">
+                  <span className="summary-label-title">Subtotal {group.label}</span>
+                  <span className="summary-label-count">{withRevenue.length} stor{withRevenue.length === 1 ? 'y' : 'ies'} com receita</span>
+                </div>
+                {/* col 4: orders */}
+                <div className="summary-val">{mOrders > 0 ? mOrders : '—'}</div>
+                {/* col 5: receita */}
+                <div className="summary-val">{fmtBRL(mReceita)}</div>
+                {/* col 6: ticket */}
+                <div className="summary-val total">{mTicket != null ? fmtBRL(mTicket) : '—'}</div>
+                {/* col 7: status vazio, col 8: utm vazio */}
+                <div /><div />
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      {more > 0 && (
+        <div className="st-table-more">+ {more} stor{more === 1 ? 'y' : 'ies'} (use filtros pra ver tudo)</div>
       )}
     </DashCard>
   )
@@ -884,9 +1029,10 @@ interface Props {
   onStoryCreated: (s: Story) => void
   onStoryUpdated: (s: Story) => void
   onStoryClick: (s: Story) => void
+  onNewStory: () => void
 }
 
-export default function StoriesView({ stories, dayAggregates, onStoryCreated, onStoryClick }: Props) {
+export default function StoriesView({ stories, dayAggregates, onStoryCreated, onStoryUpdated, onStoryClick, onNewStory }: Props) {
   const today = todayISO()
   const todayDate = parseISO(today)
   const [viewMode, setViewMode] = useState<'analytics' | 'calendar'>('analytics')
@@ -920,7 +1066,6 @@ export default function StoriesView({ stories, dayAggregates, onStoryCreated, on
   const [period, setPeriod] = useState<PeriodId>('month')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
-  const [createOpen, setCreateOpen] = useState(false)
 
   const filteredStories = useMemo(() => {
     if (period === 'custom') {
@@ -1049,7 +1194,7 @@ export default function StoriesView({ stories, dayAggregates, onStoryCreated, on
         )}
 
         <div style={{ flex: 1 }} />
-        <button className="btn btn-accent" style={{ fontSize: 13, padding: '8px 14px' }} onClick={() => setCreateOpen(true)}>
+        <button className="btn btn-accent" style={{ fontSize: 13, padding: '8px 14px' }} onClick={onNewStory}>
           <svg viewBox="0 0 16 16" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
             <line x1="8" y1="3" x2="8" y2="13" /><line x1="3" y1="8" x2="13" y2="8" />
           </svg>
@@ -1066,7 +1211,7 @@ export default function StoriesView({ stories, dayAggregates, onStoryCreated, on
               month={month}
               stories={stories}
               onStoryClick={onStoryClick}
-              onNewStory={() => setCreateOpen(true)}
+              onNewStory={onNewStory}
             />
           ) : (
             <StoriesWeekView
@@ -1140,20 +1285,16 @@ export default function StoriesView({ stories, dayAggregates, onStoryCreated, on
 
           <HeatmapTiming stories={filteredStories} />
           <ProdutosChart stories={filteredStories} />
-          <StoriesTable stories={filteredStories} onRowClick={onStoryClick} />
+          <StoriesTable
+            stories={filteredStories}
+            onRowClick={onStoryClick}
+            onStatusChange={(s, newStatus) => {
+              onStoryUpdated({ ...s, status: newStatus as Story['status'] })
+            }}
+          />
         </>
       )}
 
-      {/* Create modal */}
-      {createOpen && (
-        <CreateStoryModal
-          onClose={() => setCreateOpen(false)}
-          onSaved={story => {
-            onStoryCreated(story)
-            setCreateOpen(false)
-          }}
-        />
-      )}
     </div>
   )
 }

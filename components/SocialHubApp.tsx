@@ -16,12 +16,11 @@ import {
   campaignToDb, collectionToDb, postToDb, sourceToTable,
   dbToPost, dbToCampaign, dbToCollection, dbToCanalPost,
   dbToLive, dbToMerchan, liveToDb, merchanToDb, dbToStory, storyToDb,
-  dbToStoryFromBeleza, storyToDbBeleza,
   dbToEventDate, dbToFutebolEvent, dbToDayAggregate,
   dbToSiteLink, siteLinkToDb,
 } from '@/lib/supabase/mappers'
 import BrandSwitcher from './BrandSwitcher'
-import { WEEKDAY_NOMES } from '@/lib/livesUtils'
+import { WEEKDAY_NOMES, shortLabel } from '@/lib/livesUtils'
 import { Icon, PlatformIcon } from './Icons'
 import CalendarGrid from './CalendarGrid'
 import WeekView from './WeekView'
@@ -198,8 +197,15 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     }
     return result.sort((a, b) => a.localeCompare(b, 'pt-BR'))
   }, [stories])
-  const isBelezaBrand = (b: Brand) => b === 'barbours' || b === 'kokeshi' || b === 'lescent'
-
+  const knownCategorias = useMemo(() => {
+    const seen = new Set<string>()
+    const result: string[] = []
+    for (const s of stories) {
+      const c = s.categoria?.trim()
+      if (c && !seen.has(c)) { seen.add(c); result.push(c) }
+    }
+    return result.sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  }, [stories])
   const fetchForBrand = useCallback(async (b: Brand) => {
     setBrandLoading(true)
     try {
@@ -225,9 +231,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
         supabase.from('products').select('name').eq('brand', b).order('name', { ascending: true }),
         supabase.from('lives').select('*').eq('brand', b).order('date', { ascending: true }),
         supabase.from('merchans').select('*').eq('brand', b).order('nome', { ascending: true }),
-        isBelezaBrand(b)
-          ? supabase.from('stories_beleza').select('*').eq('marca', b).order('date', { ascending: false })
-          : supabase.from('stories').select('*').eq('brand', b).order('date', { ascending: false }),
+        supabase.from('stories').select('*').eq('brand', b).order('date', { ascending: false }),
         supabase.from('stories_day_aggregates').select('*').eq('brand', b).order('date', { ascending: true }),
         supabase.from('site_links').select('*').eq('brand', b).order('categoria', { ascending: true }),
       ])
@@ -248,10 +252,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
       setLives((livesData ?? []).map(r => dbToLive(r as Record<string, unknown>)))
       setMerchans((merchansData ?? []).map(r => dbToMerchan(r as Record<string, unknown>)))
 
-      setStories(isBelezaBrand(b)
-        ? (storiesData ?? []).map(r => dbToStoryFromBeleza(r as Record<string, unknown>))
-        : (storiesData ?? []).map(r => dbToStory(r as Record<string, unknown>))
-      )
+      setStories((storiesData ?? []).map(r => dbToStory(r as Record<string, unknown>)))
       setDayAggregates((dayAggData ?? []).map(r => dbToDayAggregate(r as Record<string, unknown>)))
       setCanalPosts((canalData ?? []).map(r => dbToCanalPost(r as Record<string, unknown>)))
       setSiteLinks((siteLinksData ?? []).map(r => dbToSiteLink(r as Record<string, unknown>)))
@@ -307,9 +308,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   const storiesCount = (() => {
     const d = new Date(today); d.setDate(d.getDate() - 30)
     const cutoff = d.toISOString().slice(0, 10)
-    return isBelezaBrand(brand)
-      ? stories.filter(s => s.status === 'postado' && s.date >= cutoff).length
-      : stories.filter(s => s.status === 'feito').length
+    return stories.filter(s => (s.status === 'postado' || s.status === 'feito') && s.date >= cutoff).length
   })()
 
   const [year, setYear] = useState(todayDate.getFullYear())
@@ -427,17 +426,6 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
         setStories(arr => arr.map(x => x.id === s.id ? s : x))
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'stories' }, ({ old: row }) => {
-        setStories(arr => arr.filter(x => x.id !== String((row as Record<string, unknown>).id)))
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'stories_beleza' }, ({ new: row }) => {
-        const s = dbToStoryFromBeleza(row as Record<string, unknown>)
-        setStories(arr => arr.some(x => x.id === s.id) ? arr : [s, ...arr])
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'stories_beleza' }, ({ new: row }) => {
-        const s = dbToStoryFromBeleza(row as Record<string, unknown>)
-        setStories(arr => arr.map(x => x.id === s.id ? s : x))
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'stories_beleza' }, ({ old: row }) => {
         setStories(arr => arr.filter(x => x.id !== String((row as Record<string, unknown>).id)))
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'site_links' }, ({ new: row }) => {
@@ -646,16 +634,26 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   // ─── Lives handlers ───────────────────────────────────────────
 
   const saveLive = async (l: Live) => {
-    setLives(arr => arr.map(x => x.id === l.id ? l : x))
-    const { id, ...rest } = l
-    await supabase.from('lives').update(liveToDb(rest)).eq('id', id)
+    if (l.id === '__new__') {
+      const { id: _id, ...rest } = l
+      const { data } = await supabase.from('lives').insert({ ...liveToDb(rest), brand }).select().single()
+      if (data) {
+        const created = dbToLive(data as Record<string, unknown>)
+        setLives(arr => [...arr, created].sort((a, b) => a.date.localeCompare(b.date)))
+      }
+    } else {
+      setLives(arr => arr.map(x => x.id === l.id ? l : x))
+      const { id, ...rest } = l
+      await supabase.from('lives').update(liveToDb(rest)).eq('id', id)
+    }
   }
 
-  const createLive = async (defaults: Partial<Live> = {}) => {
+  const createLive = (defaults: Partial<Live> = {}) => {
     const date = defaults.date ?? today
     const dayIndex = new Date(date + 'T00:00:00').getDay()
     const diaSemana = WEEKDAY_NOMES[dayIndex]
-    const payload: Omit<Live, 'id'> = {
+    const draft: Live = {
+      id: '__new__',
       date,
       hora: '',
       diaSemana,
@@ -683,12 +681,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
       notes: '',
       ...defaults,
     }
-    const { data } = await supabase.from('lives').insert({ ...liveToDb(payload), brand }).select().single()
-    if (data) {
-      const created = dbToLive(data as Record<string, unknown>)
-      setLives(arr => [...arr, created].sort((a, b) => a.date.localeCompare(b.date)))
-      setActiveLive(created)
-    }
+    setActiveLive(draft)
   }
 
   const deleteLive = async (l: Live) => {
@@ -721,22 +714,33 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   // ─── Stories handlers ──────────────────────────────────────────
 
   const saveStory = async (s: Story) => {
-    setStories(arr => arr.map(x => x.id === s.id ? s : x))
     const { id, produtoSlug, ...rest } = s
-    if (isBelezaBrand(brand)) {
-      await supabase.from('stories_beleza').update(storyToDbBeleza(rest, brand)).eq('id', id)
+    if (id === '__new__') {
+      const d = new Date(s.date + 'T00:00:00')
+      const WDAYS = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
+      const payload = { ...storyToDb(rest), brand, dia_semana: WDAYS[d.getDay()] }
+      const { data, error } = await supabase.from('stories').insert(payload).select().single()
+      if (error || !data) return
+      const created = dbToStory(data as Record<string, unknown>)
+      setStories(arr => [created, ...arr])
     } else {
+      setStories(arr => arr.map(x => x.id === s.id ? s : x))
       await supabase.from('stories').update(storyToDb(rest)).eq('id', id)
     }
   }
 
+  const createStory = () => {
+    setActiveStory({
+      id: '__new__', date: today, hora: 18, diaSemana: '', utm: '',
+      produto: '', produtoSlug: '', categoria: '', status: 'nao_iniciado',
+      linkMidia: null, linkUtm: null, rastreioReceita: null, receita: null,
+      orders: null, notes: null, origem: 'manual',
+    })
+  }
+
   const deleteStory = async (s: Story) => {
     setStories(arr => arr.filter(x => x.id !== s.id))
-    if (isBelezaBrand(brand)) {
-      await supabase.from('stories_beleza').delete().eq('id', s.id)
-    } else {
-      await supabase.from('stories').delete().eq('id', s.id)
-    }
+    await supabase.from('stories').delete().eq('id', s.id)
   }
 
   const approveAllPropostas = async () => {
@@ -807,6 +811,12 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     await supabase.from('merchans').update({ nome: novoNome }).eq('id', m.id)
     await supabase.from('lives').update({ merchan1: novoNome }).eq('merchan1', m.nome)
     await supabase.from('lives').update({ merchan2: novoNome }).eq('merchan2', m.nome)
+  }
+
+  const renameShortMerchan = async (m: Merchan, novoShort: string) => {
+    const updated = { ...m, short: novoShort || shortLabel(m.nome) }
+    setMerchans(arr => arr.map(x => x.id === m.id ? updated : x))
+    await supabase.from('merchans').update({ short: novoShort || null }).eq('id', m.id)
   }
 
   const deleteMerchan = async (m: Merchan) => {
@@ -1271,6 +1281,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             onStoryCreated={s => setStories(arr => [s, ...arr])}
             onStoryUpdated={s => setStories(arr => arr.map(x => x.id === s.id ? s : x))}
             onStoryClick={setActiveStory}
+            onNewStory={createStory}
           />
         )}
         {view === 'canal'         && (
@@ -1352,6 +1363,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
           story={activeStory}
           brand={brand}
           knownProducts={knownProducts}
+          knownCategorias={knownCategorias}
           siteLinks={siteLinks}
           onClose={() => setActiveStory(null)}
           onSave={s => { saveStory(s); setActiveStory(null) }}
@@ -1382,6 +1394,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
           onChange={saveMerchan}
           onAdd={nome => onAddMerchan(nome)}
           onRename={renameMerchan}
+          onRenameShort={renameShortMerchan}
           onDelete={deleteMerchan}
         />
       )}

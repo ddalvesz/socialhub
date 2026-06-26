@@ -801,13 +801,68 @@ function PropBar({ cupom, utm }: { cupom: number; utm: number }) {
 const MONTH_NAMES_BR = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                         'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
+function LiveSortHeader({ label, col, sortBy, sortAsc, onSort, align, className }: {
+  label: string
+  col: 'date' | 'cupom' | 'utm' | 'ticket' | 'total'
+  sortBy: string
+  sortAsc: boolean
+  onSort: (col: 'date' | 'cupom' | 'utm' | 'ticket' | 'total') => void
+  align?: 'right' | 'center'
+  className?: string
+}) {
+  const active = sortBy === col
+  return (
+    <div
+      className={`live-sort-header${align ? ' live-sort-header-' + align : ''}${className ? ' ' + className : ''}`}
+      onClick={() => onSort(col)}
+    >
+      {label}
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ opacity: active ? 1 : 0.35, flexShrink: 0 }}>
+        {(active ? sortAsc : true)
+          ? <path d="M5 2L9 8H1L5 2Z" fill="currentColor" />
+          : <path d="M5 8L1 2H9L5 8Z" fill="currentColor" />}
+      </svg>
+    </div>
+  )
+}
+
 function LivesTable({ lives, merchans, onRowClick, onStatusChange, limit }: {
   lives: Live[]; merchans: Merchan[]
   onRowClick: (l: Live) => void
   onStatusChange?: (l: Live, id: string) => void
   limit?: number
 }) {
-  const shown = limit ? lives.slice(0, limit) : lives
+  const [sortBy, setSortBy] = useState<'date' | 'cupom' | 'utm' | 'ticket' | 'total'>('date')
+  const [sortAsc, setSortAsc] = useState(false)
+
+  function toggleSort(col: typeof sortBy) {
+    if (sortBy === col) setSortAsc(v => !v)
+    else { setSortBy(col); setSortAsc(col === 'date' ? false : true) }
+  }
+
+  const sorted = useMemo(() => {
+    return [...lives].sort((a, b) => {
+      let diff = 0
+      if (sortBy === 'date') {
+        diff = a.date < b.date ? -1 : a.date > b.date ? 1 : 0
+      } else if (sortBy === 'cupom') {
+        diff = ((a.receita1 || 0) + (a.receita2 || 0)) - ((b.receita1 || 0) + (b.receita2 || 0))
+      } else if (sortBy === 'utm') {
+        diff = (a.receitaUtm || 0) - (b.receitaUtm || 0)
+      } else if (sortBy === 'total') {
+        const ta = (a.receita1 || 0) + (a.receita2 || 0) + (a.receitaUtm || 0)
+        const tb = (b.receita1 || 0) + (b.receita2 || 0) + (b.receitaUtm || 0)
+        diff = ta - tb
+      } else {
+        const ta = a.ordersTotal && a.ordersTotal > 0 ? ((a.receita1||0)+(a.receita2||0)+(a.receitaUtm||0)) / a.ordersTotal : -1
+        const tb = b.ordersTotal && b.ordersTotal > 0 ? ((b.receita1||0)+(b.receita2||0)+(b.receitaUtm||0)) / b.ordersTotal : -1
+        diff = ta - tb
+      }
+      return sortAsc ? diff : -diff
+    })
+  }, [lives, sortBy, sortAsc])
+
+  const shown = limit ? sorted.slice(0, limit) : sorted
   const more  = limit && lives.length > limit ? lives.length - limit : 0
 
   // Agrupar por mês com rows acessíveis para subtotal
@@ -827,12 +882,12 @@ function LivesTable({ lives, merchans, onRowClick, onStatusChange, limit }: {
   return (
     <div className="live-table">
       <div className="live-table-head">
-        <div>Data</div>
+        <LiveSortHeader label="Data" col="date" sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
         <div>Cupons</div>
-        <div className="r">Rec. cupom</div>
-        <div className="r">Rec. UTM</div>
-        <div className="r">Ticket médio</div>
-        <div className="col-total">Receita total</div>
+        <LiveSortHeader label="Rec. cupom" col="cupom" sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} align="right" />
+        <LiveSortHeader label="Rec. UTM" col="utm" sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} align="right" />
+        <LiveSortHeader label="Ticket médio" col="ticket" sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} align="right" />
+        <LiveSortHeader label="Receita total" col="total" sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} className="col-total" />
         <div className="ctr">Status</div>
         <div />
       </div>

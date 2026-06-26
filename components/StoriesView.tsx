@@ -522,6 +522,31 @@ function StoryStatusCell({ story, onStatusChange }: { story: Story; onStatusChan
   )
 }
 
+function SortHeader({ label, col, sortBy, sortAsc, onSort, align, className }: {
+  label: string
+  col: 'date' | 'orders' | 'receita' | 'ticket'
+  sortBy: string
+  sortAsc: boolean
+  onSort: (col: 'date' | 'orders' | 'receita' | 'ticket') => void
+  align?: 'right'
+  className?: string
+}) {
+  const active = sortBy === col
+  return (
+    <div
+      className={`st-sort-header${align === 'right' ? ' st-sort-header-r' : ''}${className ? ' ' + className : ''}`}
+      onClick={() => onSort(col)}
+    >
+      {label}
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ opacity: active ? 1 : 0.35, flexShrink: 0 }}>
+        {(active ? sortAsc : true)
+          ? <path d="M5 2L9 8H1L5 2Z" fill="currentColor" />
+          : <path d="M5 8L1 2H9L5 8Z" fill="currentColor" />}
+      </svg>
+    </div>
+  )
+}
+
 function StoriesTable({ stories, onRowClick, onStatusChange }: {
   stories: Story[]
   onRowClick: (s: Story) => void
@@ -529,6 +554,13 @@ function StoriesTable({ stories, onRowClick, onStatusChange }: {
 }) {
   const [statusFilt, setStatusFilt] = useState('all')
   const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState<'date' | 'orders' | 'receita' | 'ticket'>('date')
+  const [sortAsc, setSortAsc] = useState(false)
+
+  function toggleSort(col: typeof sortBy) {
+    if (sortBy === col) setSortAsc(v => !v)
+    else { setSortBy(col); setSortAsc(col === 'date' ? false : true) }
+  }
 
   const filtered = useMemo(() => {
     let arr = statusFilt === 'all' ? stories : stories.filter(s => s.status === statusFilt)
@@ -539,8 +571,25 @@ function StoriesTable({ stories, onRowClick, onStatusChange }: {
         (s.categoria || '').toLowerCase().includes(q)
       )
     }
+    arr = [...arr].sort((a, b) => {
+      let diff = 0
+      if (sortBy === 'date') {
+        const ka = a.date + String(a.hora).padStart(2, '0')
+        const kb = b.date + String(b.hora).padStart(2, '0')
+        diff = ka < kb ? -1 : ka > kb ? 1 : 0
+      } else if (sortBy === 'orders') {
+        diff = (a.orders ?? -1) - (b.orders ?? -1)
+      } else if (sortBy === 'receita') {
+        diff = (a.receita ?? -1) - (b.receita ?? -1)
+      } else {
+        const ta = a.orders && a.orders > 0 && a.receita != null ? a.receita / a.orders : -1
+        const tb = b.orders && b.orders > 0 && b.receita != null ? b.receita / b.orders : -1
+        diff = ta - tb
+      }
+      return sortAsc ? diff : -diff
+    })
     return arr
-  }, [stories, statusFilt, search])
+  }, [stories, statusFilt, search, sortBy, sortAsc])
 
   const LIMIT = 80
   const shown = filtered.slice(0, LIMIT)
@@ -566,6 +615,32 @@ function StoriesTable({ stories, onRowClick, onStatusChange }: {
     stories.forEach(s => { if (!m.has(s.produto)) m.set(s.produto, m.size) })
     return m
   }, [stories])
+
+  // ranges para coloração condicional (só linhas com valor)
+  const heatRanges = useMemo(() => {
+    const ordersVals  = shown.map(s => s.orders).filter((v): v is number => v != null && v > 0)
+    const receitaVals = shown.map(s => s.receita).filter((v): v is number => v != null && v > 0)
+    const ticketVals  = shown
+      .map(s => s.orders && s.orders > 0 && s.receita != null ? s.receita / s.orders : null)
+      .filter((v): v is number => v != null && v > 0)
+    const range = (arr: number[]) => arr.length < 2
+      ? null
+      : { min: Math.min(...arr), max: Math.max(...arr) }
+    return {
+      orders:  range(ordersVals),
+      receita: range(receitaVals),
+      ticket:  range(ticketVals),
+    }
+  }, [shown])
+
+  function heatColor(value: number | null, range: { min: number; max: number } | null): string | undefined {
+    if (value == null || value <= 0 || range == null || range.max === range.min) return undefined
+    const t = (value - range.min) / (range.max - range.min)
+    // red(0) → yellow(0.5) → green(1)
+    const r = t < 0.5 ? 220 : Math.round(220 - (t - 0.5) * 2 * 160)
+    const g = t < 0.5 ? Math.round(t * 2 * 190) : 190
+    return `rgb(${r}, ${g}, 60)`
+  }
 
   return (
     <DashCard title="Histórico de stories">
@@ -594,13 +669,14 @@ function StoriesTable({ stories, onRowClick, onStatusChange }: {
 
       {/* cabeçalho */}
       <div className="st-table-head">
-        <div>Data / Hora</div>
+        <SortHeader label="Data / Hora" col="date" sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
         <div>Produto foco</div>
         <div>Tipo de conteúdo</div>
-        <div className="r">Orders</div>
-        <div className="r">Receita</div>
-        <div className="r col-total">Ticket médio</div>
-        <div>Status</div>
+        <SortHeader label="Orders" col="orders" sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} align="right" />
+        <SortHeader label="Ticket médio" col="ticket" sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} align="right" className="col-total" />
+        <SortHeader label="Receita" col="receita" sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} align="right" />
+        <div />
+        <div style={{ textAlign: 'center' }}>Status</div>
         <div />
       </div>
 
@@ -653,22 +729,24 @@ function StoriesTable({ stories, onRowClick, onStatusChange }: {
                   {/* 4. Orders */}
                   <div className="st-cell-r">
                     {s.orders != null
-                      ? <span className="st-receita">{s.orders}</span>
+                      ? <span className="st-receita" style={{ color: heatColor(s.orders, heatRanges.orders) }}>{s.orders}</span>
                       : <span className="st-no-rev">—</span>}
                   </div>
-                  {/* 5. Receita */}
-                  <div className="st-cell-r">
-                    {s.receita != null
-                      ? <span className="st-receita">{fmtBRL(s.receita)}</span>
-                      : <span className="st-no-rev">—</span>}
-                  </div>
-                  {/* 6. Ticket médio */}
+                  {/* 5. Ticket médio */}
                   <div className="st-cell-r">
                     {ticket != null
-                      ? <span className="st-receita">{fmtBRL(ticket)}</span>
+                      ? <span className="st-receita" style={{ color: heatColor(ticket, heatRanges.ticket) }}>{fmtBRL(ticket)}</span>
                       : <span className="st-no-rev">—</span>}
                   </div>
-                  {/* 7. Status dropdown */}
+                  {/* 6. Receita */}
+                  <div className="st-cell-r">
+                    {s.receita != null
+                      ? <span className="st-receita" style={{ color: heatColor(s.receita, heatRanges.receita) }}>{fmtBRL(s.receita)}</span>
+                      : <span className="st-no-rev">—</span>}
+                  </div>
+                  {/* 7. Spacer */}
+                  <div />
+                  {/* 8. Status dropdown */}
                   <StoryStatusCell story={s} onStatusChange={onStatusChange} />
                   {/* 8. UTM */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
@@ -688,12 +766,12 @@ function StoriesTable({ stories, onRowClick, onStatusChange }: {
                 </div>
                 {/* col 4: orders */}
                 <div className="summary-val">{mOrders > 0 ? mOrders : '—'}</div>
-                {/* col 5: receita */}
-                <div className="summary-val">{fmtBRL(mReceita)}</div>
-                {/* col 6: ticket */}
+                {/* col 5: ticket */}
                 <div className="summary-val total">{mTicket != null ? fmtBRL(mTicket) : '—'}</div>
-                {/* col 7: status vazio, col 8: utm vazio */}
-                <div /><div />
+                {/* col 6: receita */}
+                <div className="summary-val">{fmtBRL(mReceita)}</div>
+                {/* col 7: spacer, col 8: status vazio, col 9: utm vazio */}
+                <div /><div /><div />
               </div>
             )}
           </div>

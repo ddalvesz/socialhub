@@ -663,6 +663,17 @@
 .live-table-head .num,
 .live-table-row .num { text-align: right }
 
+.live-sort-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.live-sort-header-right { justify-content: flex-end; }
+.live-sort-header:hover { color: var(--ink); }
+
 .live-table-date {
   display: flex;
   flex-direction: column;

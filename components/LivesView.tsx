@@ -364,7 +364,7 @@ function Heatmap({ matrix, max, merchans }: { matrix: ReturnType<typeof heatmapM
             <div className="live-heat-row-label">{WEEKDAY_LABELS[row.weekday]}</div>
             {row.cells.map(c => (
               <div
-                key={c.merchan}
+                key={`${row.weekday}-${c.merchan}`}
                 className={`live-heat-cell ${c.count === 0 ? 'empty' : ''}`}
                 style={{ background: cellBg(c.avg), color: cellFg(c.avg) }}
                 title={`${WEEKDAY_LABELS[row.weekday]} · ${c.merchan} — ${c.count} cupom${c.count === 1 ? '' : 's'}, média ${fmtBRL(c.avg)}`}>
@@ -877,21 +877,25 @@ function LivesTable({ lives, merchans, onRowClick, onStatusChange, limit }: {
                   {/* 2. Cupons (unificado) */}
                   <div className="live-cupons-cell">
                     <div className="live-cupom-row">
-                      {m1 ? (
+                      {(m1 || l.nominal1) ? (
                         <>
-                          <span className="live-merchan-chip" title={m1.nome}>
-                            <span className="dot" style={{ background: m1.color }} />{m1.short}
-                          </span>
-                          <span className="nominal-code">{l.nominal1}</span>
+                          {m1 && (
+                            <span className="live-merchan-chip" title={m1.nome}>
+                              <span className="dot" style={{ background: m1.color }} />{m1.short}
+                            </span>
+                          )}
+                          {l.nominal1 && <span className="nominal-code">{l.nominal1}</span>}
                         </>
                       ) : <span className="ink-4">—</span>}
                     </div>
-                    {m2 && (
+                    {(m2 || l.nominal2) && (
                       <div className="live-cupom-row">
-                        <span className="live-merchan-chip" title={m2.nome}>
-                          <span className="dot" style={{ background: m2.color }} />{m2.short}
-                        </span>
-                        <span className="nominal-code">{l.nominal2}</span>
+                        {m2 && (
+                          <span className="live-merchan-chip" title={m2.nome}>
+                            <span className="dot" style={{ background: m2.color }} />{m2.short}
+                          </span>
+                        )}
+                        {l.nominal2 && <span className="nominal-code">{l.nominal2}</span>}
                       </div>
                     )}
                   </div>

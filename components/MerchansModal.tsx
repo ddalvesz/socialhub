@@ -6,20 +6,31 @@ import { Icon } from './Icons'
 
 // ─── MerchanRow ──────────────────────────────────────────────
 
-function MerchanRow({ m, livesCount, onChange, onRename, onDelete }: {
+function MerchanRow({ m, livesCount, onChange, onRename, onRenameShort, onDelete }: {
   m: Merchan
   livesCount: number
   onChange: (m: Merchan, patch: Partial<Pick<Merchan, 'ativo' | 'forte' | 'sempreSozinho'>>) => void
   onRename: (m: Merchan, novoNome: string) => void
+  onRenameShort: (m: Merchan, novoShort: string) => void
   onDelete: (m: Merchan) => void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(m.nome)
+  const [editingShort, setEditingShort] = useState(false)
+  const [draftShort, setDraftShort] = useState(m.short)
+
+  useEffect(() => { setDraftShort(m.short) }, [m.short])
 
   const submitRename = () => {
     const nm = draft.trim()
     if (nm && nm !== m.nome) onRename(m, nm)
     setEditing(false)
+  }
+
+  const submitShort = () => {
+    const s = draftShort.trim()
+    onRenameShort(m, s)
+    setEditingShort(false)
   }
 
   return (
@@ -43,7 +54,28 @@ function MerchanRow({ m, livesCount, onChange, onRename, onDelete }: {
           </button>
         )}
         <div className="merchan-row-sub">
-          <span className="merchan-row-short">{m.short}</span>
+          {editingShort ? (
+            <input
+              className="field"
+              autoFocus
+              style={{ fontSize: 11, padding: '1px 4px', maxWidth: 120 }}
+              value={draftShort}
+              onChange={e => setDraftShort(e.target.value)}
+              onBlur={submitShort}
+              onKeyDown={e => {
+                if (e.key === 'Enter') submitShort()
+                if (e.key === 'Escape') { setDraftShort(m.short); setEditingShort(false) }
+              }} />
+          ) : (
+            <button
+              className="merchan-row-short"
+              onClick={() => { setDraftShort(m.short); setEditingShort(true) }}
+              title="Clique pra editar o apelido"
+              style={{ cursor: 'pointer' }}
+            >
+              {m.short}
+            </button>
+          )}
           <span className="merchan-row-uses">{livesCount} live{livesCount === 1 ? '' : 's'}</span>
         </div>
       </div>
@@ -81,10 +113,11 @@ interface Props {
   onChange: (m: Merchan, patch: Partial<Pick<Merchan, 'ativo' | 'forte' | 'sempreSozinho'>>) => void
   onAdd: (nome: string) => void
   onRename: (m: Merchan, novoNome: string) => void
+  onRenameShort: (m: Merchan, novoShort: string) => void
   onDelete: (m: Merchan) => void
 }
 
-export default function MerchansModal({ merchans, lives, onClose, onChange, onAdd, onRename, onDelete }: Props) {
+export default function MerchansModal({ merchans, lives, onClose, onChange, onAdd, onRename, onRenameShort, onDelete }: Props) {
   const [filter, setFilter] = useState('')
   const [showInactive, setShowInactive] = useState(true)
   const [adding, setAdding] = useState(false)
@@ -170,6 +203,7 @@ export default function MerchansModal({ merchans, lives, onClose, onChange, onAd
               livesCount={counts[m.nome] || 0}
               onChange={onChange}
               onRename={onRename}
+              onRenameShort={onRenameShort}
               onDelete={onDelete} />
           ))}
           {filtered.length === 0 && (

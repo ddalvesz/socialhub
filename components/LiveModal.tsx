@@ -203,6 +203,7 @@ export default function LiveModal({ live, brand, merchans, siteLinks, onClose, o
   const [catSel, setCatSel] = useState(() =>
     siteLinks.find(sl => sl.produto === live.produto)?.categoria ?? ''
   )
+  const [showCupom2, setShowCupom2] = useState(() => !!(live.merchan2 || live.nominal2))
 
   const produtosFiltrados = useMemo(() =>
     catSel ? siteLinks.filter(sl => sl.categoria === catSel) : siteLinks,
@@ -283,6 +284,54 @@ export default function LiveModal({ live, brand, merchans, siteLinks, onClose, o
                 style={{ maxWidth: 120 }} />
             </div>
 
+            {/* Seletor de produto — apenas gobeauté */}
+            {!isGocase && siteLinks.length > 0 && (
+              <div className="modal-grid" style={{ marginBottom: 8, marginTop: 16 }}>
+                <label>Categoria</label>
+                <select
+                  className="field"
+                  value={catSel}
+                  onChange={e => {
+                    setCatSel(e.target.value)
+                    const still = siteLinks.find(sl => sl.produto === draft.produto && sl.categoria === e.target.value)
+                    if (!still) set('produto', '')
+                  }}
+                  style={{ paddingRight: 32 }}
+                >
+                  <option value="">Todas as categorias</option>
+                  {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+
+                <label>Produto</label>
+                <div>
+                  <select
+                    className="field"
+                    value={draft.produto || ''}
+                    onChange={e => {
+                      const sl = siteLinks.find(x => x.produto === e.target.value)
+                      set('produto', e.target.value)
+                      if (sl) set('linkUtm', sl.link)
+                    }}
+                    style={{ paddingRight: 32, width: '100%' }}
+                  >
+                    <option value="">Selecionar produto…</option>
+                    {produtosFiltrados.map(sl => (
+                      <option key={sl.id} value={sl.produto}>{sl.produto}</option>
+                    ))}
+                  </select>
+                  {produtoNaoEncontrado && (
+                    <div className="utm-aviso" style={{ marginTop: 6 }}>
+                      <Icon.info />
+                      <span>
+                        Produto não encontrado nos Links do Site. Adicione-o na aba{' '}
+                        <strong>Links do Site</strong> para gerar UTM automaticamente.
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* CUPOM 1 */}
             <div className="cupom-block">
               <div className="cupom-head">
@@ -327,21 +376,22 @@ export default function LiveModal({ live, brand, merchans, siteLinks, onClose, o
             </div>
 
             {/* CUPOM 2 */}
-            <div className={`cupom-block ${m1?.sempreSozinho ? 'disabled' : ''}`}>
-              <div className="cupom-head">
-                <span className="cupom-tag cupom-2">CUPOM 2</span>
-                <span className="cupom-hint">
-                  {m1?.sempreSozinho
-                    ? `«${m1.nome}» sempre vai sozinho`
-                    : draft.merchan2 ? 'secundário' : 'opcional — vazio se a live só teve 1 cupom'}
-                </span>
-                {draft.merchan2 && !m1?.sempreSozinho && (
-                  <button className="link-btn" onClick={() => setMany({ merchan2: '', nominal2: '', receita2: 0 })}>
+            {m1?.sempreSozinho ? (
+              <div className="cupom-block disabled">
+                <div className="cupom-head">
+                  <span className="cupom-tag cupom-2">CUPOM 2</span>
+                  <span className="cupom-hint">«{m1.nome}» sempre vai sozinho</span>
+                </div>
+              </div>
+            ) : showCupom2 ? (
+              <div className="cupom-block">
+                <div className="cupom-head">
+                  <span className="cupom-tag cupom-2">CUPOM 2</span>
+                  <span className="cupom-hint">secundário</span>
+                  <button className="link-btn" onClick={() => { setMany({ merchan2: '', nominal2: '', receita2: 0 }); setShowCupom2(false) }}>
                     remover
                   </button>
-                )}
-              </div>
-              {!m1?.sempreSozinho && (
+                </div>
                 <div className="modal-grid">
                   <label>Merchan</label>
                   <MerchanSelect
@@ -349,32 +399,36 @@ export default function LiveModal({ live, brand, merchans, siteLinks, onClose, o
                     merchans={merchans.filter(m => m.ativo && !m.sempreSozinho && m.nome !== draft.merchan1)}
                     onChange={v => set('merchan2', v)}
                     onAddMerchan={onAddMerchan}
-                    placeholder="Sem cupom 2"
+                    placeholder="Sem merchan"
                     allowClear />
 
-                  {draft.merchan2 && (
-                    <>
-                      <label>Código</label>
-                      <input
-                        className="field"
-                        value={draft.nominal2 || ''}
-                        onChange={e => set('nominal2', e.target.value)}
-                        placeholder="Código do segundo cupom" />
+                  <label>Código</label>
+                  <input
+                    className="field"
+                    value={draft.nominal2 || ''}
+                    onChange={e => set('nominal2', e.target.value)}
+                    placeholder="Código do segundo cupom" />
 
-                      <label>Receita</label>
-                      <div className="live-money-input">
-                        <span className="prefix">R$</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={draft.receita2 || 0}
-                          onChange={e => set('receita2', Number(e.target.value))} />
-                      </div>
-                    </>
-                  )}
+                  <label>Receita</label>
+                  <div className="live-money-input">
+                    <span className="prefix">R$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={draft.receita2 || 0}
+                      onChange={e => set('receita2', Number(e.target.value))} />
+                  </div>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <button
+                className="link-btn"
+                style={{ alignSelf: 'flex-start', marginBottom: 8, fontSize: 13 }}
+                onClick={() => setShowCupom2(true)}
+              >
+                + Adicionar cupom 2
+              </button>
+            )}
 
             {/* Total + sinaleiras */}
             <div className="mh-section">
@@ -433,54 +487,6 @@ export default function LiveModal({ live, brand, merchans, siteLinks, onClose, o
             <div className="modal-col-head">
               <Icon.branding /> Métricas secundárias
             </div>
-
-            {/* Seletor de produto — apenas gobeauté */}
-            {!isGocase && siteLinks.length > 0 && (
-              <div className="modal-grid" style={{ marginBottom: 16 }}>
-                <label>Categoria do produto</label>
-                <select
-                  className="field"
-                  value={catSel}
-                  onChange={e => {
-                    setCatSel(e.target.value)
-                    const still = siteLinks.find(sl => sl.produto === draft.produto && sl.categoria === e.target.value)
-                    if (!still) set('produto', '')
-                  }}
-                  style={{ paddingRight: 32 }}
-                >
-                  <option value="">Todas as categorias</option>
-                  {categorias.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-
-                <label>Produto da live</label>
-                <div>
-                  <select
-                    className="field"
-                    value={draft.produto || ''}
-                    onChange={e => {
-                      const sl = siteLinks.find(x => x.produto === e.target.value)
-                      set('produto', e.target.value)
-                      if (sl) set('linkUtm', sl.link)
-                    }}
-                    style={{ paddingRight: 32, width: '100%' }}
-                  >
-                    <option value="">Selecionar produto…</option>
-                    {produtosFiltrados.map(sl => (
-                      <option key={sl.id} value={sl.produto}>{sl.produto}</option>
-                    ))}
-                  </select>
-                  {produtoNaoEncontrado && (
-                    <div className="utm-aviso" style={{ marginTop: 6 }}>
-                      <Icon.info />
-                      <span>
-                        Produto não encontrado nos Links do Site. Adicione-o na aba{' '}
-                        <strong>Links do Site</strong> para gerar UTM automaticamente.
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
 
             {/* UTM gerada */}
             {utm && (
@@ -567,9 +573,11 @@ export default function LiveModal({ live, brand, merchans, siteLinks, onClose, o
         </div>
 
         <div className="modal-foot">
-          <button className="danger" onClick={() => { onDelete(draft); onClose() }}>
-            <Icon.trash /> Excluir
-          </button>
+          {draft.id !== '__new__' && (
+            <button className="danger" onClick={() => { onDelete(draft); onClose() }}>
+              <Icon.trash /> Excluir
+            </button>
+          )}
           <div style={{ flex: 1 }} />
           <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
           <button className="btn btn-accent" onClick={() => onSave({ ...draft, receitaTotal: total })}>

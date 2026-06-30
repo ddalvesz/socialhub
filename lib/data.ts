@@ -52,22 +52,22 @@ export const COMEMORATIVAS: EventDate[] = [
 ]
 
 export const FUTEBOL_2026: FutebolEvent[] = [
-  { id:1,  type:'copa',        name:'Abertura Copa do Mundo',     date:'2026-06-11' },
-  { id:2,  type:'brasil',      name:'Brasil x Sérvia (Estreia)',  date:'2026-06-15' },
-  { id:3,  type:'jogo',        name:'Argentina x França',         date:'2026-06-18' },
-  { id:4,  type:'brasil',      name:'Brasil x Camarões',          date:'2026-06-20' },
-  { id:5,  type:'brasil',      name:'Brasil x Suíça',             date:'2026-06-25' },
-  { id:6,  type:'jogo',        name:'Oitavas - confronto Brasil', date:'2026-07-01' },
-  { id:7,  type:'final',       name:'Final Copa do Mundo',        date:'2026-07-19' },
-  { id:8,  type:'final',       name:'Final Champions League',     date:'2026-05-30' },
-  { id:9,  type:'final',       name:'Final Libertadores',         date:'2026-11-28' },
-  { id:10, type:'premiacao',   name:'Bola de Ouro 2026',          date:'2026-10-26' },
-  { id:11, type:'aniversario', name:'Aniversário Pelé',           date:'2026-10-23' },
-  { id:12, type:'aniversario', name:'Aniversário Neymar',         date:'2026-02-05' },
-  { id:13, type:'aniversario', name:'Aniversário Messi',          date:'2026-06-24' },
-  { id:14, type:'jogo',        name:'Brasileirão - Fla x Flu',    date:'2026-05-17' },
-  { id:15, type:'jogo',        name:'Brasileirão - Clássico',     date:'2026-05-24' },
-  { id:16, type:'copa',        name:'Sorteio Grupos Copa',        date:'2026-04-05' },
+  { id:1,  type:'copa',        name:'Abertura Copa do Mundo',     date:'2026-06-11', notes:'' },
+  { id:2,  type:'brasil',      name:'Brasil x Sérvia (Estreia)',  date:'2026-06-15', notes:'' },
+  { id:3,  type:'jogo',        name:'Argentina x França',         date:'2026-06-18', notes:'' },
+  { id:4,  type:'brasil',      name:'Brasil x Camarões',          date:'2026-06-20', notes:'' },
+  { id:5,  type:'brasil',      name:'Brasil x Suíça',             date:'2026-06-25', notes:'' },
+  { id:6,  type:'jogo',        name:'Oitavas - confronto Brasil', date:'2026-07-01', notes:'' },
+  { id:7,  type:'final',       name:'Final Copa do Mundo',        date:'2026-07-19', notes:'' },
+  { id:8,  type:'final',       name:'Final Champions League',     date:'2026-05-30', notes:'' },
+  { id:9,  type:'final',       name:'Final Libertadores',         date:'2026-11-28', notes:'' },
+  { id:10, type:'premiacao',   name:'Bola de Ouro 2026',          date:'2026-10-26', notes:'' },
+  { id:11, type:'aniversario', name:'Aniversário Pelé',           date:'2026-10-23', notes:'' },
+  { id:12, type:'aniversario', name:'Aniversário Neymar',         date:'2026-02-05', notes:'' },
+  { id:13, type:'aniversario', name:'Aniversário Messi',          date:'2026-06-24', notes:'' },
+  { id:14, type:'jogo',        name:'Brasileirão - Fla x Flu',    date:'2026-05-17', notes:'' },
+  { id:15, type:'jogo',        name:'Brasileirão - Clássico',     date:'2026-05-24', notes:'' },
+  { id:16, type:'copa',        name:'Sorteio Grupos Copa',        date:'2026-04-05', notes:'' },
 ]
 
 export const CAMPAIGNS_LIST: Campaign[] = [

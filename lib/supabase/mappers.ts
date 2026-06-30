@@ -254,15 +254,16 @@ export function eventDateToDb(e: EventDate): Record<string, unknown> {
 
 export function dbToFutebolEvent(row: Record<string, unknown>): FutebolEvent {
   return {
-    id:   row.id as number,
-    type: (row.type as string) ?? 'jogo',
-    name: (row.name as string) ?? '',
-    date: (row.date as string) ?? '',
+    id:    row.id as number,
+    type:  (row.type as string) ?? 'jogo',
+    name:  (row.name as string) ?? '',
+    date:  (row.date as string) ?? '',
+    notes: (row.notes as string) ?? '',
   }
 }
 
 export function futebolEventToDb(e: FutebolEvent): Record<string, unknown> {
-  return { type: e.type, name: e.name, date: e.date }
+  return { type: e.type, name: e.name, date: e.date, notes: e.notes ?? '' }
 }
 
 // ─── Live ────────────────────────────────────────────────────

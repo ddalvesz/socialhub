@@ -299,6 +299,7 @@ export interface FutebolEvent {
   type: string
   name: string
   date: string
+  notes: string
 }
 
 export interface TeamProfile {

@@ -6,7 +6,12 @@ import { GenericSelect, DateRangeFilter, DateRange } from './FormHelpers'
 import { FutebolEvent, MONTHS, WEEKDAYS, fmtBR, buildMonthGrid, parseISO, toISO, todayISO } from '@/lib/types'
 import { FUT_TYPES } from '@/lib/data'
 
-function MiniCalendar({ events, year, month }: { events: FutebolEvent[]; year: number; month: number }) {
+function MiniCalendar({ events, year, month, onEventClick }: {
+  events: FutebolEvent[]
+  year: number
+  month: number
+  onEventClick: (e: FutebolEvent) => void
+}) {
   const cells = buildMonthGrid(year, month)
   const today = todayISO()
   const byDay: Record<string, FutebolEvent[]> = {}
@@ -30,9 +35,9 @@ function MiniCalendar({ events, year, month }: { events: FutebolEvent[]; year: n
               const tp = FUT_TYPES.find(t => t.id === e.type)
               const color = tp?.color ?? '#999'
               return (
-                <div key={k} style={{
+                <div key={k} onClick={() => onEventClick(e)} style={{
                   display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '5px 8px', borderRadius: 6,
+                  padding: '5px 8px', borderRadius: 6, cursor: 'pointer',
                   background: `color-mix(in oklab, ${color}, white 88%)`,
                   color: `color-mix(in oklab, ${color}, black 25%)`,
                   fontSize: 11.5, fontWeight: 500,
@@ -49,16 +54,45 @@ function MiniCalendar({ events, year, month }: { events: FutebolEvent[]; year: n
   )
 }
 
-function FutebolFormModal({ onClose, onSave }: { onClose: () => void, onSave: (data: any) => void }) {
-  const [draft, setDraft] = useState({ type: 'jogo', name: '', date: todayISO() })
-  const set = (k: string, v: any) => setDraft(d => ({ ...d, [k]: v }))
-  
-  const handleSave = () => {
+function FutebolModal({
+  initial,
+  onClose,
+  onSave,
+  onDelete,
+}: {
+  initial: FutebolEvent | null
+  onClose: () => void
+  onSave: (data: Omit<FutebolEvent, 'id'>) => Promise<void>
+  onDelete?: () => Promise<void>
+}) {
+  const isNew = initial === null
+  const [draft, setDraft] = useState<Omit<FutebolEvent, 'id'>>({
+    type:  initial?.type  ?? 'jogo',
+    name:  initial?.name  ?? '',
+    date:  initial?.date  ?? todayISO(),
+    notes: initial?.notes ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  const set = (k: keyof typeof draft, v: string) => setDraft(d => ({ ...d, [k]: v }))
+
+  const handleSave = async () => {
     if (!draft.name.trim()) return
-    onSave(draft)
+    setSaving(true)
+    await onSave(draft)
+    setSaving(false)
     onClose()
   }
-  
+
+  const handleDelete = async () => {
+    if (!confirmDelete) { setConfirmDelete(true); return }
+    setSaving(true)
+    await onDelete!()
+    setSaving(false)
+    onClose()
+  }
+
   const tp = FUT_TYPES.find(t => t.id === draft.type)
 
   return (
@@ -67,10 +101,12 @@ function FutebolFormModal({ onClose, onSave }: { onClose: () => void, onSave: (d
         <div className="modal-head">
           <div style={{
             width: 40, height: 40, borderRadius: 12, flex: '0 0 40px',
-            background: tp?.color || '#999', color: 'white', display: 'grid', placeItems: 'center'
+            background: tp?.color || '#999', color: 'white', display: 'grid', placeItems: 'center',
           }}><Icon.ball /></div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 500, letterSpacing: '.04em' }}>NOVO EVENTO FUTEBOL 2026</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 500, letterSpacing: '.04em' }}>
+              {isNew ? 'NOVO EVENTO FUTEBOL 2026' : 'EDITAR EVENTO FUTEBOL 2026'}
+            </div>
             <input className="modal-title" value={draft.name} placeholder="Ex: Brasil x Argentina"
               onChange={e => set('name', e.target.value)} autoFocus />
           </div>
@@ -80,35 +116,63 @@ function FutebolFormModal({ onClose, onSave }: { onClose: () => void, onSave: (d
         <div className="modal-body">
           <div className="modal-grid">
             <label>Tipo</label>
-            <GenericSelect value={draft.type} options={[{id: '', label: 'Nenhum'}, ...FUT_TYPES.map(t => ({ id: t.id, label: t.label }))]}
+            <GenericSelect value={draft.type}
+              options={[{ id: '', label: 'Nenhum' }, ...FUT_TYPES.map(t => ({ id: t.id, label: t.label }))]}
               onChange={v => set('type', v)} width={240} />
 
             <label>Data</label>
             <input className="field" type="date" value={draft.date}
               onChange={e => set('date', e.target.value)} style={{ maxWidth: 200 }} />
+
+            <label style={{ alignSelf: 'flex-start', paddingTop: 6 }}>Observações</label>
+            <textarea className="field" value={draft.notes} placeholder="Detalhes sobre o evento..."
+              onChange={e => set('notes', e.target.value)}
+              rows={4} style={{ resize: 'vertical', fontFamily: 'inherit', fontSize: 14 }} />
           </div>
         </div>
 
         <div className="modal-foot">
+          {!isNew && onDelete && (
+            <button
+              className="btn btn-ghost"
+              onClick={handleDelete}
+              disabled={saving}
+              style={{ color: confirmDelete ? 'var(--red)' : undefined }}
+            >
+              {confirmDelete ? 'Confirmar exclusão' : 'Excluir'}
+            </button>
+          )}
           <div style={{ flex: 1 }} />
           <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-accent" onClick={handleSave}>Criar evento</button>
+          <button className="btn btn-accent" onClick={handleSave} disabled={saving || !draft.name.trim()}>
+            {isNew ? 'Criar evento' : 'Salvar'}
+          </button>
         </div>
       </div>
     </div>
   )
 }
 
-export default function FutebolView({ initialItems }: { initialItems: FutebolEvent[] }) {
+export default function FutebolView({
+  initialItems,
+  onSave,
+  onDelete,
+}: {
+  initialItems: FutebolEvent[]
+  onSave: (e: FutebolEvent) => Promise<FutebolEvent>
+  onDelete: (id: number) => Promise<void>
+}) {
   const [view, setView] = useState<'list' | 'calendar'>('list')
   const [filter, setFilter] = useState('all')
   const [month, setMonth] = useState(4)
   const [year] = useState(2026)
-  const [showForm, setShowForm] = useState(false)
   const [dateRange, setDateRange] = useState<DateRange>({ from: '', to: '' })
   const today = todayISO()
 
   const [items, setItems] = useState<FutebolEvent[]>(initialItems)
+  const [modalTarget, setModalTarget] = useState<FutebolEvent | null | undefined>(undefined)
+  // undefined = closed, null = new, FutebolEvent = editing
+
   const filtered = (filter === 'all' ? items : items.filter(e => e.type === filter))
     .filter(e => e.date && e.date !== '-')
     .filter(e => {
@@ -118,9 +182,23 @@ export default function FutebolView({ initialItems }: { initialItems: FutebolEve
     })
   const sorted = [...filtered].sort((a, b) => a.date.localeCompare(b.date))
 
-  const addItem = (data: any) => {
-    const id = items.reduce((m, c) => Math.max(m, c.id), 0) + 1
-    setItems(arr => [...arr, { id, ...data } as FutebolEvent])
+  const handleSave = async (data: Omit<FutebolEvent, 'id'>) => {
+    if (modalTarget === null) {
+      // create
+      const created = await onSave({ id: 0, ...data })
+      setItems(arr => [...arr, created].sort((a, b) => a.date.localeCompare(b.date)))
+    } else if (modalTarget) {
+      // update
+      const updated = { ...modalTarget, ...data }
+      await onSave(updated)
+      setItems(arr => arr.map(x => x.id === updated.id ? updated : x))
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!modalTarget) return
+    await onDelete(modalTarget.id)
+    setItems(arr => arr.filter(x => x.id !== modalTarget.id))
   }
 
   return (
@@ -139,7 +217,7 @@ export default function FutebolView({ initialItems }: { initialItems: FutebolEve
           <button className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>Lista</button>
           <button className={view === 'calendar' ? 'active' : ''} onClick={() => setView('calendar')}>Calendário</button>
         </div>
-        <button className="btn btn-accent" onClick={() => setShowForm(true)}><Icon.plus /> Novo evento</button>
+        <button className="btn btn-accent" onClick={() => setModalTarget(null)}><Icon.plus /> Novo evento</button>
       </div>
 
       <div className="list-wrap">
@@ -154,7 +232,8 @@ export default function FutebolView({ initialItems }: { initialItems: FutebolEve
               const tp = FUT_TYPES.find(t => t.id === e.type) ?? { color: '#999', label: e.type }
               const past = e.date < today
               return (
-                <div key={e.id} className="list-row" style={{ gridTemplateColumns: '40px 1.1fr 2fr 160px', opacity: past ? 0.5 : 1 }}>
+                <div key={e.id} className="list-row" onClick={() => setModalTarget(e)}
+                  style={{ gridTemplateColumns: '40px 1.1fr 2fr 160px', opacity: past ? 0.5 : 1, cursor: 'pointer' }}>
                   <div className="cell"><span className="dot" style={{ background: tp.color }} /></div>
                   <div className="cell">
                     <span style={{
@@ -163,7 +242,14 @@ export default function FutebolView({ initialItems }: { initialItems: FutebolEve
                       color: tp.color,
                     }}>{tp.label}</span>
                   </div>
-                  <div className="cell" style={{ fontSize: 14, fontWeight: 500 }}>{e.name}</div>
+                  <div className="cell" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={{ fontSize: 14, fontWeight: 500 }}>{e.name}</span>
+                    {e.notes && (
+                      <span style={{ fontSize: 12, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 400 }}>
+                        {e.notes}
+                      </span>
+                    )}
+                  </div>
                   <div className="cell" style={{ fontSize: 13, color: 'var(--ink-2)', fontVariantNumeric: 'tabular-nums' }}>
                     {fmtBR(e.date)}
                   </div>
@@ -180,13 +266,18 @@ export default function FutebolView({ initialItems }: { initialItems: FutebolEve
                 <button onClick={() => setMonth(m => Math.min(11, m + 1))}><Icon.chevR /></button>
               </div>
             </div>
-            <MiniCalendar events={filtered} year={year} month={month} />
+            <MiniCalendar events={filtered} year={year} month={month} onEventClick={setModalTarget} />
           </div>
         )}
       </div>
 
-      {showForm && (
-        <FutebolFormModal onClose={() => setShowForm(false)} onSave={addItem} />
+      {modalTarget !== undefined && (
+        <FutebolModal
+          initial={modalTarget}
+          onClose={() => setModalTarget(undefined)}
+          onSave={handleSave}
+          onDelete={modalTarget ? handleDelete : undefined}
+        />
       )}
     </>
   )

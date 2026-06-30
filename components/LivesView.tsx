@@ -19,6 +19,46 @@ import {
 } from '@/lib/types'
 import { Icon } from './Icons'
 
+// ─── CSV export ──────────────────────────────────────────────
+
+function exportLivesCSV(lives: Live[]) {
+  const headers = [
+    'Data', 'Dia da semana', 'Hora', 'Status',
+    'Merchan 1', 'Cupom 1', 'Receita Cupom 1',
+    'Merchan 2', 'Cupom 2', 'Receita Cupom 2',
+    'Cupom extra', 'Receita extra',
+    'Receita UTM', 'Receita total',
+    'Pedidos cupom', 'Pedidos UTM', 'Pedidos total',
+    'Alcance', 'Produto', 'Criativo', 'UTM Campaign', 'Notes',
+  ]
+
+  const escape = (v: unknown) => {
+    const s = v == null ? '' : String(v)
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? `"${s.replace(/"/g, '""')}"`
+      : s
+  }
+
+  const rows = lives.map(l => [
+    l.date, l.diaSemana, l.hora, l.status,
+    l.merchan1, l.nominal1, l.receita1,
+    l.merchan2, l.nominal2, l.receita2,
+    l.cupomExtra, l.receitaExtra,
+    l.receitaUtm, l.receitaTotal,
+    l.ordersCupom ?? '', l.ordersUtm ?? '', l.ordersTotal ?? '',
+    l.alcance, l.produto, l.criativo, l.utmCampaign, l.notes,
+  ].map(escape).join(','))
+
+  const csv = [headers.join(','), ...rows].join('\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `lives_${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 // ─── Chart palette ───────────────────────────────────────────
 
 const LIVES_AXIS       = 'oklch(0.62 0.012 300)'
@@ -1207,6 +1247,9 @@ export default function LivesView({
         )}
 
         <div style={{ flex: 1 }} />
+        <button className="btn btn-ghost" onClick={() => exportLivesCSV(lives)} title="Exportar histórico completo como CSV">
+          <Icon.download /> Exportar CSV
+        </button>
         <button className="btn btn-ghost" onClick={onOpenMerchans}>
           <Icon.settings /> Gerenciar merchans
         </button>

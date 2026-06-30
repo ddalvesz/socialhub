@@ -368,7 +368,7 @@ export const WEEKDAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 export const WEEKDAYS_FULL = ['Dom.','Seg.','Ter.','Qua.','Qui.','Sex.','Sáb.']
 export const MONTH_ABBR = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ']
 
-export type AppView = 'calendar' | 'stories' | 'branding' | 'mh' | 'comemorativas' | 'futebol' | 'campaigns' | 'collections' | 'profile' | 'lives' | 'archived' | 'canal' | 'site_links'
+export type AppView = 'calendar' | 'stories' | 'branding' | 'mh' | 'comemorativas' | 'futebol' | 'campaigns' | 'collections' | 'profile' | 'lives' | 'archived' | 'canal' | 'site_links' | 'metrics'
 
 // ─── Site Links ───────────────────────────────────────────────
 

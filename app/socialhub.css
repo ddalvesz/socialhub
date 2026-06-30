@@ -138,17 +138,7 @@ a { color: inherit; text-decoration: none }
 }
 .sb-item.active svg { color: var(--accent-deep) }
 .sb-item svg { width: 18px; height: 18px; flex: 0 0 18px; color: var(--ink-3) }
-.sb-count {
-  margin-left: auto;
-  font-size: 11.5px;
-  color: var(--ink-3);
-  background: var(--surface-3);
-  padding: 1px 7px;
-  border-radius: 999px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-}
-.sb-item.active .sb-count { background: rgba(255,255,255,.7); color: var(--accent-deep) }
+.sb-count { display: none; }
 
 .sb-user {
   margin-top: auto;

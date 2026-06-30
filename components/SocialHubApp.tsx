@@ -41,6 +41,7 @@ import SiteLinksView from './SiteLinksView'
 import LiveModal from './LiveModal'
 import MerchansModal from './MerchansModal'
 import StoryModal from './StoryModal'
+import MetricsView from './MetricsView'
 
 
 interface Props {
@@ -284,7 +285,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   }, [])
 
   const BRAND_VIEWS: Record<Brand, AppView[]> = {
-    gocase:   ['calendar','branding','mh','comemorativas','futebol','campaigns','collections','archived','lives','stories','site_links','profile'],
+    gocase:   ['calendar','branding','mh','comemorativas','futebol','campaigns','collections','archived','lives','stories','site_links','metrics','profile'],
     barbours: ['calendar','canal','comemorativas','campaigns','archived','lives','stories','site_links','profile'],
     kokeshi:  ['calendar','campaigns','lives','stories','site_links','profile'],
     lescent:  ['calendar','campaigns','lives','stories','site_links','profile'],
@@ -957,6 +958,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     archived:      { title: 'Arquivados',           sub: 'Itens arquivados'                      },
     canal:         { title: 'Canal',                sub: 'Mensagens · WhatsApp / Telegram'       },
     site_links:    { title: 'Links do Site',        sub: 'Catálogo de produtos e UTMs'            },
+    metrics:       { title: 'Métricas Sociais',     sub: 'Instagram · TikTok · 2026'             },
   }
   const { title, sub } = viewTitles[view]
   const isCalView = view === 'calendar' || view === 'branding'
@@ -1011,6 +1013,17 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             <button className={`sb-item ${view === 'collections' ? 'active' : ''}`} onClick={() => setView('collections')}><Icon.collections /> <span>Coleções</span><span className="sb-count">{collections.length}</span></button>
             <button className={`sb-item ${view === 'site_links' ? 'active' : ''}`} onClick={() => setView('site_links')}><Icon.link /> <span>Links do Site</span></button>
             <button className={`sb-item ${view === 'archived' ? 'active' : ''}`} onClick={() => setView('archived')}><Icon.trash /> <span>Arquivados</span></button>
+          </div>
+          <div className="sb-section">
+            <div className="sb-label">Análise</div>
+            <button className={`sb-item ${view === 'metrics' ? 'active' : ''}`} onClick={() => setView('metrics')}>
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+                <rect x="2" y="11" width="3" height="5" rx="1"/>
+                <rect x="7.5" y="6" width="3" height="10" rx="1"/>
+                <rect x="13" y="2" width="3" height="14" rx="1"/>
+              </svg>
+              <span>Métricas</span>
+            </button>
           </div>
           <div className="sb-section">
             <div className="sb-label">Performance</div>
@@ -1111,7 +1124,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             </div>
           )}
 
-          {view !== 'stories' && view !== 'canal' && (
+          {view !== 'stories' && view !== 'canal' && view !== 'metrics' && (
             <button className="btn btn-accent" onClick={() => createPost({})}>
               <Icon.plus /> Novo post
             </button>
@@ -1346,6 +1359,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
           />
         )}
         {view === 'archived' && <ArchivedView />}
+        {view === 'metrics'  && <MetricsView />}
         {view === 'site_links' && (
           <SiteLinksView
             brand={brand}

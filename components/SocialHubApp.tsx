@@ -979,7 +979,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     archived:      { title: 'Arquivados',           sub: 'Itens arquivados'                      },
     canal:         { title: 'Canal',                sub: 'Mensagens · WhatsApp / Telegram'       },
     site_links:    { title: 'Links do Site',        sub: 'Catálogo de produtos e UTMs'            },
-    metrics:       { title: 'Métricas Sociais',     sub: 'Instagram · TikTok · 2026'             },
+    metrics:       { title: 'KPIs Sociais',          sub: 'Instagram · TikTok · 2026'             },
   }
   const { title, sub } = viewTitles[view]
   const isCalView = view === 'calendar' || view === 'branding'
@@ -1036,18 +1036,17 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             <button className={`sb-item ${view === 'archived' ? 'active' : ''}`} onClick={() => setView('archived')}><Icon.trash /> <span>Arquivados</span></button>
           </div>
           <div className="sb-section">
-            <div className="sb-label">Análise</div>
+          </div>
+          <div className="sb-section" style={{ marginTop: -5 }}>
+            <div className="sb-label">Performance</div>
             <button className={`sb-item ${view === 'metrics' ? 'active' : ''}`} onClick={() => setView('metrics')}>
               <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
                 <rect x="2" y="11" width="3" height="5" rx="1"/>
                 <rect x="7.5" y="6" width="3" height="10" rx="1"/>
                 <rect x="13" y="2" width="3" height="14" rx="1"/>
               </svg>
-              <span>Métricas</span>
+              <span>KPIs</span>
             </button>
-          </div>
-          <div className="sb-section">
-            <div className="sb-label">Performance</div>
             <button className={`sb-item ${view === 'lives' ? 'active' : ''}`} onClick={() => setView('lives')}><Icon.live /> <span>Lives</span><span className="sb-count">{lives.filter(l => l.status === 'realizada').length}</span></button>
             <button className={`sb-item ${view === 'stories' ? 'active' : ''}`} onClick={() => setView('stories')}><Icon.stories /> <span>Stories</span><span className="sb-count">{storiesCount}</span></button>
           </div>

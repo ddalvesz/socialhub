@@ -2093,6 +2093,11 @@ function PostsView() {
 
 // ── MetricsView — main entry point ────────────────────────────────────────────
 
+// Aba Collab bloqueada temporariamente: a fonte de dados parou de marcar
+// TIPO = 'COLLAB' a partir de nov/2025 (posts recentes caem como INTERNO).
+// Religar assim que a planilha/import voltar a classificar collabs corretamente.
+const COLLAB_TAB_ENABLED = false
+
 export default function MetricsView() {
   const { data, loading, error } = useMetricsData()
   const [platform, setPlatform] = useState<'ig' | 'tt' | 'collab' | 'posts'>('ig')
@@ -2100,7 +2105,7 @@ export default function MetricsView() {
   const tabs = [
     { id: 'ig'     as const, label: 'Instagram',     dot: 'var(--c-ig-fg)' },
     { id: 'tt'     as const, label: 'TikTok',         dot: 'var(--c-tt-fg)' },
-    { id: 'collab' as const, label: 'Collab',         dot: COLLAB_BAR },
+    ...(COLLAB_TAB_ENABLED ? [{ id: 'collab' as const, label: 'Collab', dot: COLLAB_BAR }] : []),
     { id: 'posts'  as const, label: 'Tabela de Posts', dot: 'var(--ink-3)' },
   ]
 
@@ -2146,7 +2151,7 @@ export default function MetricsView() {
 
       {data && platform === 'ig' && <IGView data={data} />}
       {data && platform === 'tt' && <TTView data={data} />}
-      {platform === 'collab' && <CollabView />}
+      {COLLAB_TAB_ENABLED && platform === 'collab' && <CollabView />}
       {platform === 'posts' && <PostsView />}
     </>
   )

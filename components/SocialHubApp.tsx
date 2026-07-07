@@ -2,10 +2,11 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { safeWrite } from '@/lib/supabase/safeWrite'
 import {
   Post, Platform, PostSource, AppView, CalendarMode, Campaign, CanalPost, Collection, Linking,
-  EventDate, FutebolEvent, Live, Merchan, LiveStatus, SiteLink, Story, DayAggregate,
-  MONTHS, PLATFORMS, TAGS, STATUSES,
+  EventDate, FutebolEvent, Live, Merchan, LiveStatus, SiteLink, Story, StoryStatus, DayAggregate,
+  MONTHS, PLATFORMS, TAGS, STATUSES, SOURCES,
   addDaysISO, startOfWeekISO, todayISO, parseISO,
   CONTENT_TYPES_IG, CONTENT_TYPES_OTHER,
   colProgress,
@@ -19,6 +20,7 @@ import {
   dbToEventDate, dbToFutebolEvent, futebolEventToDb, dbToDayAggregate,
   dbToSiteLink, siteLinkToDb,
 } from '@/lib/supabase/mappers'
+import { showToast } from '@/lib/toast'
 import BrandSwitcher from './BrandSwitcher'
 import { WEEKDAY_NOMES, shortLabel } from '@/lib/livesUtils'
 import { Icon, PlatformIcon } from './Icons'
@@ -42,6 +44,8 @@ import LiveModal from './LiveModal'
 import MerchansModal from './MerchansModal'
 import StoryModal from './StoryModal'
 import MetricsView from './MetricsView'
+import ShareSocialView from './ShareSocialView'
+import ToastHost from './Toast'
 
 
 interface Props {
@@ -290,6 +294,18 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     kokeshi:  ['calendar','campaigns','lives','stories','site_links','profile'],
     lescent:  ['calendar','campaigns','lives','stories','site_links','profile'],
   }
+  // A qual aba/AppView cada calendário (PostSource) pertence — usado para
+  // só oferecer, no seletor do post, os calendários que existem para a marca ativa.
+  const SOURCE_VIEW: Partial<Record<PostSource, AppView>> = {
+    branding: 'branding',
+    mh:       'mh',
+    copa:     'futebol',
+    canal:    'canal',
+  }
+  const sourceOptions = SOURCES.filter(s => {
+    const v = SOURCE_VIEW[s.id]
+    return v ? BRAND_VIEWS[brand].includes(v) : false
+  })
   const handleBrandChange = (b: Brand) => {
     setBrandState(b)
     localStorage.setItem('activeBrand', b)
@@ -458,7 +474,13 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
       if (changed.length > 0) {
         setTimeout(() => {
           changed.forEach(col => {
-            supabase.from('collections').update(collectionToDb(col)).eq('id', col.id).then(() => {})
+            const old = prevMap.get(col.id)
+            safeWrite(
+              supabase.from('collections').update(collectionToDb(col)).eq('id', col.id),
+              'Falha ao salvar a coleção. A alteração foi desfeita.',
+            ).then(ok => {
+              if (!ok && old) setCollectionsRaw(arr => arr.map(c => c.id === col.id ? old : c))
+            })
           })
         }, 0)
       }
@@ -477,7 +499,13 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
       if (changed.length > 0) {
         setTimeout(() => {
           changed.forEach(camp => {
-            supabase.from('campaigns').update(campaignToDb(camp)).eq('id', camp.id).then(() => {})
+            const old = prevMap.get(camp.id)
+            safeWrite(
+              supabase.from('campaigns').update(campaignToDb(camp)).eq('id', camp.id),
+              'Falha ao salvar a campanha. A alteração foi desfeita.',
+            ).then(ok => {
+              if (!ok && old) setCampaignsRaw(arr => arr.map(c => c.id === camp.id ? old : c))
+            })
           })
         }, 0)
       }
@@ -536,28 +564,72 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
 
   // ─── CRUD ─────────────────────────────────────────────────────
   const savePost = async (p: Post) => {
+    const prev = posts
+    const original = posts.find(x => x.id === p.id)
+
+    // Post mudou de calendário (ex: Branding → Máquina de Hits): cada calendário
+    // é uma tabela física própria, então "salvar" aqui significa mover a linha.
+    if (original && original.source !== p.source) {
+      setPosts(arr => arr.filter(x => x.id !== p.id))
+      const { id, source, ...rest } = p
+      const { data, error } = await supabase.from(sourceToTable(source)).insert({ ...postToDb(rest, source), brand }).select().single()
+      if (error || !data) {
+        console.error(error)
+        showToast('Falha ao mover o post para o novo calendário.')
+        setPosts(prev)
+        return
+      }
+      await safeWrite(
+        supabase.from(sourceToTable(original.source)).delete().eq('id', id),
+        'Post movido, mas houve falha ao remover a cópia do calendário anterior.',
+      )
+      const moved = { ...p, id: String(data.id) } as Post
+      setPosts(arr => [...arr, moved])
+      setActivePost(moved)
+      return
+    }
+
     setPosts(arr => arr.map(x => x.id === p.id ? p : x))
     const { id, source, ...rest } = p
-    await supabase.from(sourceToTable(source)).update(postToDb(rest, source)).eq('id', id)
+    const ok = await safeWrite(
+      supabase.from(sourceToTable(source)).update(postToDb(rest, source)).eq('id', id),
+      'Falha ao salvar o post. As alterações foram desfeitas.',
+    )
+    if (!ok) setPosts(prev)
   }
 
   const movePost = async (postId: string, date: string, time?: string) => {
     const post = posts.find(p => p.id === postId)
     if (!post) return
+    const prev = posts
     const updated = { ...post, date, ...(time !== undefined ? { time } : {}) }
     setPosts(arr => arr.map(p => p.id === postId ? updated : p))
     const { id, source, ...rest } = updated
-    await supabase.from(sourceToTable(source)).update(postToDb(rest, source)).eq('id', id)
+    const ok = await safeWrite(
+      supabase.from(sourceToTable(source)).update(postToDb(rest, source)).eq('id', id),
+      'Falha ao mover o post. A alteração foi desfeita.',
+    )
+    if (!ok) setPosts(prev)
   }
 
   const deletePost = async (p: Post) => {
+    const prev = posts
     setPosts(arr => arr.filter(x => x.id !== p.id))
-    await supabase.from(sourceToTable(p.source)).delete().eq('id', p.id)
+    const ok = await safeWrite(
+      supabase.from(sourceToTable(p.source)).delete().eq('id', p.id),
+      'Falha ao excluir o post. Ele foi restaurado.',
+    )
+    if (!ok) setPosts(prev)
   }
 
   const archivePost = async (p: Post) => {
+    const prev = posts
     setPosts(arr => arr.filter(x => x.id !== p.id))
-    await supabase.from(sourceToTable(p.source)).update({ archived: true }).eq('id', p.id)
+    const ok = await safeWrite(
+      supabase.from(sourceToTable(p.source)).update({ archived: true }).eq('id', p.id),
+      'Falha ao arquivar o post. Ele foi restaurado.',
+    )
+    if (!ok) setPosts(prev)
   }
 
   const createPost = async (defaults: Partial<Post> & { source?: PostSource }) => {
@@ -755,6 +827,15 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     setActiveStory({
       id: '__new__', date: today, hora: 18, diaSemana: '', utm: '',
       produto: '', produtoSlug: '', categoria: '', status: 'nao_iniciado',
+      linkMidia: null, linkUtm: null, rastreioReceita: null, receita: null,
+      orders: null, notes: null, origem: 'manual',
+    })
+  }
+
+  const quickCreateStory = async (partial: { date: string; hora: number; produto: string; categoria: string; status: StoryStatus }) => {
+    await saveStory({
+      id: '__new__', date: partial.date, hora: partial.hora, diaSemana: '', utm: '',
+      produto: partial.produto, produtoSlug: '', categoria: partial.categoria, status: partial.status,
       linkMidia: null, linkUtm: null, rastreioReceita: null, receita: null,
       orders: null, notes: null, origem: 'manual',
     })
@@ -980,6 +1061,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     canal:         { title: 'Canal',                sub: 'Mensagens · WhatsApp / Telegram'       },
     site_links:    { title: 'Links do Site',        sub: 'Catálogo de produtos e UTMs'            },
     metrics:       { title: 'KPIs Sociais',          sub: 'Instagram · TikTok · 2026'             },
+    share_social:  { title: 'Share Social',          sub: 'Receita · Meta · Canal Social'         },
   }
   const { title, sub } = viewTitles[view]
   const isCalView = view === 'calendar' || view === 'branding'
@@ -999,6 +1081,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   // ─── Render ───────────────────────────────────────────────────
   return (
     <div className="app">
+      <ToastHost />
       {/* ── Sidebar ──────────────────────────────────────────── */}
       <aside className="sidebar">
         <div className="sb-brand">
@@ -1047,6 +1130,9 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
               </svg>
               <span>KPIs</span>
             </button>
+            <button className={`sb-item ${view === 'share_social' ? 'active' : ''}`} onClick={() => setView('share_social')}>
+              <Icon.share /> <span>Share Social</span>
+            </button>
             <button className={`sb-item ${view === 'lives' ? 'active' : ''}`} onClick={() => setView('lives')}><Icon.live /> <span>Lives</span><span className="sb-count">{lives.filter(l => l.status === 'realizada').length}</span></button>
             <button className={`sb-item ${view === 'stories' ? 'active' : ''}`} onClick={() => setView('stories')}><Icon.stories /> <span>Stories</span><span className="sb-count">{storiesCount}</span></button>
           </div>
@@ -1074,6 +1160,17 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
           </div>
           <div className="sb-section">
             <div className="sb-label">Performance</div>
+            <button className={`sb-item ${view === 'metrics' ? 'active' : ''}`} onClick={() => setView('metrics')}>
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+                <rect x="2" y="11" width="3" height="5" rx="1"/>
+                <rect x="7.5" y="6" width="3" height="10" rx="1"/>
+                <rect x="13" y="2" width="3" height="14" rx="1"/>
+              </svg>
+              <span>KPIs</span>
+            </button>
+            <button className={`sb-item ${view === 'share_social' ? 'active' : ''}`} onClick={() => setView('share_social')}>
+              <Icon.share /> <span>Share Social</span>
+            </button>
             <button className={`sb-item ${view === 'lives' ? 'active' : ''}`} onClick={() => setView('lives')}><Icon.live /> <span>Lives</span><span className="sb-count">{lives.filter(l => l.status === 'realizada').length}</span></button>
             <button className={`sb-item ${view === 'stories' ? 'active' : ''}`} onClick={() => setView('stories')}><Icon.stories /> <span>Stories</span><span className="sb-count">{storiesCount}</span></button>
           </div>
@@ -1088,6 +1185,17 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             </button>
             <button className={`sb-item ${view === 'campaigns' ? 'active' : ''}`} onClick={() => setView('campaigns')}><Icon.campaign /> <span>Campanhas</span><span className="sb-count">{campaigns.length}</span></button>
             <button className={`sb-item ${view === 'site_links' ? 'active' : ''}`} onClick={() => setView('site_links')}><Icon.link /> <span>Links do Site</span></button>
+            <button className={`sb-item ${view === 'metrics' ? 'active' : ''}`} onClick={() => setView('metrics')}>
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+                <rect x="2" y="11" width="3" height="5" rx="1"/>
+                <rect x="7.5" y="6" width="3" height="10" rx="1"/>
+                <rect x="13" y="2" width="3" height="14" rx="1"/>
+              </svg>
+              <span>KPIs</span>
+            </button>
+            <button className={`sb-item ${view === 'share_social' ? 'active' : ''}`} onClick={() => setView('share_social')}>
+              <Icon.share /> <span>Share Social</span>
+            </button>
             <button className={`sb-item ${view === 'lives' ? 'active' : ''}`} onClick={() => setView('lives')}><Icon.live /> <span>Lives</span><span className="sb-count">{lives.filter(l => l.status === 'realizada').length}</span></button>
             <button className={`sb-item ${view === 'stories' ? 'active' : ''}`} onClick={() => setView('stories')}><Icon.stories /> <span>Stories</span><span className="sb-count">{storiesCount}</span></button>
           </div>
@@ -1311,8 +1419,11 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
           <StoriesView
             stories={stories}
             dayAggregates={dayAggregates}
+            knownProducts={knownProducts}
+            knownCategorias={knownCategorias}
             onStoryCreated={s => setStories(arr => [s, ...arr])}
-            onStoryUpdated={s => setStories(arr => arr.map(x => x.id === s.id ? s : x))}
+            onStoryUpdated={saveStory}
+            onQuickCreateStory={quickCreateStory}
             onStoryClick={setActiveStory}
             onNewStory={createStory}
           />
@@ -1379,7 +1490,8 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
           />
         )}
         {view === 'archived' && <ArchivedView />}
-        {view === 'metrics'  && <MetricsView />}
+        {view === 'metrics'  && <MetricsView brand={brand} />}
+        {view === 'share_social' && <ShareSocialView brand={brand} />}
         {view === 'site_links' && (
           <SiteLinksView
             brand={brand}
@@ -1453,6 +1565,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             setProducts(prev => [...prev, name].sort())
           }}
           tagOptions={[...new Set(posts.flatMap(p => p.tags ?? []).filter(Boolean))].sort()}
+          sourceOptions={sourceOptions}
           allPosts={posts}
           onLinkedPostClick={p => setActivePost(p)}
         />

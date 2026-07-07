@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import type { Brand, SiteLink, Story, StoryStatus } from '@/lib/types'
 import { STORY_STATUS_META, buildUtmForStory, fmtBRL } from '@/lib/storiesUtils'
-import { Popover } from './FormHelpers'
+import { Popover, FreeCombobox } from './FormHelpers'
 import { Icon } from './Icons'
 
 /* ── Constants ────────────────────────────────────────────── */
@@ -70,79 +70,6 @@ function StoryStatusPill({ value, onChange }: { value: StoryStatus; onChange: (v
           )
         })}
       </Popover>
-    </div>
-  )
-}
-
-/* ── ProdutoCombobox (fallback sem site_links) ─────────────── */
-
-function FreeCombobox({ value, onChange, suggestions: allSuggestions, placeholder }: {
-  value: string
-  onChange: (v: string) => void
-  suggestions: string[]
-  placeholder?: string
-}) {
-  const [open, setOpen] = useState(false)
-  const [q, setQ] = useState(value)
-  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => { setQ(value) }, [value])
-
-  const suggestions = useMemo(() => {
-    const trimmed = q.trim().toLowerCase()
-    if (!trimmed) return allSuggestions.slice(0, 12)
-    return allSuggestions.filter(p => p.toLowerCase().includes(trimmed)).slice(0, 12)
-  }, [q, allSuggestions])
-
-  const commit = (v: string) => { onChange(v); setQ(v); setOpen(false) }
-
-  const openDropdown = () => {
-    if (inputRef.current) {
-      const r = inputRef.current.getBoundingClientRect()
-      setRect({ top: r.bottom + 4, left: r.left, width: r.width })
-    }
-    setOpen(true)
-  }
-
-  const showDropdown = open && suggestions.length > 0
-
-  return (
-    <div style={{ width: '100%' }}>
-      <input
-        ref={inputRef}
-        className="field"
-        value={q}
-        placeholder={placeholder ?? ''}
-        onChange={e => { setQ(e.target.value); onChange(e.target.value); openDropdown() }}
-        onFocus={openDropdown}
-        onKeyDown={e => { if (e.key === 'Escape') setOpen(false); if (e.key === 'Enter') { setOpen(false); inputRef.current?.blur() } }}
-        autoComplete="off"
-      />
-      {showDropdown && rect && (
-        <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 55 }} onClick={() => setOpen(false)} />
-          <div className="popover" style={{
-            position: 'fixed', top: rect.top, left: rect.left, width: rect.width,
-            zIndex: 56, maxHeight: 220, overflowY: 'auto',
-          }}>
-            {suggestions.map(p => (
-              <button key={p} className="po-item" onMouseDown={e => { e.preventDefault(); commit(p) }}>
-                {p}
-                {p === value && <span className="check"><Icon.check /></span>}
-              </button>
-            ))}
-            {q.trim() && !allSuggestions.includes(q.trim()) && (
-              <>
-                <div className="po-divider" />
-                <button className="po-item po-item-add" onMouseDown={e => { e.preventDefault(); commit(q.trim()) }}>
-                  <Icon.plus /> Usar &ldquo;{q.trim()}&rdquo;
-                </button>
-              </>
-            )}
-          </div>
-        </>
-      )}
     </div>
   )
 }

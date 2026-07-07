@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { safeWrite } from '@/lib/supabase/safeWrite'
+import { showToast } from '@/lib/toast'
 import type { CanalPost, PostStatus, Campaign, Brand } from '@/lib/types'
 import { fmtBR } from '@/lib/types'
 import { dbToCanalPost, canalPostToDb } from '@/lib/supabase/mappers'
@@ -227,8 +229,8 @@ interface ModalProps {
   isNew: boolean
   campaigns: Campaign[]
   onClose: () => void
-  onSave: (draft: CanalPost) => void
-  onDelete: (post: CanalPost) => void
+  onSave: (draft: CanalPost) => Promise<boolean>
+  onDelete: (post: CanalPost) => Promise<boolean>
 }
 
 function CanalMessageModal({ post, isNew, campaigns, onClose, onSave, onDelete }: ModalProps) {
@@ -373,7 +375,7 @@ function CanalMessageModal({ post, isNew, campaigns, onClose, onSave, onDelete }
         {/* Footer */}
         <div className="modal-foot">
           {!isNew && (
-            <button className="danger" type="button" onClick={() => { onDelete(draft); onClose() }}>
+            <button className="danger" type="button" onClick={async () => { if (await onDelete(draft)) onClose() }}>
               <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
               </svg>
@@ -382,7 +384,7 @@ function CanalMessageModal({ post, isNew, campaigns, onClose, onSave, onDelete }
           )}
           <div style={{ flex: 1 }} />
           <button className="btn btn-ghost" type="button" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-accent" type="button" onClick={() => { onSave(draft); onClose() }}>
+          <button className="btn btn-accent" type="button" onClick={async () => { if (await onSave(draft)) onClose() }}>
             {isNew ? 'Criar mensagem' : 'Salvar alterações'}
           </button>
         </div>
@@ -470,27 +472,44 @@ export default function CanalView({ posts, brand, campaigns, onPostAdded, onPost
     }
   }
 
-  async function handleSave(draft: CanalPost) {
+  async function handleSave(draft: CanalPost): Promise<boolean> {
     const isNew = !messages.some(m => m.id === draft.id)
     const row = canalPostToDb(draft)
     if (isNew) {
-      const { data } = await supabase.from('canal_posts').insert({ ...row, id: undefined }).select().single()
-      const saved = data ? dbToCanalPost(data as Record<string, unknown>) : draft
+      const { data, error } = await supabase.from('canal_posts').insert({ ...row, id: undefined }).select().single()
+      if (error || !data) {
+        console.error(error)
+        showToast('Falha ao criar a mensagem. Tente novamente.')
+        return false
+      }
+      const saved = dbToCanalPost(data as Record<string, unknown>)
       setMessages(arr => [...arr, saved])
       onPostAdded(saved)
       setExpandedId(saved.id)
-    } else {
-      await supabase.from('canal_posts').update(row).eq('id', draft.id)
-      setMessages(arr => arr.map(m => m.id === draft.id ? draft : m))
-      onPostUpdated(draft)
+      return true
     }
+    const prev = messages
+    setMessages(arr => arr.map(m => m.id === draft.id ? draft : m))
+    const ok = await safeWrite(
+      supabase.from('canal_posts').update(row).eq('id', draft.id),
+      'Falha ao salvar a mensagem. A alteração foi desfeita.',
+    )
+    if (!ok) { setMessages(prev); return false }
+    onPostUpdated(draft)
+    return true
   }
 
-  async function handleDelete(post: CanalPost) {
-    await supabase.from('canal_posts').delete().eq('id', post.id)
+  async function handleDelete(post: CanalPost): Promise<boolean> {
+    const prev = messages
     setMessages(arr => arr.filter(m => m.id !== post.id))
+    const ok = await safeWrite(
+      supabase.from('canal_posts').delete().eq('id', post.id),
+      'Falha ao excluir a mensagem. Ela foi restaurada.',
+    )
+    if (!ok) { setMessages(prev); return false }
     onPostDeleted(post.id)
     if (expandedId === post.id) setExpandedId(null)
+    return true
   }
 
   function handleDuplicate(post: CanalPost) {

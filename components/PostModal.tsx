@@ -5,8 +5,8 @@ import { Icon, PlatformIcon } from './Icons'
 import DeleteConfirmModal from './DeleteConfirmModal'
 import { Popover, GenericSelect, DatePicker } from './FormHelpers'
 import {
-  Post, Platform, PostStatus, Campaign,
-  PLATFORMS, STATUSES, LINHAS_ED,
+  Post, Platform, PostSource, PostStatus, Campaign,
+  PLATFORMS, STATUSES, SOURCES, LINHAS_ED,
   CONTENT_TYPES_IG, CONTENT_TYPES_OTHER, CONTENT_TYPES_YOUTUBE,
 } from '@/lib/types'
 import { TEAM_NAMES } from '@/lib/data'
@@ -22,6 +22,7 @@ interface Props {
   campaigns?: Campaign[]
   products?: string[]
   tagOptions?: string[]
+  sourceOptions?: { id: PostSource; label: string }[]
   onAddProduct?: (name: string) => Promise<void>
   allPosts?: Post[]
   onLinkedPostClick?: (post: Post) => void
@@ -153,8 +154,39 @@ function PlatformSelect({ value, onChange }: { value: Platform; onChange: (v: Pl
   )
 }
 
+// ─── Source (calendar) select ─────────────────────────────────
+function SourceSelect({ value, options, onChange }: { value: PostSource; options: { id: PostSource; label: string }[]; onChange: (v: PostSource) => void }) {
+  const [open, setOpen] = useState(false)
+  const list = options.some(o => o.id === value) ? options : [...options, ...SOURCES.filter(s => s.id === value)]
+  const cur = list.find(o => o.id === value) ?? { id: value, label: value }
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)',
+          background: 'transparent', border: '1px solid var(--line)',
+          borderRadius: 6, padding: '2px 6px 2px 8px', cursor: 'pointer',
+        }}
+      >
+        {cur.label}
+        <Icon.chevD />
+      </button>
+      <Popover open={open} onClose={() => setOpen(false)}>
+        {list.map(o => (
+          <button key={o.id} className="po-item" onClick={() => { onChange(o.id); setOpen(false) }}>
+            {o.label}
+            {o.id === value && <span className="check"><Icon.check /></span>}
+          </button>
+        ))}
+      </Popover>
+    </div>
+  )
+}
+
 // ─── Main modal ──────────────────────────────────────────────
-export default function PostModal({ post, onClose, onSave, onDelete, onArchive, onDuplicate, showProduct, campaigns = [], products = [], tagOptions = [], onAddProduct, allPosts = [], onLinkedPostClick }: Props) {
+export default function PostModal({ post, onClose, onSave, onDelete, onArchive, onDuplicate, showProduct, campaigns = [], products = [], tagOptions = [], sourceOptions = SOURCES, onAddProduct, allPosts = [], onLinkedPostClick }: Props) {
   const [draft, setDraft] = useState<Post>(post)
   const [newProduct, setNewProduct] = useState('')
   const [addingProduct, setAddingProduct] = useState(false)
@@ -213,8 +245,9 @@ export default function PostModal({ post, onClose, onSave, onDelete, onArchive, 
             />
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 6 }}>
               <StatusSelect value={draft.status} onChange={v => set('status', v)} />
+              <SourceSelect value={draft.source} options={sourceOptions} onChange={v => set('source', v)} />
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
-                {draft.source} · {String(draft.id).slice(0, 8)}
+                {String(draft.id).slice(0, 8)}
               </span>
               {linkedPost && linkedPlat && (
                 <button

@@ -5,7 +5,8 @@ import {
   ComposedChart, Area, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, LabelList, Cell,
 } from 'recharts'
-import type { Story, DayAggregate } from '@/lib/types'
+import type { Story, StoryStatus, DayAggregate } from '@/lib/types'
+import { FreeCombobox } from './FormHelpers'
 import {
   storiesKpis, eficienciaAlcance,
   receitaComparacao, receitaVariacao, engajamentoDiario, correlacaoReceitaAlcance,
@@ -29,6 +30,7 @@ const PERIOD_OPTS: { id: PeriodId; label: string }[] = [
 
 const WEEKDAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
 const SLOT_LABELS = ['7h–9h','9h–11h','11h–13h','13h–15h','15h–17h','17h–19h','19h–21h','21h–23h']
+const HORA_OPTS = [7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22]
 
 const AXIS_COLOR = 'oklch(0.62 0.012 300)'
 const GRID_COLOR = 'oklch(0.94 0.01 300)'
@@ -996,11 +998,149 @@ function StoriesWeekView({ weekStart, stories, onStoryClick }: {
 
 /* ── Stories Calendar — List view ────────────────────────── */
 
-function StoriesListView({ year, month, stories, onStoryClick }: {
+interface DraftStoryRow {
+  tempId: string
+  date: string
+  hora: number
+  produto: string
+  categoria: string
+  status: StoryStatus
+}
+
+function draftToFakeStory(d: DraftStoryRow): Story {
+  return {
+    id: d.tempId, date: d.date, hora: d.hora, diaSemana: '', utm: '',
+    produto: d.produto, produtoSlug: '', categoria: d.categoria, status: d.status,
+    linkMidia: null, linkUtm: null, rastreioReceita: null, receita: null,
+    orders: null, notes: null, origem: 'manual',
+  }
+}
+
+function StoryListRow({
+  story, isDraft, saving, onOpen, onStatusChange, onHoraChange, onProdutoCommit, onCategoriaCommit, onDiscard,
+  knownProducts, knownCategorias,
+}: {
+  story: Story
+  isDraft: boolean
+  saving?: boolean
+  onOpen: () => void
+  onStatusChange: (s: Story, id: string) => void
+  onHoraChange: (hora: number) => void
+  onProdutoCommit: (produto: string) => void
+  onCategoriaCommit: (categoria: string) => void
+  onDiscard?: () => void
+  knownProducts: string[]
+  knownCategorias: string[]
+}) {
+  const col = STATUS_COLORS[story.status] ?? STATUS_COLORS.nao_iniciado
+  const smallInput: React.CSSProperties = {
+    fontSize: 12.5, padding: '5px 8px', boxSizing: 'border-box',
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+  }
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', marginBottom: 4,
+        borderRadius: 10, background: 'var(--surface)',
+        border: isDraft ? '1px dashed var(--line-2)' : '1px solid var(--border)',
+        opacity: saving ? 0.55 : 1, transition: 'background 0.12s, opacity 0.12s',
+        pointerEvents: saving ? 'none' : 'auto',
+      }}
+      onMouseEnter={e => { if (!isDraft) e.currentTarget.style.background = col.bg }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface)' }}
+    >
+      <select
+        className="field"
+        value={story.hora}
+        onChange={e => onHoraChange(Number(e.target.value))}
+        style={{
+          fontSize: 12.5, boxSizing: 'border-box', width: 92, flexShrink: 0,
+          padding: '5px 8px', paddingRight: 22, fontFamily: 'var(--font-mono)',
+        }}
+      >
+        {HORA_OPTS.map(h => <option key={h} value={h}>{pad(h)}:00</option>)}
+      </select>
+
+      <div style={{ width: 220, flexShrink: 0, boxSizing: 'border-box' }}>
+        <FreeCombobox
+          value={story.produto}
+          onChange={() => {}}
+          onCommit={onProdutoCommit}
+          suggestions={knownProducts}
+          placeholder="Produto foco…"
+          inputStyle={smallInput}
+        />
+      </div>
+
+      <div style={{ width: 150, flexShrink: 0, boxSizing: 'border-box' }}>
+        <FreeCombobox
+          value={story.categoria}
+          onChange={() => {}}
+          onCommit={onCategoriaCommit}
+          suggestions={knownCategorias}
+          placeholder="Categoria…"
+          inputStyle={{ ...smallInput, color: 'var(--ink-2)' }}
+        />
+      </div>
+
+      {story.receita != null && (
+        <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT, flexShrink: 0, whiteSpace: 'nowrap' }}>
+          {fmtBRL(story.receita)}
+        </div>
+      )}
+
+      <div style={{ flex: 1 }} />
+
+      <StoryStatusCell story={story} onStatusChange={onStatusChange} />
+
+      {isDraft ? (
+        <button
+          onClick={onDiscard}
+          title="Descartar rascunho"
+          style={{
+            width: 22, height: 22, flexShrink: 0, borderRadius: 6, border: 'none', background: 'transparent',
+            color: 'var(--ink-3)', cursor: 'pointer', display: 'grid', placeItems: 'center',
+          }}
+        >
+          <svg viewBox="0 0 16 16" width={12} height={12} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/>
+          </svg>
+        </button>
+      ) : (
+        <button
+          onClick={onOpen}
+          title="Abrir detalhes"
+          style={{
+            width: 22, height: 22, flexShrink: 0, borderRadius: 6, border: 'none', background: 'transparent',
+            color: 'var(--ink-3)', cursor: 'pointer', display: 'grid', placeItems: 'center',
+          }}
+        >
+          <svg viewBox="0 0 16 16" width={12} height={12} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 3h7v7M13 3 3 13"/>
+          </svg>
+        </button>
+      )}
+    </div>
+  )
+}
+
+function StoriesListView({
+  year, month, stories, onStoryClick, onStoryUpdated, onQuickCreateStory, knownProducts, knownCategorias,
+}: {
   year: number; month: number; stories: Story[]
   onStoryClick: (s: Story) => void
+  onStoryUpdated: (s: Story) => void
+  onQuickCreateStory: (partial: { date: string; hora: number; produto: string; categoria: string; status: StoryStatus }) => Promise<void>
+  knownProducts: string[]
+  knownCategorias: string[]
 }) {
   const today = todayISO()
+  const [drafts, setDrafts] = useState<DraftStoryRow[]>([])
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkDate, setBulkDate] = useState(today)
+  const [bulkQty, setBulkQty] = useState(3)
+
   const monthStories = stories
     .filter(s => {
       const [y, m] = s.date.split('-').map(Number)
@@ -1008,29 +1148,89 @@ function StoriesListView({ year, month, stories, onStoryClick }: {
     })
     .sort((a, b) => a.date !== b.date ? a.date.localeCompare(b.date) : a.hora - b.hora)
 
-  const grouped: [string, Story[]][] = []
-  for (const s of monthStories) {
-    const last = grouped[grouped.length - 1]
-    if (last && last[0] === s.date) last[1].push(s)
-    else grouped.push([s.date, [s]])
-  }
+  const monthDrafts = drafts
+    .filter(d => {
+      const [y, m] = d.date.split('-').map(Number)
+      return y === year && m - 1 === month
+    })
+    .sort((a, b) => a.date !== b.date ? a.date.localeCompare(b.date) : a.hora - b.hora)
 
-  if (!grouped.length) {
-    return (
-      <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--ink-3)' }}>
-        Nenhum story neste mês.
-      </div>
-    )
-  }
+  const dates = Array.from(new Set([...monthStories.map(s => s.date), ...monthDrafts.map(d => d.date)])).sort()
 
   const weekdayShort = (iso: string) => {
     const d = parseISO(iso)
     return ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][d.getDay()]
   }
 
+  const addDraft = (date: string) => {
+    setDrafts(ds => [...ds, { tempId: crypto.randomUUID(), date, hora: 18, produto: '', categoria: '', status: 'nao_iniciado' }])
+  }
+
+  const patchDraft = (tempId: string, patch: Partial<DraftStoryRow>) => {
+    setDrafts(ds => ds.map(d => d.tempId === tempId ? { ...d, ...patch } : d))
+  }
+
+  const removeDraft = (tempId: string) => setDrafts(ds => ds.filter(d => d.tempId !== tempId))
+
+  const commitDraftProduto = async (draft: DraftStoryRow, produtoRaw: string) => {
+    const produto = produtoRaw.trim()
+    patchDraft(draft.tempId, { produto })
+    if (!produto) return
+    setSavingIds(ids => new Set(ids).add(draft.tempId))
+    await onQuickCreateStory({ date: draft.date, hora: draft.hora, produto, categoria: draft.categoria, status: draft.status })
+    removeDraft(draft.tempId)
+    setSavingIds(ids => { const next = new Set(ids); next.delete(draft.tempId); return next })
+  }
+
+  const confirmBulk = () => {
+    const n = Math.max(1, Math.min(30, Math.round(bulkQty) || 1))
+    setDrafts(ds => [
+      ...ds,
+      ...Array.from({ length: n }, () => ({
+        tempId: crypto.randomUUID(), date: bulkDate, hora: 18, produto: '', categoria: '', status: 'nao_iniciado' as StoryStatus,
+      })),
+    ])
+    setBulkOpen(false)
+  }
+
+  const toolbar = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+      <button className="btn btn-ghost" style={{ fontSize: 12.5, padding: '6px 12px' }} onClick={() => addDraft(today)}>
+        + Nova story
+      </button>
+      <button className="btn btn-ghost" style={{ fontSize: 12.5, padding: '6px 12px' }} onClick={() => setBulkOpen(o => !o)}>
+        + Adicionar em lote
+      </button>
+      {bulkOpen && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--ink-2)' }}>
+          <input type="date" className="field" value={bulkDate} onChange={e => setBulkDate(e.target.value)} style={{ fontSize: 12.5, padding: '5px 8px', width: 130 }} />
+          <span>×</span>
+          <input type="number" min={1} max={30} className="field" value={bulkQty} onChange={e => setBulkQty(Number(e.target.value))} style={{ fontSize: 12.5, padding: '5px 8px', width: 56 }} />
+          <span>linhas</span>
+          <button className="btn btn-accent" style={{ fontSize: 12.5, padding: '5px 12px' }} onClick={confirmBulk}>Adicionar</button>
+          <button className="btn btn-ghost" style={{ fontSize: 12.5, padding: '5px 12px' }} onClick={() => setBulkOpen(false)}>Cancelar</button>
+        </div>
+      )}
+    </div>
+  )
+
+  if (!dates.length) {
+    return (
+      <div className="pautas-view" style={{ paddingTop: 16 }}>
+        {toolbar}
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--ink-3)' }}>
+          Nenhum story neste mês.
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="pautas-view" style={{ paddingTop: 16 }}>
-      {grouped.map(([date, dayStories]) => {
+      {toolbar}
+      {dates.map(date => {
+        const dayStories = monthStories.filter(s => s.date === date)
+        const dayDrafts = monthDrafts.filter(d => d.date === date)
         const isToday = date === today
         const isPast = date < today
         const [, mm, dd] = date.split('-')
@@ -1047,50 +1247,45 @@ function StoriesListView({ year, month, stories, onStoryClick }: {
               {isToday && <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 2, fontWeight: 700 }}>hoje</div>}
             </div>
             <div style={{ flex: 1, borderLeft: `2px solid ${isToday ? 'var(--accent-soft)' : 'var(--border)'}`, paddingLeft: 16, paddingTop: 8, paddingBottom: 8 }}>
-              {dayStories.map(s => {
-                const col = STATUS_COLORS[s.status] ?? STATUS_COLORS.nao_iniciado
-                const meta = STORY_STATUS_META[s.status]
-                return (
-                  <div
-                    key={s.id}
-                    onClick={() => onStoryClick(s)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', marginBottom: 4,
-                      borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)',
-                      cursor: 'pointer', transition: 'background 0.12s',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = col.bg }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface)' }}
-                  >
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)', width: 40, flexShrink: 0 }}>
-                      {pad(s.hora)}:00
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {s.produto || '—'}
-                      </div>
-                      {s.categoria && (
-                        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>{s.categoria}</div>
-                      )}
-                    </div>
-                    {s.receita != null && (
-                      <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT, flexShrink: 0 }}>
-                        {fmtBRL(s.receita)}
-                      </div>
-                    )}
-                    <span className={`status-pill ${
-                      s.status === 'nao_iniciado' ? 's-st-ni'
-                      : s.status === 'em_andamento' ? 's-st-ea'
-                      : s.status === 'feito' ? 's-st-feito'
-                      : s.status === 'proposta' ? 's-st-post'
-                      : s.status === 'postado' ? 's-st-postado'
-                      : 's-st-np'
-                    }`} style={{ flexShrink: 0 }}>
-                      <span className="sdot" />{meta?.label ?? s.status}
-                    </span>
-                  </div>
-                )
-              })}
+              {dayStories.map(s => (
+                <StoryListRow
+                  key={s.id}
+                  story={s}
+                  isDraft={false}
+                  onOpen={() => onStoryClick(s)}
+                  onStatusChange={(_, st) => onStoryUpdated({ ...s, status: st as StoryStatus })}
+                  onHoraChange={hora => onStoryUpdated({ ...s, hora })}
+                  onProdutoCommit={v => { const produto = v.trim(); if (produto !== s.produto) onStoryUpdated({ ...s, produto }) }}
+                  onCategoriaCommit={v => { const categoria = v.trim(); if (categoria !== s.categoria) onStoryUpdated({ ...s, categoria }) }}
+                  knownProducts={knownProducts}
+                  knownCategorias={knownCategorias}
+                />
+              ))}
+              {dayDrafts.map(d => (
+                <StoryListRow
+                  key={d.tempId}
+                  story={draftToFakeStory(d)}
+                  isDraft
+                  saving={savingIds.has(d.tempId)}
+                  onOpen={() => {}}
+                  onStatusChange={(_, st) => patchDraft(d.tempId, { status: st as StoryStatus })}
+                  onHoraChange={hora => patchDraft(d.tempId, { hora })}
+                  onProdutoCommit={v => commitDraftProduto(d, v)}
+                  onCategoriaCommit={v => patchDraft(d.tempId, { categoria: v.trim() })}
+                  onDiscard={() => removeDraft(d.tempId)}
+                  knownProducts={knownProducts}
+                  knownCategorias={knownCategorias}
+                />
+              ))}
+              <button
+                onClick={() => addDraft(date)}
+                style={{
+                  fontSize: 12, color: 'var(--ink-3)', background: 'transparent', border: 'none',
+                  cursor: 'pointer', padding: '4px 2px', textAlign: 'left',
+                }}
+              >
+                + adicionar story
+              </button>
             </div>
           </div>
         )
@@ -1101,16 +1296,23 @@ function StoriesListView({ year, month, stories, onStoryClick }: {
 
 /* ── Main StoriesView ────────────────────────────────────── */
 
+interface QuickCreatePartial {
+  date: string; hora: number; produto: string; categoria: string; status: StoryStatus
+}
+
 interface Props {
   stories: Story[]
   dayAggregates: DayAggregate[]
+  knownProducts: string[]
+  knownCategorias: string[]
   onStoryCreated: (s: Story) => void
   onStoryUpdated: (s: Story) => void
+  onQuickCreateStory: (partial: QuickCreatePartial) => Promise<void>
   onStoryClick: (s: Story) => void
   onNewStory: () => void
 }
 
-export default function StoriesView({ stories, dayAggregates, onStoryCreated, onStoryUpdated, onStoryClick, onNewStory }: Props) {
+export default function StoriesView({ stories, dayAggregates, knownProducts, knownCategorias, onStoryCreated, onStoryUpdated, onQuickCreateStory, onStoryClick, onNewStory }: Props) {
   const today = todayISO()
   const todayDate = parseISO(today)
   const [viewMode, setViewMode] = useState<'analytics' | 'calendar'>('analytics')
@@ -1306,6 +1508,10 @@ export default function StoriesView({ stories, dayAggregates, onStoryCreated, on
           month={month}
           stories={stories}
           onStoryClick={onStoryClick}
+          onStoryUpdated={onStoryUpdated}
+          onQuickCreateStory={onQuickCreateStory}
+          knownProducts={knownProducts}
+          knownCategorias={knownCategorias}
         />
       )}
 

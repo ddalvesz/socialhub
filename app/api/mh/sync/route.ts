@@ -79,6 +79,7 @@ export async function POST() {
 
   // 3. Verificar cada pasta no Dropbox
   const results: { name: string; semana: number; count: number }[] = []
+  const failures: { name: string; semana: number; error: string }[] = []
   let totalUpdated = 0
 
   for (const { owner, semana, ids } of groups.values()) {
@@ -98,8 +99,11 @@ export async function POST() {
     if (!updateErr) {
       totalUpdated += ids.length
       results.push({ name: owner, semana, count: ids.length })
+    } else {
+      console.error(`[mh/sync] falha ao atualizar ${owner} semana ${semana}:`, updateErr)
+      failures.push({ name: owner, semana, error: updateErr.message })
     }
   }
 
-  return NextResponse.json({ updated: totalUpdated, creators: results })
+  return NextResponse.json({ updated: totalUpdated, creators: results, failures })
 }

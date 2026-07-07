@@ -2526,3 +2526,20 @@ textarea.field { resize: vertical; min-height: 80px; font-family: inherit; line-
 
 .btn-sm { padding: 5px 12px !important; font-size: 12px !important; }
 .field-sm { padding: 6px 10px; font-size: 13px; }
+
+/* ── Toast ────────────────────────────────────────────────── */
+.toast-host {
+  position: fixed; bottom: 20px; right: 20px; z-index: 9999;
+  display: flex; flex-direction: column; gap: 8px; max-width: 360px;
+}
+.toast {
+  padding: 12px 16px; border-radius: var(--radius-sm); font-size: 13.5px;
+  font-weight: 500; color: #fff; box-shadow: var(--shadow-lg);
+  animation: toast-in .15s ease-out;
+}
+.toast-error   { background: oklch(0.55 0.19 25); }
+.toast-success { background: oklch(0.55 0.14 145); }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

@@ -1,10 +1,12 @@
 'use client'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import type { Brand } from '@/lib/types'
 import {
   useReactTable, getCoreRowModel, flexRender,
   type ColumnDef, type VisibilityState, type SortingState,
 } from '@tanstack/react-table'
+import { mN, mFull, mPct, MonthPicker, KpiCard, SectionHead, ChartLegend, MONTH_LABELS } from './metrics/SharedMetricsUI'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -63,12 +65,14 @@ interface MetricsDataShape {
   diasNoMes: number
   ig: {
     metas: { views: number; alcance: number; interacoes: number }
+    weeklyGoal: number
     mensal: IgMonthEntry[]
     breakdown: Record<string, { reels: BreakdownEntry | null; posts: BreakdownEntry | null }>
     semanal: IgWeekEntry[]
   }
   tt: {
     metas: { views: number }
+    weeklyGoal: number
     mensal: TtMonthEntry[]
     semanal: TtWeekEntry[]
   }
@@ -76,17 +80,21 @@ interface MetricsDataShape {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const MONTHS_FULL = [
-  'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
-  'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro',
-]
-const MONTH_LABELS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
-const IG_METAS = { views: 12000000, alcance: 10000000, interacoes: 300000 }
-const TT_METAS = { views: 1000000 }
-const IG_WEEKLY_GOAL = 2800000
-const TT_WEEKLY_GOAL = 233333
+// Metas oficiais só existem para a Gocase hoje. Marcas sem meta cadastrada
+// ficam com tudo zerado — a UI trata meta 0 como "não cadastrada" e esconde o Pace.
+const IG_METAS_BY_BRAND: Record<Brand, { views: number; alcance: number; interacoes: number }> = {
+  gocase:   { views: 12000000, alcance: 10000000, interacoes: 300000 },
+  barbours: { views: 0, alcance: 0, interacoes: 0 },
+  kokeshi:  { views: 0, alcance: 0, interacoes: 0 },
+  lescent:  { views: 0, alcance: 0, interacoes: 0 },
+}
+const TT_METAS_BY_BRAND: Record<Brand, { views: number }> = {
+  gocase: { views: 1000000 }, barbours: { views: 0 }, kokeshi: { views: 0 }, lescent: { views: 0 },
+}
+const IG_WEEKLY_GOAL_BY_BRAND: Record<Brand, number> = { gocase: 2800000, barbours: 0, kokeshi: 0, lescent: 0 }
+const TT_WEEKLY_GOAL_BY_BRAND: Record<Brand, number> = { gocase: 233333, barbours: 0, kokeshi: 0, lescent: 0 }
 const ANO = 2026
 
 // ── Data fetching hook ────────────────────────────────────────────────────────
@@ -101,7 +109,7 @@ function weekDays(dias: string): number {
   return Math.round((b.getTime() - a.getTime()) / 86400000) + 1
 }
 
-function useMetricsData() {
+function useMetricsData(brand: Brand) {
   const [data, setData] = useState<MetricsDataShape | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -112,16 +120,21 @@ function useMetricsData() {
     const mesIdx = today.getMonth()        // 0-based
     const mes = mesIdx + 1                 // 1-based
     const diasNoMes = MONTH_DAYS[mesIdx]
+    const igWeeklyGoal = IG_WEEKLY_GOAL_BY_BRAND[brand]
+    const ttWeeklyGoal = TT_WEEKLY_GOAL_BY_BRAND[brand]
+
+    setLoading(true)
+    setError(null)
 
     async function load() {
       const sb = createClient()
 
       const [r1, r2, r3, r4, r5] = await Promise.all([
-        sb.from('v_metricas_ig_mensal_2026').select('*').order('mes'),
-        sb.from('v_metricas_ig_breakdown_2026').select('*').order('mes'),
-        sb.from('v_metricas_ig_semanal_2026').select('*').order('semana'),
-        sb.from('v_metricas_tt_mensal_2026').select('*').order('mes'),
-        sb.from('v_metricas_tt_semanal_2026').select('*').order('semana'),
+        sb.from('v_metricas_ig_mensal_2026').select('*').eq('brand', brand).order('mes'),
+        sb.from('v_metricas_ig_breakdown_2026').select('*').eq('brand', brand).order('mes'),
+        sb.from('v_metricas_ig_semanal_2026').select('*').eq('brand', brand).order('semana'),
+        sb.from('v_metricas_tt_mensal_2026').select('*').eq('brand', brand).order('mes'),
+        sb.from('v_metricas_tt_semanal_2026').select('*').eq('brand', brand).order('semana'),
       ])
 
       if (r1.error || r2.error || r3.error || r4.error || r5.error) {
@@ -165,7 +178,7 @@ function useMetricsData() {
         return {
           semana: Number(r.semana),
           dias: String(r.dias),
-          meta: days < 7 ? Math.round(IG_WEEKLY_GOAL * days / 7) : IG_WEEKLY_GOAL,
+          meta: days < 7 ? Math.round(igWeeklyGoal * days / 7) : igWeeklyGoal,
           views: Number(r.views),
           alcance: Number(r.alcance),
           interacoes: Number(r.interacoes),
@@ -190,7 +203,7 @@ function useMetricsData() {
         return {
           semana: Number(r.semana),
           dias: String(r.dias),
-          meta: days < 7 ? Math.round(TT_WEEKLY_GOAL * days / 7) : TT_WEEKLY_GOAL,
+          meta: days < 7 ? Math.round(ttWeeklyGoal * days / 7) : ttWeeklyGoal,
           views: Number(r.views),
           posts: Number(r.qtd_posts),
           engaj: Number(r.engaj),
@@ -211,8 +224,8 @@ function useMetricsData() {
         mes,
         dia,
         diasNoMes,
-        ig: { metas: IG_METAS, mensal: igMensal, breakdown, semanal: igSemanal },
-        tt: { metas: TT_METAS, mensal: ttMensal, semanal: ttSemanal },
+        ig: { metas: IG_METAS_BY_BRAND[brand], weeklyGoal: igWeeklyGoal, mensal: igMensal, breakdown, semanal: igSemanal },
+        tt: { metas: TT_METAS_BY_BRAND[brand], weeklyGoal: ttWeeklyGoal, mensal: ttMensal, semanal: ttSemanal },
       })
       setLoading(false)
     }
@@ -221,24 +234,9 @@ function useMetricsData() {
       setError('Erro inesperado ao carregar métricas')
       setLoading(false)
     })
-  }, [])
+  }, [brand])
 
   return { data, loading, error }
-}
-
-// ── Formatters ────────────────────────────────────────────────────────────────
-
-function mN(n: number | null | undefined, dp = 1): string {
-  if (n == null) return '—'
-  if (n >= 1e6) return (n / 1e6).toFixed(dp).replace(/\.0+$/, '') + 'M'
-  if (n >= 1e3) return (n / 1e3).toFixed(dp).replace(/\.0+$/, '') + 'K'
-  return n.toLocaleString('pt-BR')
-}
-function mFull(n: number | null | undefined): string {
-  return n == null ? '—' : Math.round(n).toLocaleString('pt-BR')
-}
-function mPct(p: number | null | undefined, dp = 2): string {
-  return p == null ? '—' : p.toFixed(dp).replace('.', ',') + '%'
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -248,174 +246,6 @@ function weekSem(dias: string): 1 | 2 {
   const parts = start.split('/')
   if (parts.length < 2) return 1
   return parseInt(parts[1], 10) <= 6 ? 1 : 2
-}
-
-// ── Month Picker ──────────────────────────────────────────────────────────────
-
-function MonthPicker({ mensal, selectedIdx, onChange, ano }: {
-  mensal: { label: string }[]
-  selectedIdx: number
-  onChange: (i: number) => void
-  ano: number
-}) {
-  const canBack = selectedIdx > 0
-  const canFwd  = selectedIdx < mensal.length - 1
-  const fullName = MONTHS_FULL[selectedIdx]
-
-  const btnStyle = (enabled: boolean): React.CSSProperties => ({
-    width: 32, height: 32, borderRadius: '50%', padding: 0, border: '1.5px solid var(--line)',
-    background: 'var(--surface)', color: enabled ? 'var(--ink)' : 'var(--ink-4)',
-    cursor: enabled ? 'pointer' : 'default', display: 'flex', alignItems: 'center',
-    justifyContent: 'center', fontSize: 20, lineHeight: '1', fontFamily: 'var(--font-sans)',
-    opacity: enabled ? 1 : 0.35, flexShrink: 0,
-  })
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
-      <button onClick={() => canBack && onChange(selectedIdx - 1)} disabled={!canBack} style={btnStyle(canBack)}>‹</button>
-
-      <div style={{ minWidth: 170 }}>
-        <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-0.035em', color: 'var(--ink)', lineHeight: 1 }}>
-          {fullName}
-        </div>
-        <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>{ano}</div>
-      </div>
-
-      <button onClick={() => canFwd && onChange(selectedIdx + 1)} disabled={!canFwd} style={btnStyle(canFwd)}>›</button>
-
-      <div style={{ display: 'flex', gap: 4, marginLeft: 6, flexWrap: 'wrap' }}>
-        {mensal.map((m, i) => {
-          const active = i === selectedIdx
-          return (
-            <button key={i} onClick={() => onChange(i)} style={{
-              padding: '5px 11px', borderRadius: 999, lineHeight: '1',
-              border: `1.5px solid ${active ? 'var(--accent)' : 'var(--line)'}`,
-              background: active ? 'var(--accent)' : 'var(--surface)',
-              color: active ? '#fff' : 'var(--ink-2)',
-              fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: active ? 700 : 400,
-              cursor: 'pointer',
-            }}>{m.label}</button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ── KPI Card ──────────────────────────────────────────────────────────────────
-
-function KpiCard({ label, value, sub, highlight, currRaw, prevRaw, prevLabel, isPartialMonth, diaAtual, diasNoMesPrev, noProrate, isPct }: {
-  label: string
-  value: string | number
-  sub?: string
-  highlight?: boolean
-  currRaw?: number | null
-  prevRaw?: number | null
-  prevLabel?: string | null
-  isPartialMonth?: boolean
-  diaAtual?: number
-  diasNoMesPrev?: number | null
-  noProrate?: boolean
-  isPct?: boolean
-}) {
-  const [hovered, setHovered] = useState(false)
-
-  const fairPrev = (isPartialMonth && !noProrate && prevRaw != null && diasNoMesPrev)
-    ? prevRaw * ((diaAtual ?? 0) / diasNoMesPrev)
-    : prevRaw
-
-  const delta = (currRaw != null && fairPrev)
-    ? ((currRaw - fairPrev) / Math.abs(fairPrev)) * 100
-    : null
-
-  const hasTip = prevLabel != null && prevRaw != null && currRaw != null
-  const displayFairPrev = isPct ? mPct(fairPrev) : mFull(fairPrev != null ? Math.round(fairPrev) : null)
-  const displayCurr = isPct ? mPct(currRaw ?? null) : mFull(currRaw != null ? Math.round(currRaw) : null)
-  const deltaColor = delta != null && delta >= 0 ? 'oklch(0.46 0.13 150)' : 'oklch(0.5 0.16 25)'
-
-  const cardBg = highlight
-    ? 'var(--accent-gradient-softer)'
-    : (hasTip && delta != null)
-      ? delta >= 0 ? 'oklch(0.975 0.016 150)' : 'oklch(0.975 0.016 25)'
-      : 'var(--surface)'
-
-  const cardBorder = (hovered && hasTip)
-    ? 'var(--accent-soft)'
-    : highlight
-      ? 'var(--accent-soft)'
-      : (hasTip && delta != null)
-        ? delta >= 0 ? 'oklch(0.87 0.055 150)' : 'oklch(0.87 0.055 25)'
-        : 'var(--line)'
-
-  return (
-    <div style={{ position: 'relative' }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <div style={{
-        background: cardBg,
-        border: `1px solid ${cardBorder}`,
-        borderRadius: 'var(--radius-md)', padding: '14px 18px',
-        transition: 'border-color .15s, box-shadow .15s',
-        boxShadow: hovered && hasTip ? '0 2px 12px oklch(0 0 0 / 0.07)' : 'none',
-        userSelect: 'none',
-      }}>
-        <div style={{ fontSize: 10.5, color: highlight ? 'var(--accent-deep)' : 'var(--ink-3)', fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 5 }}>
-          {label}
-        </div>
-        <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.022em', color: highlight ? 'var(--accent-deep)' : 'var(--ink)', lineHeight: 1, fontVariantNumeric: 'tabular-nums', marginBottom: 6 }}>
-          {value}
-        </div>
-        <div style={{ minHeight: 16, display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-          {sub && <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{sub}</span>}
-          {hasTip && delta != null && (
-            <span style={{ fontSize: 11, fontWeight: 700, color: deltaColor, fontVariantNumeric: 'tabular-nums' }}>
-              {delta >= 0 ? '+' : ''}{delta.toFixed(1)}%
-            </span>
-          )}
-        </div>
-      </div>
-
-      {hovered && hasTip && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 7px)', left: 0, right: 0, zIndex: 30,
-          background: 'var(--surface)', border: '1px solid var(--line)',
-          borderRadius: 'var(--radius-md)', padding: '12px 14px',
-          boxShadow: '0 8px 24px oklch(0 0 0 / 0.1)', pointerEvents: 'none',
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 10 }}>
-            {isPartialMonth && !noProrate ? `vs ${prevLabel} · proporcional ao dia ${diaAtual}` : `vs ${prevLabel}`}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-            <div>
-              <div style={{ fontSize: 10, color: 'var(--ink-4)', marginBottom: 3 }}>Este mês</div>
-              <div style={{ fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--ink)', lineHeight: 1 }}>
-                {displayCurr}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, color: 'var(--ink-4)', marginBottom: 3 }}>
-                {isPartialMonth && !noProrate ? `${prevLabel} (dia ${diaAtual})` : prevLabel}
-              </div>
-              <div style={{ fontSize: 16, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: 'var(--ink-2)', lineHeight: 1 }}>
-                {displayFairPrev}
-              </div>
-            </div>
-          </div>
-          {delta != null && (
-            <div style={{ borderTop: '1px solid var(--line)', paddingTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 10, color: 'var(--ink-4)' }}>
-                {isPartialMonth && !noProrate ? 'Comparação proporcional' : 'Variação'}
-              </span>
-              <span style={{ fontSize: 20, fontWeight: 800, color: deltaColor, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.025em', lineHeight: 1 }}>
-                {delta >= 0 ? '+' : ''}{delta.toFixed(1)}%
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
 }
 
 // ── Breakdown Table ───────────────────────────────────────────────────────────
@@ -496,31 +326,6 @@ function PaceTable({ items, dia, diasNoMes, isComplete }: {
   )
 }
 
-// ── Chart Legend ──────────────────────────────────────────────────────────────
-
-function ChartLegend({ items }: { items: { color: string; label: string; type: 'bar' | 'line' | 'dashed' }[] }) {
-  return (
-    <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginBottom: 12 }}>
-      {items.map((it, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--ink-3)' }}>
-          {it.type === 'bar' ? (
-            <div style={{ width: 11, height: 11, background: it.color, borderRadius: 2, flexShrink: 0 }} />
-          ) : it.type === 'dashed' ? (
-            <svg width={18} height={6} style={{ overflow: 'visible', flexShrink: 0 }}>
-              <line x1={0} y1={3} x2={18} y2={3} stroke={it.color} strokeWidth={2} strokeDasharray="4,2" />
-            </svg>
-          ) : (
-            <svg width={18} height={8} style={{ overflow: 'visible', flexShrink: 0 }}>
-              <line x1={0} y1={4} x2={18} y2={4} stroke={it.color} strokeWidth={2} />
-              <circle cx={9} cy={4} r={2.5} fill={it.color} />
-            </svg>
-          )}
-          <span>{it.label}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
 
 // ── Bar + Line SVG chart ──────────────────────────────────────────────────────
 
@@ -745,20 +550,6 @@ function StackedDualChart({ data, bar1Key, bar2Key, bar1Color, bar2Color, lineKe
   )
 }
 
-// ── Section Head ──────────────────────────────────────────────────────────────
-
-function SectionHead({ title, sub, right }: { title: string; sub?: string; right?: React.ReactNode }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 14 }}>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.015em', color: 'var(--ink)' }}>{title}</div>
-        {sub && <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>{sub}</div>}
-      </div>
-      {right && <div>{right}</div>}
-    </div>
-  )
-}
-
 // ── Monthly Tables ────────────────────────────────────────────────────────────
 
 function IGMonthlyTable({ data, selectedIdx }: { data: IgMonthEntry[]; selectedIdx: number }) {
@@ -852,7 +643,7 @@ function IGWeeklyTable({ data }: { data: IgWeekEntry[] }) {
         {data.length === 0
           ? <div style={{ padding: '20px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>Sem dados para este período</div>
           : data.map((d, i) => {
-            const hit = d.views >= d.meta
+            const hit = d.meta > 0 && d.views >= d.meta
             const metaDelta = d.meta > 0 ? ((d.views - d.meta) / d.meta) * 100 : null
             const metaDeltaColor = metaDelta != null && metaDelta >= 0 ? 'oklch(0.46 0.13 150)' : 'oklch(0.5 0.16 25)'
             const prev = i > 0 ? data[i - 1] : null
@@ -862,7 +653,7 @@ function IGWeeklyTable({ data }: { data: IgWeekEntry[] }) {
               <div key={i} className="list-row" style={{ gridTemplateColumns: cols }}>
                 <div className="cell" style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>{d.semana}</div>
                 <div className="cell" style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{d.dias}</div>
-                <div className="cell" style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--ink-3)' }}>{mFull(d.meta)}</div>
+                <div className="cell" style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--ink-3)' }}>{d.meta > 0 ? mFull(d.meta) : '—'}</div>
                 <div className="cell" style={{ paddingLeft: 40, display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: hit ? 600 : 400, color: hit ? 'oklch(0.42 0.13 150)' : 'var(--ink)' }}>
                     {mFull(d.views)}
@@ -901,7 +692,7 @@ function TTWeeklyTable({ data }: { data: TtWeekEntry[] }) {
         {data.length === 0
           ? <div style={{ padding: '20px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>Sem dados para este período</div>
           : data.map((d, i) => {
-            const hit = d.views >= d.meta
+            const hit = d.meta > 0 && d.views >= d.meta
             const metaDelta = d.meta > 0 ? ((d.views - d.meta) / d.meta) * 100 : null
             const metaDeltaColor = metaDelta != null && metaDelta >= 0 ? 'oklch(0.46 0.13 150)' : 'oklch(0.5 0.16 25)'
             const prev = i > 0 ? data[i - 1] : null
@@ -911,7 +702,7 @@ function TTWeeklyTable({ data }: { data: TtWeekEntry[] }) {
               <div key={i} className="list-row" style={{ gridTemplateColumns: cols }}>
                 <div className="cell" style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>{d.semana}</div>
                 <div className="cell" style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{d.dias}</div>
-                <div className="cell" style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--ink-3)' }}>{mFull(d.meta)}</div>
+                <div className="cell" style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--ink-3)' }}>{d.meta > 0 ? mFull(d.meta) : '—'}</div>
                 <div className="cell" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: hit ? 600 : 400, color: hit ? 'oklch(0.42 0.13 150)' : 'var(--ink)' }}>
                     {mFull(d.views)}
@@ -995,14 +786,20 @@ function IGView({ data }: { data: MetricsDataShape }) {
             title="Pace do Mês"
             sub={`${isComplete ? 'Mês concluído' : `Dia ${diaUsed} de ${diasNoMesUsed}`} · ${curr.label} ${ano}`}
           />
-          <PaceTable
-            items={[
-              { label: 'Views Reels', real: curr.viewsReels, meta: ig.metas.views },
-              { label: 'Alcance',     real: curr.alcance,    meta: ig.metas.alcance },
-              { label: 'Interações',  real: curr.interacoes, meta: ig.metas.interacoes },
-            ]}
-            dia={diaUsed} diasNoMes={diasNoMesUsed} isComplete={isComplete}
-          />
+          {ig.metas.views > 0 ? (
+            <PaceTable
+              items={[
+                { label: 'Views Reels', real: curr.viewsReels, meta: ig.metas.views },
+                { label: 'Alcance',     real: curr.alcance,    meta: ig.metas.alcance },
+                { label: 'Interações',  real: curr.interacoes, meta: ig.metas.interacoes },
+              ]}
+              dia={diaUsed} diasNoMes={diasNoMesUsed} isComplete={isComplete}
+            />
+          ) : (
+            <div style={{ padding: '18px 22px', color: 'var(--ink-3)', fontSize: 13, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+              Metas de Instagram ainda não cadastradas para esta marca.
+            </div>
+          )}
         </section>
       </div>
 
@@ -1034,11 +831,11 @@ function IGView({ data }: { data: MetricsDataShape }) {
             <ChartLegend items={[
               { color: 'var(--accent)',        label: 'Views Reels', type: 'bar' },
               { color: 'var(--p-ig)',          label: 'Alcance',     type: 'line' },
-              { color: 'oklch(0.58 0.13 150)', label: 'Meta',        type: 'dashed' },
+              ...(ig.weeklyGoal > 0 ? [{ color: 'oklch(0.58 0.13 150)', label: 'Meta', type: 'dashed' as const }] : []),
             ]} />
             <BarLineChart data={weeklyChartData as unknown as Record<string, unknown>[]} barKey="views" barColor="var(--accent)"
               lineKey="alcance" lineColor="var(--p-ig)"
-              goalVal={IG_WEEKLY_GOAL} goalColor="oklch(0.58 0.13 150)"
+              goalVal={ig.weeklyGoal > 0 ? ig.weeklyGoal : undefined} goalColor="oklch(0.58 0.13 150)"
               showBarLabels={false} height={190} />
           </div>
         )}
@@ -1104,10 +901,16 @@ function TTView({ data }: { data: MetricsDataShape }) {
       {/* Pace */}
       <section>
         <SectionHead title="Pace do Mês" sub={`${isComplete ? 'Mês concluído' : `Dia ${diaUsed} de ${diasNoMesUsed}`} · ${curr.label} ${ano}`} />
-        <PaceTable
-          items={[{ label: 'Views', real: totalViews, meta: tt.metas.views }]}
-          dia={diaUsed} diasNoMes={diasNoMesUsed} isComplete={isComplete}
-        />
+        {tt.metas.views > 0 ? (
+          <PaceTable
+            items={[{ label: 'Views', real: totalViews, meta: tt.metas.views }]}
+            dia={diaUsed} diasNoMes={diasNoMesUsed} isComplete={isComplete}
+          />
+        ) : (
+          <div style={{ padding: '18px 22px', color: 'var(--ink-3)', fontSize: 13, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+            Metas de TikTok ainda não cadastradas para esta marca.
+          </div>
+        )}
       </section>
 
       {/* Monthly chart + table */}
@@ -1141,10 +944,10 @@ function TTView({ data }: { data: MetricsDataShape }) {
           <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius)', padding: '16px 16px 8px', marginBottom: 12 }}>
             <ChartLegend items={[
               { color: TT_BAR1,                label: 'Views', type: 'bar' },
-              { color: 'oklch(0.58 0.13 150)', label: 'Meta',  type: 'dashed' },
+              ...(tt.weeklyGoal > 0 ? [{ color: 'oklch(0.58 0.13 150)', label: 'Meta', type: 'dashed' as const }] : []),
             ]} />
             <BarLineChart data={weeklyChartData as unknown as Record<string, unknown>[]} barKey="views" barColor={TT_BAR1}
-              goalVal={TT_WEEKLY_GOAL} goalColor="oklch(0.58 0.13 150)"
+              goalVal={tt.weeklyGoal > 0 ? tt.weeklyGoal : undefined} goalColor="oklch(0.58 0.13 150)"
               showBarLabels={false} height={180} />
           </div>
         )}
@@ -1474,7 +1277,7 @@ function CollabView() {
             />
           </FilterField>
         </div>
-        <IgPostsTable filters={{ ...EMPTY_FILTERS, tipo: 'COLLAB', conta: contaFilter }} />
+        <IgPostsTable brand="gocase" filters={{ ...EMPTY_FILTERS, tipo: 'COLLAB', conta: contaFilter }} />
       </section>
     </div>
   )
@@ -1577,7 +1380,7 @@ const TT_SORT_DB_COLUMN: Partial<Record<keyof TtPost, string>> = {
 
 interface SortSpec { id: string; desc: boolean }
 
-function useIgPosts(filters: PostsFilters, sort: SortSpec | null) {
+function useIgPosts(brand: Brand, filters: PostsFilters, sort: SortSpec | null) {
   const [rows, setRows] = useState<IgPost[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
@@ -1585,14 +1388,14 @@ function useIgPosts(filters: PostsFilters, sort: SortSpec | null) {
   const [error, setError] = useState<string | null>(null)
   const { mes, ano, conta, tipoPub, tipo, nicho } = filters
 
-  useEffect(() => { setPage(0) }, [mes, ano, conta, tipoPub, tipo, nicho, sort?.id, sort?.desc])
+  useEffect(() => { setPage(0) }, [brand, mes, ano, conta, tipoPub, tipo, nicho, sort?.id, sort?.desc])
 
   useEffect(() => {
     setLoading(true)
     setError(null)
     const sb = createClient()
     let q = sb
-      .from('metricas_posts_instagram_gocase')
+      .from(`metricas_posts_instagram_${brand}`)
       .select('*', { count: 'exact' })
 
     q = applyMesFilter(q, mes, ano)
@@ -1612,7 +1415,7 @@ function useIgPosts(filters: PostsFilters, sort: SortSpec | null) {
         setTotal(count ?? 0)
         setLoading(false)
       })
-  }, [mes, ano, conta, tipoPub, tipo, nicho, page, sort])
+  }, [brand, mes, ano, conta, tipoPub, tipo, nicho, page, sort])
 
   return { rows, total, page, setPage, loading, error }
 }
@@ -1652,9 +1455,10 @@ function useTtPosts(filters: PostsFilters, sort: SortSpec | null) {
   return { rows, total, page, setPage, loading, error }
 }
 
-function useDistinctValues(table: string, column: string) {
+function useDistinctValues(table: string, column: string, enabled = true) {
   const [values, setValues] = useState<string[]>([])
   useEffect(() => {
+    if (!enabled) { setValues([]); return }
     createClient()
       .from(table)
       .select('*')
@@ -1667,7 +1471,7 @@ function useDistinctValues(table: string, column: string) {
           setValues(unique)
         }
       })
-  }, [table, column])
+  }, [table, column, enabled])
   return values
 }
 
@@ -1918,9 +1722,9 @@ function useTtColumns(): ColumnDef<TtPost, any>[] {
   ], [])
 }
 
-function IgPostsTable({ filters }: { filters: PostsFilters }) {
+function IgPostsTable({ brand, filters }: { brand: Brand; filters: PostsFilters }) {
   const [sort, setSort] = useState<SortSpec | null>(null)
-  const { rows, total, page, setPage, loading, error } = useIgPosts(filters, sort)
+  const { rows, total, page, setPage, loading, error } = useIgPosts(brand, filters, sort)
   const columns = useIgColumns()
 
   if (loading) return <div style={{ padding: '40px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>Carregando…</div>
@@ -2034,15 +1838,18 @@ function PostsFiltersBar({ platform, years, tipoPubOptions, tipoOptions, nichoOp
   )
 }
 
-function PostsView() {
+function PostsView({ brand }: { brand: Brand }) {
+  const hasTikTok = brand === 'gocase'
   const [platform, setPlatform] = useState<'ig' | 'tt'>('ig')
   const [filters, setFilters] = useState<PostsFilters>(EMPTY_FILTERS)
 
-  const igMonths = useDistinctValues('metricas_posts_instagram_gocase', 'MÊS')
-  const ttMonths = useDistinctValues('metricas_posts_tiktok_gocase', 'MÊS')
-  const tipoPubOptions = useDistinctValues('metricas_posts_instagram_gocase', 'Tipo de publicação')
-  const tipoOptions = useDistinctValues('metricas_posts_instagram_gocase', 'TIPO')
-  const nichoOptions = useDistinctValues('metricas_posts_instagram_gocase', 'NICHO')
+  useEffect(() => { if (!hasTikTok) setPlatform('ig') }, [hasTikTok])
+
+  const igMonths = useDistinctValues(`metricas_posts_instagram_${brand}`, 'MÊS')
+  const ttMonths = useDistinctValues('metricas_posts_tiktok_gocase', 'MÊS', hasTikTok)
+  const tipoPubOptions = useDistinctValues(`metricas_posts_instagram_${brand}`, 'Tipo de publicação')
+  const tipoOptions = useDistinctValues(`metricas_posts_instagram_${brand}`, 'TIPO')
+  const nichoOptions = useDistinctValues(`metricas_posts_instagram_${brand}`, 'NICHO')
 
   const months = platform === 'ig' ? igMonths : ttMonths
   const years = useMemo(
@@ -2052,7 +1859,7 @@ function PostsView() {
 
   const subTabs = [
     { id: 'ig' as const, label: 'Instagram', color: 'var(--c-ig-fg)' },
-    { id: 'tt' as const, label: 'TikTok',    color: 'oklch(0.52 0.15 232)' },
+    ...(hasTikTok ? [{ id: 'tt' as const, label: 'TikTok', color: 'oklch(0.52 0.15 232)' }] : []),
   ]
 
   return (
@@ -2085,8 +1892,8 @@ function PostsView() {
         filters={filters}
         onChange={setFilters}
       />
-      {platform === 'ig' && <IgPostsTable filters={filters} />}
-      {platform === 'tt' && <TtPostsTable filters={filters} />}
+      {platform === 'ig' && <IgPostsTable brand={brand} filters={filters} />}
+      {platform === 'tt' && hasTikTok && <TtPostsTable filters={filters} />}
     </div>
   )
 }
@@ -2098,13 +1905,16 @@ function PostsView() {
 // Religar assim que a planilha/import voltar a classificar collabs corretamente.
 const COLLAB_TAB_ENABLED = false
 
-export default function MetricsView() {
-  const { data, loading, error } = useMetricsData()
+export default function MetricsView({ brand }: { brand: Brand }) {
+  const { data, loading, error } = useMetricsData(brand)
+  const hasTikTok = brand === 'gocase'
   const [platform, setPlatform] = useState<'ig' | 'tt' | 'collab' | 'posts'>('ig')
+
+  useEffect(() => { if (!hasTikTok && platform === 'tt') setPlatform('ig') }, [hasTikTok, platform])
 
   const tabs = [
     { id: 'ig'     as const, label: 'Instagram',     dot: 'var(--c-ig-fg)' },
-    { id: 'tt'     as const, label: 'TikTok',         dot: 'var(--c-tt-fg)' },
+    ...(hasTikTok ? [{ id: 'tt' as const, label: 'TikTok', dot: 'var(--c-tt-fg)' }] : []),
     ...(COLLAB_TAB_ENABLED ? [{ id: 'collab' as const, label: 'Collab', dot: COLLAB_BAR }] : []),
     { id: 'posts'  as const, label: 'Tabela de Posts', dot: 'var(--ink-3)' },
   ]
@@ -2150,9 +1960,9 @@ export default function MetricsView() {
       )}
 
       {data && platform === 'ig' && <IGView data={data} />}
-      {data && platform === 'tt' && <TTView data={data} />}
+      {data && platform === 'tt' && hasTikTok && <TTView data={data} />}
       {COLLAB_TAB_ENABLED && platform === 'collab' && <CollabView />}
-      {platform === 'posts' && <PostsView />}
+      {platform === 'posts' && <PostsView brand={brand} />}
     </>
   )
 }

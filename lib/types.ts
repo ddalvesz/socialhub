@@ -332,6 +332,15 @@ export const STATUSES = [
   { id: 'entregue' as PostStatus, label: 'Entregue',    className: 's-entregue' },
 ]
 
+export const SOURCES = [
+  { id: 'branding' as PostSource, label: 'Branding'         },
+  { id: 'mh'       as PostSource, label: 'Máquina de Hits'   },
+  { id: 'copa'     as PostSource, label: 'Futebol'           },
+  { id: 'canal'    as PostSource, label: 'Canal'             },
+  { id: 'tiktok'   as PostSource, label: 'TikTok'            },
+  { id: 'twitter'  as PostSource, label: 'Twitter'           },
+]
+
 export const TAGS = [
   { id: 'campanha', label: 'Campanha' },
   { id: 'branding', label: 'Branding' },
@@ -369,7 +378,7 @@ export const WEEKDAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 export const WEEKDAYS_FULL = ['Dom.','Seg.','Ter.','Qua.','Qui.','Sex.','Sáb.']
 export const MONTH_ABBR = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ']
 
-export type AppView = 'calendar' | 'stories' | 'branding' | 'mh' | 'comemorativas' | 'futebol' | 'campaigns' | 'collections' | 'profile' | 'lives' | 'archived' | 'canal' | 'site_links' | 'metrics'
+export type AppView = 'calendar' | 'stories' | 'branding' | 'mh' | 'comemorativas' | 'futebol' | 'campaigns' | 'collections' | 'profile' | 'lives' | 'archived' | 'canal' | 'site_links' | 'metrics' | 'share_social'
 
 // ─── Site Links ───────────────────────────────────────────────
 
@@ -400,7 +409,7 @@ export interface Live {
   receita2: number
   cupomExtra: string
   receitaExtra: number
-  receitaTotal: number
+  receitaTotal: number  // = receita1 + receita2 (nunca soma receitaUtm — cupom e UTM podem se sobrepor)
   receitaUtm: number
   ordersCupom: number | null
   ordersUtm: number | null

@@ -26,3 +26,7 @@ design_handoff_canal/
 design_handoff_metrics/
 handover-stories/
 design-reference/
+design_handoff_share_social/
+
+# Claude Code (config local, não compartilhada)
+.claude/settings.local.json

@@ -105,9 +105,9 @@ function WeekTooltip({ active, payload, label }: any) {
   return (
     <div className="live-tip">
       <div className="live-tip-name">Semana {label}</div>
-      <div className="live-tip-row"><span>Receita</span><strong>{fmtBRL(d.total)}</strong></div>
+      <div className="live-tip-row"><span>Receita cupom</span><strong>{fmtBRL(d.totalCupom)}</strong></div>
+      <div className="live-tip-row"><span>Receita UTM</span><strong>{fmtBRL(d.totalUtm)}</strong></div>
       <div className="live-tip-row"><span>Lives</span><strong>{d.count}</strong></div>
-      <div className="live-tip-row"><span>Média</span><strong>{fmtBRL(d.count > 0 ? d.total / d.count : 0)}</strong></div>
     </div>
   )
 }
@@ -315,22 +315,29 @@ function MerchanScatter({ data }: { data: ReturnType<typeof perMerchanMetrics> }
 
 // ─── WeeklyTrend ─────────────────────────────────────────────
 
+const LIVES_UTM_COLOR = 'oklch(0.58 0.13 265)'
+
 function WeeklyTrend({ data }: { data: ReturnType<typeof weeklyTrend> }) {
   return (
     <div style={{ width: '100%', height: 280 }}>
       <ResponsiveContainer>
         <AreaChart data={data} margin={{ top: 10, right: 24, left: 8, bottom: 0 }}>
           <defs>
-            <linearGradient id="liveAreaGrad" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id="liveAreaGradCupom" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={LIVES_ACCENT} stopOpacity={0.28} />
               <stop offset="95%" stopColor={LIVES_ACCENT} stopOpacity={0.02} />
+            </linearGradient>
+            <linearGradient id="liveAreaGradUtm" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={LIVES_UTM_COLOR} stopOpacity={0.24} />
+              <stop offset="95%" stopColor={LIVES_UTM_COLOR} stopOpacity={0.02} />
             </linearGradient>
           </defs>
           <CartesianGrid stroke={LIVES_GRID} vertical={false} />
           <XAxis dataKey="label" stroke={LIVES_AXIS} tick={{ fontSize: 11, fill: LIVES_AXIS }} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={32} />
           <YAxis stroke={LIVES_AXIS} tick={{ fontSize: 11, fill: LIVES_AXIS }} tickFormatter={fmtBRLk} axisLine={false} tickLine={false} width={64} />
           <Tooltip content={<WeekTooltip />} cursor={{ stroke: LIVES_ACCENT_DEEP, strokeWidth: 1, strokeDasharray: '3 3' }} />
-          <Area type="monotone" dataKey="total" stroke={LIVES_ACCENT_DEEP} strokeWidth={2} fill="url(#liveAreaGrad)" dot={false} activeDot={{ r: 5, fill: LIVES_ACCENT_DEEP }} />
+          <Area type="monotone" dataKey="totalCupom" name="Receita cupom" stroke={LIVES_ACCENT_DEEP} strokeWidth={2} fill="url(#liveAreaGradCupom)" dot={false} activeDot={{ r: 5, fill: LIVES_ACCENT_DEEP }} />
+          <Area type="monotone" dataKey="totalUtm" name="Receita UTM" stroke={LIVES_UTM_COLOR} strokeWidth={2} fill="url(#liveAreaGradUtm)" dot={false} activeDot={{ r: 5, fill: LIVES_UTM_COLOR }} />
         </AreaChart>
       </ResponsiveContainer>
     </div>
@@ -339,34 +346,49 @@ function WeeklyTrend({ data }: { data: ReturnType<typeof weeklyTrend> }) {
 
 // ─── MonthVsPrev ─────────────────────────────────────────────
 
-function MonthVsPrev({ mvp, today }: { mvp: ReturnType<typeof monthVsPrev>; today: string }) {
-  const todayDate = new Date(today + 'T00:00:00')
-  const monthNames = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro']
-  const curMonth  = monthNames[todayDate.getMonth()]
-  const prevMonth = monthNames[(todayDate.getMonth() + 11) % 12]
-  const hasComp   = mvp.prev > 0
-  const up        = mvp.delta >= 0
-  const absDiff   = Math.abs(mvp.diff)
+function MonthVsPrevRow({ label, cur, prev, delta, diff, curMonth, prevMonth, mvp }: {
+  label: string
+  cur: number; prev: number; delta: number; diff: number
+  curMonth: string; prevMonth: string
+  mvp: ReturnType<typeof monthVsPrev>
+}) {
+  const hasComp = prev > 0
+  const up      = delta >= 0
+  const absDiff = Math.abs(diff)
   return (
     <div className="live-mvp">
+      <div className="live-mvp-label">{label}</div>
       <div className="live-mvp-cur">
         <div className="lbl">{curMonth} · 1–{mvp.dayOfMonth}</div>
-        <div className="val">{fmtBRLk(mvp.cur)}</div>
+        <div className="val">{fmtBRLk(cur)}</div>
       </div>
       {hasComp ? (
-        <div className={`live-mvp-delta ${up ? 'up' : 'down'}`}>{up ? '▲' : '▼'} {Math.abs(mvp.delta * 100).toFixed(0)}%</div>
+        <div className={`live-mvp-delta ${up ? 'up' : 'down'}`}>{up ? '▲' : '▼'} {Math.abs(delta * 100).toFixed(0)}%</div>
       ) : (
         <div className="live-mvp-delta neutral">—</div>
       )}
       <div className="live-mvp-prev">
         <div className="lbl">{prevMonth} · 1–{mvp.endDayPrev} <span className="lbl-sub">(mesmo período)</span></div>
-        <div className="val">{hasComp ? fmtBRLk(mvp.prev) : '—'}</div>
+        <div className="val">{hasComp ? fmtBRLk(prev) : '—'}</div>
       </div>
       <div className="live-mvp-foot">
         {hasComp
           ? (up ? `+${fmtBRLk(absDiff)} ante o mesmo período do mês passado` : `−${fmtBRLk(absDiff)} ante o mesmo período do mês passado`)
           : 'Sem receita registrada no mesmo período do mês passado.'}
       </div>
+    </div>
+  )
+}
+
+function MonthVsPrev({ mvp, today }: { mvp: ReturnType<typeof monthVsPrev>; today: string }) {
+  const todayDate = new Date(today + 'T00:00:00')
+  const monthNames = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro']
+  const curMonth  = monthNames[todayDate.getMonth()]
+  const prevMonth = monthNames[(todayDate.getMonth() + 11) % 12]
+  return (
+    <div className="live-mvp-wrap">
+      <MonthVsPrevRow label="Cupom" cur={mvp.curCupom} prev={mvp.prevCupom} delta={mvp.deltaCupom} diff={mvp.diffCupom} curMonth={curMonth} prevMonth={prevMonth} mvp={mvp} />
+      <MonthVsPrevRow label="UTM" cur={mvp.curUtm} prev={mvp.prevUtm} delta={mvp.deltaUtm} diff={mvp.diffUtm} curMonth={curMonth} prevMonth={prevMonth} mvp={mvp} />
     </div>
   )
 }
@@ -821,21 +843,6 @@ function LivesCalListView({ year, month, lives, merchans, onLiveClick }: {
   )
 }
 
-// ─── PropBar ─────────────────────────────────────────────────
-
-function PropBar({ cupom, utm }: { cupom: number; utm: number }) {
-  const total = cupom + utm
-  if (!total) return null
-  const pC = (cupom / total) * 100
-  const pU = (utm   / total) * 100
-  return (
-    <div className="prop-bar" title={`${Math.round(pC)}% cupom · ${Math.round(pU)}% utm`}>
-      <div className="prop-seg-c" style={{ width: `${pC}%` }} />
-      {utm > 0 && <div className="prop-seg-u" style={{ width: `${pU}%` }} />}
-    </div>
-  )
-}
-
 // ─── LivesTable ──────────────────────────────────────────────
 
 const MONTH_NAMES_BR = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
@@ -843,10 +850,10 @@ const MONTH_NAMES_BR = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
 
 function LiveSortHeader({ label, col, sortBy, sortAsc, onSort, align, className }: {
   label: string
-  col: 'date' | 'cupom' | 'utm' | 'ticket' | 'total'
+  col: 'date' | 'cupom' | 'utm' | 'ticketCupom' | 'ticketUtm'
   sortBy: string
   sortAsc: boolean
-  onSort: (col: 'date' | 'cupom' | 'utm' | 'ticket' | 'total') => void
+  onSort: (col: 'date' | 'cupom' | 'utm' | 'ticketCupom' | 'ticketUtm') => void
   align?: 'right' | 'center'
   className?: string
 }) {
@@ -872,7 +879,7 @@ function LivesTable({ lives, merchans, onRowClick, onStatusChange, limit }: {
   onStatusChange?: (l: Live, id: string) => void
   limit?: number
 }) {
-  const [sortBy, setSortBy] = useState<'date' | 'cupom' | 'utm' | 'ticket' | 'total'>('date')
+  const [sortBy, setSortBy] = useState<'date' | 'cupom' | 'utm' | 'ticketCupom' | 'ticketUtm'>('date')
   const [sortAsc, setSortAsc] = useState(false)
 
   function toggleSort(col: typeof sortBy) {
@@ -889,13 +896,13 @@ function LivesTable({ lives, merchans, onRowClick, onStatusChange, limit }: {
         diff = ((a.receita1 || 0) + (a.receita2 || 0)) - ((b.receita1 || 0) + (b.receita2 || 0))
       } else if (sortBy === 'utm') {
         diff = (a.receitaUtm || 0) - (b.receitaUtm || 0)
-      } else if (sortBy === 'total') {
-        const ta = (a.receita1 || 0) + (a.receita2 || 0) + (a.receitaUtm || 0)
-        const tb = (b.receita1 || 0) + (b.receita2 || 0) + (b.receitaUtm || 0)
+      } else if (sortBy === 'ticketCupom') {
+        const ta = a.ordersCupom && a.ordersCupom > 0 ? ((a.receita1 || 0) + (a.receita2 || 0)) / a.ordersCupom : -1
+        const tb = b.ordersCupom && b.ordersCupom > 0 ? ((b.receita1 || 0) + (b.receita2 || 0)) / b.ordersCupom : -1
         diff = ta - tb
       } else {
-        const ta = a.ordersTotal && a.ordersTotal > 0 ? ((a.receita1||0)+(a.receita2||0)+(a.receitaUtm||0)) / a.ordersTotal : -1
-        const tb = b.ordersTotal && b.ordersTotal > 0 ? ((b.receita1||0)+(b.receita2||0)+(b.receitaUtm||0)) / b.ordersTotal : -1
+        const ta = a.ordersUtm && a.ordersUtm > 0 ? (a.receitaUtm || 0) / a.ordersUtm : -1
+        const tb = b.ordersUtm && b.ordersUtm > 0 ? (b.receitaUtm || 0) / b.ordersUtm : -1
         diff = ta - tb
       }
       return sortAsc ? diff : -diff
@@ -926,8 +933,8 @@ function LivesTable({ lives, merchans, onRowClick, onStatusChange, limit }: {
         <div>Cupons</div>
         <LiveSortHeader label="Rec. cupom" col="cupom" sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} align="right" />
         <LiveSortHeader label="Rec. UTM" col="utm" sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} align="right" />
-        <LiveSortHeader label="Ticket médio" col="ticket" sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} align="right" />
-        <LiveSortHeader label="Receita total" col="total" sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} className="col-total" />
+        <LiveSortHeader label="Tkt. cupom" col="ticketCupom" sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} align="right" />
+        <LiveSortHeader label="Tkt. UTM" col="ticketUtm" sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} align="right" />
         <div className="ctr">Status</div>
         <div />
       </div>
@@ -938,9 +945,10 @@ function LivesTable({ lives, merchans, onRowClick, onStatusChange, limit }: {
         const withRevenue = group.rows.filter(l => (l.receita1 || 0) + (l.receita2 || 0) + (l.receitaUtm || 0) > 0)
         const mCupom       = withRevenue.reduce((s, l) => s + (l.receita1 || 0) + (l.receita2 || 0), 0)
         const mUtm         = withRevenue.reduce((s, l) => s + (l.receitaUtm || 0), 0)
-        const mTotal       = mCupom + mUtm
-        const mOrdersTotal = withRevenue.reduce((s, l) => s + (l.ordersTotal ?? 0), 0)
-        const mTicket      = mOrdersTotal > 0 ? mTotal / mOrdersTotal : null
+        const mOrdersCupom = withRevenue.reduce((s, l) => s + (l.ordersCupom ?? 0), 0)
+        const mOrdersUtm   = withRevenue.reduce((s, l) => s + (l.ordersUtm ?? 0), 0)
+        const mTicketCupom = mOrdersCupom > 0 ? mCupom / mOrdersCupom : null
+        const mTicketUtm   = mOrdersUtm   > 0 ? mUtm   / mOrdersUtm   : null
 
         return (
           <div key={group.key}>
@@ -950,9 +958,11 @@ function LivesTable({ lives, merchans, onRowClick, onStatusChange, limit }: {
               const m1 = merchans.find(x => x.nome === l.merchan1)
               const m2 = merchans.find(x => x.nome === l.merchan2)
               const receitaCupom = (l.receita1 || 0) + (l.receita2 || 0)
-              const receitaTotal = receitaCupom + (l.receitaUtm || 0)
-              const ticketMedio = l.ordersTotal && l.ordersTotal > 0 && receitaTotal > 0
-                ? receitaTotal / l.ordersTotal
+              const ticketCupom = l.ordersCupom && l.ordersCupom > 0 && receitaCupom > 0
+                ? receitaCupom / l.ordersCupom
+                : null
+              const ticketUtm = l.ordersUtm && l.ordersUtm > 0 && l.receitaUtm > 0
+                ? l.receitaUtm / l.ordersUtm
                 : null
 
               const d = new Date(l.date + 'T00:00:00')
@@ -1006,20 +1016,17 @@ function LivesTable({ lives, merchans, onRowClick, onStatusChange, limit }: {
                       ? <span className="val has-data">{fmtBRL(l.receitaUtm)}</span>
                       : <span className="ink-4">—</span>}
                   </div>
-                  {/* 5. Ticket médio */}
+                  {/* 5. Ticket médio cupom */}
                   <div className="live-receita-sec">
-                    {ticketMedio != null
-                      ? <span className="val has-data">{fmtBRL(ticketMedio)}</span>
+                    {ticketCupom != null
+                      ? <span className="val has-data">{fmtBRL(ticketCupom)}</span>
                       : <span className="ink-4">—</span>}
                   </div>
-                  {/* 6. Receita total */}
-                  <div className="live-receita-total">
-                    {receitaTotal > 0 ? (
-                      <>
-                        <PropBar cupom={receitaCupom} utm={l.receitaUtm || 0} />
-                        <span className="val">{fmtBRL(receitaTotal)}</span>
-                      </>
-                    ) : <span className="ink-4" style={{ fontSize: 12 }}>sem dados</span>}
+                  {/* 6. Ticket médio UTM */}
+                  <div className="live-receita-sec">
+                    {ticketUtm != null
+                      ? <span className="val has-data">{fmtBRL(ticketUtm)}</span>
+                      : <span className="ink-4">—</span>}
                   </div>
                   {/* 6. Status */}
                   <StatusCell live={l} onStatusChange={onStatusChange} />
@@ -1031,7 +1038,7 @@ function LivesTable({ lives, merchans, onRowClick, onStatusChange, limit }: {
               )
             })}
 
-            {mTotal > 0 && (
+            {(mCupom > 0 || mUtm > 0) && (
               <div className="live-table-summary">
                 <div className="summary-label">
                   <span className="summary-label-title">Subtotal {group.label}</span>
@@ -1039,8 +1046,8 @@ function LivesTable({ lives, merchans, onRowClick, onStatusChange, limit }: {
                 </div>
                 <div className="summary-val">{fmtBRLk(mCupom)}</div>
                 <div className="summary-val">{fmtBRLk(mUtm)}</div>
-                <div className="summary-val">{mTicket != null ? fmtBRLk(mTicket) : '—'}</div>
-                <div className="summary-val total">{fmtBRLk(mTotal)}</div>
+                <div className="summary-val">{mTicketCupom != null ? fmtBRLk(mTicketCupom) : '—'}</div>
+                <div className="summary-val">{mTicketUtm != null ? fmtBRLk(mTicketUtm) : '—'}</div>
                 <div /><div />
               </div>
             )}
@@ -1293,35 +1300,36 @@ export default function LivesView({
       {/* ── Analytics view ── */}
       {viewMode === 'analytics' && (
         <>
-          {/* KPIs */}
-          <div className="lives-kpis">
-            <KpiCard label="Receita total" value={fmtBRLk(kpis.total)} sub={`${kpis.count} live${kpis.count === 1 ? '' : 's'}`} />
-            <KpiCard label="Média por live" value={fmtBRLk(kpis.avg)} sub="receita média por live" />
+          {/* KPIs — cupom e UTM são fontes de atribuição independentes (podem se sobrepor),
+              por isso nunca aparecem somadas em um "total" */}
+          <div className="lives-kpis lives-kpis-6">
+            <KpiCard label="Receita cupom" value={fmtBRLk(kpis.totalCupom)} sub={`${kpis.count} live${kpis.count === 1 ? '' : 's'}`} />
             <KpiCard
-              label="Ticket médio"
-              value={kpis.ticketMedio != null ? fmtBRLk(kpis.ticketMedio) : '—'}
-              sub={kpis.ordersTotal > 0 ? `${kpis.ordersTotal} pedidos no período` : 'sem dados de pedidos'} />
+              label="Ticket médio cupom"
+              value={kpis.ticketMedioCupom != null ? fmtBRLk(kpis.ticketMedioCupom) : '—'}
+              sub={kpis.ordersCupomTotal > 0 ? `${kpis.ordersCupomTotal} pedidos no período` : 'sem dados de pedidos'} />
             <KpiCard
-              label="Melhor live"
-              value={kpis.best ? fmtBRLk(kpis.best.receitaTotal) : '—'}
-              sub={kpis.best ? `${new Date(kpis.best.date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: '2-digit' })} · ${kpis.best.nominal1}` : ''} />
+              label="Melhor live (cupom)"
+              value={kpis.bestCupom ? fmtBRLk((kpis.bestCupom.receita1 || 0) + (kpis.bestCupom.receita2 || 0)) : '—'}
+              sub={kpis.bestCupom ? `${new Date(kpis.bestCupom.date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: '2-digit' })} · ${kpis.bestCupom.nominal1}` : ''} />
+            <KpiCard label="Receita UTM" value={fmtBRLk(kpis.totalUtm)} sub={`${kpis.utmCount} de ${kpis.count} lives com dado de UTM`} />
+            <KpiCard
+              label="Ticket médio UTM"
+              value={kpis.ticketMedioUtm != null ? fmtBRLk(kpis.ticketMedioUtm) : '—'}
+              sub={kpis.ordersUtmTotal > 0 ? `${kpis.ordersUtmTotal} pedidos no período` : 'sem dados de pedidos'} />
+            <KpiCard
+              label="Melhor live (UTM)"
+              value={kpis.bestUtm && kpis.bestUtm.receitaUtm > 0 ? fmtBRLk(kpis.bestUtm.receitaUtm) : '—'}
+              sub={kpis.bestUtm && kpis.bestUtm.receitaUtm > 0 ? `${new Date(kpis.bestUtm.date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: '2-digit' })} · ${kpis.bestUtm.nominal1}` : ''} />
           </div>
 
-          {(kpis.utmCount > 0 || kpis.alcanceCount > 0) && (
+          {kpis.alcanceCount > 0 && (
             <div className="lives-kpis-secondary">
               <span className="lks-label">Secundário</span>
-              {kpis.utmCount > 0 && (
-                <span className="lks-item">
-                  <strong>% UTM:</strong> {fmtPct(kpis.utmShareSum > 0 ? kpis.utmShareTotal / kpis.utmShareSum : 0)}
-                  <span className="lks-foot">({kpis.utmCount} de {kpis.count} lives com dado de UTM)</span>
-                </span>
-              )}
-              {kpis.alcanceCount > 0 && (
-                <span className="lks-item">
-                  <strong>Alcance:</strong> {(kpis.alcanceTotal / 1000).toFixed(0)}k
-                  <span className="lks-foot">({kpis.alcanceCount} de {kpis.count} lives com alcance)</span>
-                </span>
-              )}
+              <span className="lks-item">
+                <strong>Alcance:</strong> {(kpis.alcanceTotal / 1000).toFixed(0)}k
+                <span className="lks-foot">({kpis.alcanceCount} de {kpis.count} lives com alcance)</span>
+              </span>
             </div>
           )}
 

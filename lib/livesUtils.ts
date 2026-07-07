@@ -84,44 +84,60 @@ export function inPeriod(iso: string, periodDays: number | 'all', todayIso: stri
 
 // ─── KPI aggregation ─────────────────────────────────────────
 
+// Cupom e UTM são fontes de atribuição independentes (podem se sobrepor —
+// a mesma compra pode entrar pelo link UTM e usar o cupom da live), então
+// nunca são somadas entre si. Cada uma tem seu próprio total/ticket médio/melhor live.
+const cupomOf = (l: Live) => (l.receita1 || 0) + (l.receita2 || 0)
+
 export interface LiveKpis {
   count: number
-  total: number
-  avg: number
-  best: Live | null
+  totalCupom: number
+  totalUtm: number
+  avgCupom: number
+  avgUtm: number
+  bestCupom: Live | null
+  bestUtm: Live | null
   alcanceCount: number
   alcanceTotal: number
   utmCount: number
-  utmShareTotal: number
-  utmShareSum: number
-  ordersTotal: number
-  ticketMedio: number | null
+  ordersCupomTotal: number
+  ordersUtmTotal: number
+  ticketMedioCupom: number | null
+  ticketMedioUtm: number | null
 }
 
 export function liveKpis(lives: Live[]): LiveKpis {
   const real = lives.filter(l => l.status === 'realizada')
   if (real.length === 0) {
-    return { count: 0, total: 0, avg: 0, best: null, alcanceCount: 0, alcanceTotal: 0, utmCount: 0, utmShareTotal: 0, utmShareSum: 0, ordersTotal: 0, ticketMedio: null }
+    return {
+      count: 0, totalCupom: 0, totalUtm: 0, avgCupom: 0, avgUtm: 0, bestCupom: null, bestUtm: null,
+      alcanceCount: 0, alcanceTotal: 0, utmCount: 0,
+      ordersCupomTotal: 0, ordersUtmTotal: 0, ticketMedioCupom: null, ticketMedioUtm: null,
+    }
   }
-  const total = real.reduce((s, l) => s + l.receitaTotal, 0)
-  const best = real.reduce((m, l) => l.receitaTotal > (m?.receitaTotal ?? -1) ? l : m, null as Live | null)
+  const totalCupom = real.reduce((s, l) => s + cupomOf(l), 0)
+  const totalUtm   = real.reduce((s, l) => s + (l.receitaUtm || 0), 0)
+  const bestCupom = real.reduce((m, l) => cupomOf(l) > (m ? cupomOf(m) : -1) ? l : m, null as Live | null)
+  const bestUtm   = real.reduce((m, l) => (l.receitaUtm || 0) > (m ? (m.receitaUtm || 0) : -1) ? l : m, null as Live | null)
   const withUtm     = real.filter(l => l.receitaUtm > 0)
   const withAlcance = real.filter(l => l.alcance > 0)
+  const ordersCupomTotal = real.reduce((s, l) => s + (l.ordersCupom ?? 0), 0)
+  const ordersUtmTotal   = real.reduce((s, l) => s + (l.ordersUtm ?? 0), 0)
   return {
     count: real.length,
-    total,
-    avg: total / real.length,
-    best,
+    totalCupom,
+    totalUtm,
+    avgCupom: totalCupom / real.length,
+    avgUtm:   totalUtm / real.length,
+    bestCupom,
+    bestUtm,
     alcanceCount:  withAlcance.length,
     alcanceTotal:  withAlcance.reduce((s, l) => s + l.alcance, 0),
     utmCount:      withUtm.length,
-    utmShareTotal: withUtm.reduce((s, l) => s + l.receitaUtm, 0),
-    utmShareSum:   withUtm.reduce((s, l) => s + l.receitaTotal, 0),
-    ordersTotal:   real.reduce((s, l) => s + (l.ordersTotal ?? 0), 0),
-    ticketMedio:   (() => {
-      const ord = real.reduce((s, l) => s + (l.ordersTotal ?? 0), 0)
-      return ord > 0 ? real.reduce((s, l) => s + l.receitaTotal, 0) / ord : null
-    })(),
+    ordersCupomTotal,
+    ordersUtmTotal,
+    ticketMedioCupom: ordersCupomTotal > 0 ? totalCupom / ordersCupomTotal : null,
+    ticketMedioUtm:   ordersUtmTotal   > 0 ? totalUtm   / ordersUtmTotal   : null,
   }
 }
 
@@ -191,7 +207,8 @@ export interface WeekData {
   key: string
   year: number
   week: number
-  total: number
+  totalCupom: number
+  totalUtm: number
   count: number
   label: string
 }
@@ -210,9 +227,10 @@ export function weeklyTrend(lives: Live[]): WeekData[] {
   const map = new Map<string, WeekData>()
   for (const l of real) {
     const k = weekKey(l.date)
-    if (!map.has(k.key)) map.set(k.key, { key: k.key, year: k.year, week: k.week, total: 0, count: 0, label: `${String(k.week).padStart(2, '0')}/${String(k.year).slice(-2)}` })
+    if (!map.has(k.key)) map.set(k.key, { key: k.key, year: k.year, week: k.week, totalCupom: 0, totalUtm: 0, count: 0, label: `${String(k.week).padStart(2, '0')}/${String(k.year).slice(-2)}` })
     const e = map.get(k.key)!
-    e.total += l.receitaTotal
+    e.totalCupom += cupomOf(l)
+    e.totalUtm   += (l.receitaUtm || 0)
     e.count += 1
   }
   return Array.from(map.values()).sort((a, b) => a.key.localeCompare(b.key))
@@ -253,10 +271,14 @@ export function heatmapMatrix(lives: Live[], merchans: Merchan[]): HeatData {
 // ─── Month vs previous month ──────────────────────────────────
 
 export interface MonthVsPrevData {
-  cur: number
-  prev: number
-  delta: number
-  diff: number
+  curCupom: number
+  prevCupom: number
+  deltaCupom: number
+  diffCupom: number
+  curUtm: number
+  prevUtm: number
+  deltaUtm: number
+  diffUtm: number
   dayOfMonth: number
   endDayPrev: number
 }
@@ -270,18 +292,25 @@ export function monthVsPrev(lives: Live[], todayIso: string): MonthVsPrevData {
   const endDayPrev = Math.min(dayOfMonth, lastDayPrevMonth)
   const endPrev    = new Date(today.getFullYear(), today.getMonth() - 1, endDayPrev)
   const real = lives.filter(l => l.status === 'realizada')
-  const sumIn = (a: Date, b: Date) =>
-    real.filter(l => {
-      const d = new Date(l.date + 'T00:00:00')
-      return d >= a && d <= b
-    }).reduce((s, l) => s + l.receitaTotal, 0)
-  const cur  = sumIn(startCur, today)
-  const prev = sumIn(startPrev, endPrev)
+  const inRange = (a: Date, b: Date) => real.filter(l => {
+    const d = new Date(l.date + 'T00:00:00')
+    return d >= a && d <= b
+  })
+  const sumCupom = (a: Date, b: Date) => inRange(a, b).reduce((s, l) => s + cupomOf(l), 0)
+  const sumUtm   = (a: Date, b: Date) => inRange(a, b).reduce((s, l) => s + (l.receitaUtm || 0), 0)
+  const curCupom  = sumCupom(startCur, today)
+  const prevCupom = sumCupom(startPrev, endPrev)
+  const curUtm    = sumUtm(startCur, today)
+  const prevUtm   = sumUtm(startPrev, endPrev)
   return {
-    cur,
-    prev,
-    delta: prev === 0 ? 0 : (cur - prev) / prev,
-    diff: cur - prev,
+    curCupom,
+    prevCupom,
+    deltaCupom: prevCupom === 0 ? 0 : (curCupom - prevCupom) / prevCupom,
+    diffCupom: curCupom - prevCupom,
+    curUtm,
+    prevUtm,
+    deltaUtm: prevUtm === 0 ? 0 : (curUtm - prevUtm) / prevUtm,
+    diffUtm: curUtm - prevUtm,
     dayOfMonth,
     endDayPrev,
   }

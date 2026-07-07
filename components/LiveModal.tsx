@@ -170,7 +170,10 @@ export default function LiveModal({ live, brand, merchans, siteLinks, onClose, o
   const set = <K extends keyof Live>(k: K, v: Live[K]) => setDraft(d => ({ ...d, [k]: v }))
   const setMany = (obj: Partial<Live>) => setDraft(d => ({ ...d, ...obj }))
 
-  const total = (draft.receita1 || 0) + (draft.receita2 || 0) + (draft.receitaUtm || 0)
+  // Cupom e UTM são fontes de atribuição independentes (a mesma compra pode entrar
+  // pelo link UTM e usar o cupom da live), então nunca são somadas — "receita total"
+  // é só a soma dos cupons; UTM sempre aparece separada.
+  const receitaCupom = (draft.receita1 || 0) + (draft.receita2 || 0)
 
   // ── UTM automática ──────────────────────────────────────────
   const isGocase = brand === 'gocase'
@@ -211,7 +214,7 @@ export default function LiveModal({ live, brand, merchans, siteLinks, onClose, o
 
   const produtoNaoEncontrado = !isGocase && draft.produto?.trim() && !currentSiteLink
   useEffect(() => {
-    if (total !== draft.receitaTotal) set('receitaTotal', total)
+    if (receitaCupom !== draft.receitaTotal) set('receitaTotal', receitaCupom)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.receita1, draft.receita2])
 
@@ -433,13 +436,13 @@ export default function LiveModal({ live, brand, merchans, siteLinks, onClose, o
             {/* Total + sinaleiras */}
             <div className="mh-section">
               <div className="mh-section-head">
-                <Icon.branding /> Resultado total
+                <Icon.branding /> Resultado
               </div>
               <div className="live-total-row">
                 <div className="live-recap" style={{ flex: 1 }}>
                   <div className="live-recap-row">
-                    <span>Receita total</span>
-                    <strong>{fmtBRL(total)}</strong>
+                    <span>Receita cupom</span>
+                    <strong>{fmtBRL(receitaCupom)}</strong>
                   </div>
                   {m1 && draft.receita1 > 0 && (
                     <div className="live-recap-row">
@@ -447,7 +450,7 @@ export default function LiveModal({ live, brand, merchans, siteLinks, onClose, o
                         <span className="dot" style={{ background: m1.color }} />
                         Cupom 1
                       </span>
-                      <strong>{fmtBRL(draft.receita1)}{total > 0 ? <span className="live-recap-sub"> · {fmtPct(draft.receita1 / total)}</span> : ''}</strong>
+                      <strong>{fmtBRL(draft.receita1)}{receitaCupom > 0 ? <span className="live-recap-sub"> · {fmtPct(draft.receita1 / receitaCupom)}</span> : ''}</strong>
                     </div>
                   )}
                   {m2 && draft.receita2 > 0 && (
@@ -456,25 +459,31 @@ export default function LiveModal({ live, brand, merchans, siteLinks, onClose, o
                         <span className="dot" style={{ background: m2.color }} />
                         Cupom 2
                       </span>
-                      <strong>{fmtBRL(draft.receita2)}<span className="live-recap-sub"> · {fmtPct(draft.receita2 / total)}</span></strong>
+                      <strong>{fmtBRL(draft.receita2)}<span className="live-recap-sub"> · {fmtPct(draft.receita2 / receitaCupom)}</span></strong>
                     </div>
                   )}
-                  {draft.receitaUtm > 0 && (
+                  {draft.ordersCupom != null && draft.ordersCupom > 0 && receitaCupom > 0 && (
                     <div className="live-recap-row">
-                      <span>UTM</span>
-                      <strong>{fmtBRL(draft.receitaUtm)}<span className="live-recap-sub"> · {fmtPct(draft.receitaUtm / total)}</span></strong>
+                      <span>Ticket médio cupom</span>
+                      <strong>{fmtBRL(receitaCupom / draft.ordersCupom)}</strong>
                     </div>
                   )}
+
+                  <div className="live-recap-row" style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed var(--line)' }}>
+                    <span>Receita UTM</span>
+                    <strong>{fmtBRL(draft.receitaUtm)}</strong>
+                  </div>
+                  {draft.ordersUtm != null && draft.ordersUtm > 0 && draft.receitaUtm > 0 && (
+                    <div className="live-recap-row">
+                      <span>Ticket médio UTM</span>
+                      <strong>{fmtBRL(draft.receitaUtm / draft.ordersUtm)}</strong>
+                    </div>
+                  )}
+
                   {draft.ordersTotal != null && (
-                    <div className="live-recap-row">
-                      <span>Orders totais</span>
+                    <div className="live-recap-row" style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed var(--line)' }}>
+                      <span>Orders totais (referência)</span>
                       <strong>{draft.ordersTotal}</strong>
-                    </div>
-                  )}
-                  {draft.ordersTotal != null && draft.ordersTotal > 0 && total > 0 && (
-                    <div className="live-recap-row">
-                      <span>Ticket médio</span>
-                      <strong>{fmtBRL(total / draft.ordersTotal)}</strong>
                     </div>
                   )}
                 </div>
@@ -580,7 +589,7 @@ export default function LiveModal({ live, brand, merchans, siteLinks, onClose, o
           )}
           <div style={{ flex: 1 }} />
           <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-accent" onClick={() => onSave({ ...draft, receitaTotal: total })}>
+          <button className="btn btn-accent" onClick={() => onSave({ ...draft, receitaTotal: receitaCupom })}>
             Salvar alterações
           </button>
         </div>

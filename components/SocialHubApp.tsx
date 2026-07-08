@@ -45,6 +45,7 @@ import MerchansModal from './MerchansModal'
 import StoryModal from './StoryModal'
 import MetricsView from './MetricsView'
 import ShareSocialView from './ShareSocialView'
+import MetasView from './MetasView'
 import ToastHost from './Toast'
 
 
@@ -237,7 +238,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
         supabase.from('lives').select('*').eq('brand', b).order('date', { ascending: true }),
         supabase.from('merchans').select('*').eq('brand', b).order('nome', { ascending: true }),
         supabase.from('stories').select('*').eq('brand', b).order('date', { ascending: false }),
-        supabase.from('stories_day_aggregates').select('*').eq('brand', b).order('date', { ascending: true }),
+        supabase.from('stories_day_aggregates_live').select('*').eq('brand', b).order('date', { ascending: true }),
         supabase.from('site_links').select('*').eq('brand', b).order('categoria', { ascending: true }),
       ])
       const allPosts: Post[] = [
@@ -289,10 +290,10 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
   }, [])
 
   const BRAND_VIEWS: Record<Brand, AppView[]> = {
-    gocase:   ['calendar','branding','mh','comemorativas','futebol','campaigns','collections','archived','lives','stories','site_links','metrics','profile'],
-    barbours: ['calendar','canal','comemorativas','campaigns','archived','lives','stories','site_links','profile'],
-    kokeshi:  ['calendar','campaigns','lives','stories','site_links','profile'],
-    lescent:  ['calendar','campaigns','lives','stories','site_links','profile'],
+    gocase:   ['calendar','branding','mh','comemorativas','futebol','campaigns','collections','archived','lives','stories','site_links','metrics','metas','profile'],
+    barbours: ['calendar','canal','comemorativas','campaigns','archived','lives','stories','site_links','metas','profile'],
+    kokeshi:  ['calendar','campaigns','lives','stories','site_links','metas','profile'],
+    lescent:  ['calendar','campaigns','lives','stories','site_links','metas','profile'],
   }
   // A qual aba/AppView cada calendário (PostSource) pertence — usado para
   // só oferecer, no seletor do post, os calendários que existem para a marca ativa.
@@ -757,6 +758,39 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     setActiveLive(draft)
   }
 
+  const quickCreateLive = async (partial: { date: string; hora: string; merchan1: string; nominal1: string; status: LiveStatus }) => {
+    const dayIndex = new Date(partial.date + 'T00:00:00').getDay()
+    const diaSemana = WEEKDAY_NOMES[dayIndex]
+    await saveLive({
+      id: '__new__',
+      date: partial.date,
+      hora: partial.hora,
+      diaSemana,
+      cupomLigado: true,
+      criativo: '',
+      merchan1: partial.merchan1,
+      nominal1: partial.nominal1,
+      receita1: 0,
+      merchan2: '',
+      nominal2: '',
+      receita2: 0,
+      cupomExtra: '',
+      receitaExtra: 0,
+      receitaTotal: 0,
+      receitaUtm: 0,
+      ordersCupom: null,
+      ordersUtm: null,
+      ordersTotal: null,
+      alcance: 0,
+      produto: '',
+      linkUtm: '',
+      utmCampaign: '',
+      status: partial.status,
+      origem: 'manual',
+      notes: '',
+    })
+  }
+
   const deleteLive = async (l: Live) => {
     setLives(arr => arr.filter(x => x.id !== l.id))
     await supabase.from('lives').delete().eq('id', l.id)
@@ -862,7 +896,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
       const r = await fetch('/api/lives/gerar-proposta', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ brand }),
       })
       const json = await r.json()
       if (!r.ok) {
@@ -1062,6 +1096,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     site_links:    { title: 'Links do Site',        sub: 'Catálogo de produtos e UTMs'            },
     metrics:       { title: 'KPIs Sociais',          sub: 'Instagram · TikTok · 2026'             },
     share_social:  { title: 'Share Social',          sub: 'Receita · Meta · Canal Social'         },
+    metas:         { title: 'Metas',                sub: 'Receita Social · KPIs de Instagram e TikTok' },
   }
   const { title, sub } = viewTitles[view]
   const isCalView = view === 'calendar' || view === 'branding'
@@ -1133,6 +1168,9 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             <button className={`sb-item ${view === 'share_social' ? 'active' : ''}`} onClick={() => setView('share_social')}>
               <Icon.share /> <span>Share Social</span>
             </button>
+            <button className={`sb-item ${view === 'metas' ? 'active' : ''}`} onClick={() => setView('metas')}>
+              <Icon.target /> <span>Metas</span>
+            </button>
             <button className={`sb-item ${view === 'lives' ? 'active' : ''}`} onClick={() => setView('lives')}><Icon.live /> <span>Lives</span><span className="sb-count">{lives.filter(l => l.status === 'realizada').length}</span></button>
             <button className={`sb-item ${view === 'stories' ? 'active' : ''}`} onClick={() => setView('stories')}><Icon.stories /> <span>Stories</span><span className="sb-count">{storiesCount}</span></button>
           </div>
@@ -1171,6 +1209,9 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             <button className={`sb-item ${view === 'share_social' ? 'active' : ''}`} onClick={() => setView('share_social')}>
               <Icon.share /> <span>Share Social</span>
             </button>
+            <button className={`sb-item ${view === 'metas' ? 'active' : ''}`} onClick={() => setView('metas')}>
+              <Icon.target /> <span>Metas</span>
+            </button>
             <button className={`sb-item ${view === 'lives' ? 'active' : ''}`} onClick={() => setView('lives')}><Icon.live /> <span>Lives</span><span className="sb-count">{lives.filter(l => l.status === 'realizada').length}</span></button>
             <button className={`sb-item ${view === 'stories' ? 'active' : ''}`} onClick={() => setView('stories')}><Icon.stories /> <span>Stories</span><span className="sb-count">{storiesCount}</span></button>
           </div>
@@ -1195,6 +1236,9 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             </button>
             <button className={`sb-item ${view === 'share_social' ? 'active' : ''}`} onClick={() => setView('share_social')}>
               <Icon.share /> <span>Share Social</span>
+            </button>
+            <button className={`sb-item ${view === 'metas' ? 'active' : ''}`} onClick={() => setView('metas')}>
+              <Icon.target /> <span>Metas</span>
             </button>
             <button className={`sb-item ${view === 'lives' ? 'active' : ''}`} onClick={() => setView('lives')}><Icon.live /> <span>Lives</span><span className="sb-count">{lives.filter(l => l.status === 'realizada').length}</span></button>
             <button className={`sb-item ${view === 'stories' ? 'active' : ''}`} onClick={() => setView('stories')}><Icon.stories /> <span>Stories</span><span className="sb-count">{storiesCount}</span></button>
@@ -1252,7 +1296,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             </div>
           )}
 
-          {view !== 'stories' && view !== 'canal' && view !== 'metrics' && (
+          {view !== 'stories' && view !== 'canal' && view !== 'metrics' && view !== 'metas' && (
             <button className="btn btn-accent" onClick={() => createPost({})}>
               <Icon.plus /> Novo post
             </button>
@@ -1475,6 +1519,8 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             onGenerateProposta={generateProposta}
             generatingProposta={generatingProposta}
             onStatusChange={(live, newStatus) => saveLive({ ...live, status: newStatus as LiveStatus })}
+            onQuickCreateLive={quickCreateLive}
+            onAddMerchan={onAddMerchan}
           />
         )}
         {view === 'profile'       && (
@@ -1492,6 +1538,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
         {view === 'archived' && <ArchivedView />}
         {view === 'metrics'  && <MetricsView brand={brand} />}
         {view === 'share_social' && <ShareSocialView brand={brand} />}
+        {view === 'metas' && <MetasView brand={brand} />}
         {view === 'site_links' && (
           <SiteLinksView
             brand={brand}

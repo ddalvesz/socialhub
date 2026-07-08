@@ -82,19 +82,11 @@ interface MetricsDataShape {
 
 const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
-// Metas oficiais só existem para a Gocase hoje. Marcas sem meta cadastrada
-// ficam com tudo zerado — a UI trata meta 0 como "não cadastrada" e esconde o Pace.
-const IG_METAS_BY_BRAND: Record<Brand, { views: number; alcance: number; interacoes: number }> = {
-  gocase:   { views: 12000000, alcance: 10000000, interacoes: 300000 },
-  barbours: { views: 0, alcance: 0, interacoes: 0 },
-  kokeshi:  { views: 0, alcance: 0, interacoes: 0 },
-  lescent:  { views: 0, alcance: 0, interacoes: 0 },
-}
-const TT_METAS_BY_BRAND: Record<Brand, { views: number }> = {
-  gocase: { views: 1000000 }, barbours: { views: 0 }, kokeshi: { views: 0 }, lescent: { views: 0 },
-}
-const IG_WEEKLY_GOAL_BY_BRAND: Record<Brand, number> = { gocase: 2800000, barbours: 0, kokeshi: 0, lescent: 0 }
-const TT_WEEKLY_GOAL_BY_BRAND: Record<Brand, number> = { gocase: 233333, barbours: 0, kokeshi: 0, lescent: 0 }
+// Metas mensais de IG/TT vêm da tabela kpi_metas_mensais (cadastradas na aba Metas).
+// Marca/mês sem linha cadastrada fica com tudo zerado — a UI trata meta 0 como
+// "não cadastrada" e esconde o Pace. A meta semanal não é um dado à parte: é
+// sempre a meta mensal pró-rateada (mensal × 7/30).
+interface KpiMetaRow { ig_views: number; ig_alcance: number; ig_interacoes: number; tt_views: number }
 const ANO = 2026
 
 // ── Data fetching hook ────────────────────────────────────────────────────────
@@ -109,6 +101,12 @@ function weekDays(dias: string): number {
   return Math.round((b.getTime() - a.getTime()) / 86400000) + 1
 }
 
+// Mês (1-based) em que a semana começa — usado para buscar a meta mensal certa por semana.
+function weekStartMonth(dias: string): number {
+  const [, m1] = dias.split('–')[0].split('/').map(Number)
+  return m1
+}
+
 function useMetricsData(brand: Brand) {
   const [data, setData] = useState<MetricsDataShape | null>(null)
   const [loading, setLoading] = useState(true)
@@ -120,8 +118,6 @@ function useMetricsData(brand: Brand) {
     const mesIdx = today.getMonth()        // 0-based
     const mes = mesIdx + 1                 // 1-based
     const diasNoMes = MONTH_DAYS[mesIdx]
-    const igWeeklyGoal = IG_WEEKLY_GOAL_BY_BRAND[brand]
-    const ttWeeklyGoal = TT_WEEKLY_GOAL_BY_BRAND[brand]
 
     setLoading(true)
     setError(null)
@@ -129,19 +125,34 @@ function useMetricsData(brand: Brand) {
     async function load() {
       const sb = createClient()
 
-      const [r1, r2, r3, r4, r5] = await Promise.all([
+      const [r1, r2, r3, r4, r5, r6] = await Promise.all([
         sb.from('v_metricas_ig_mensal_2026').select('*').eq('brand', brand).order('mes'),
         sb.from('v_metricas_ig_breakdown_2026').select('*').eq('brand', brand).order('mes'),
         sb.from('v_metricas_ig_semanal_2026').select('*').eq('brand', brand).order('semana'),
         sb.from('v_metricas_tt_mensal_2026').select('*').eq('brand', brand).order('mes'),
         sb.from('v_metricas_tt_semanal_2026').select('*').eq('brand', brand).order('semana'),
+        sb.from('kpi_metas_mensais').select('*').eq('brand', brand),
       ])
 
-      if (r1.error || r2.error || r3.error || r4.error || r5.error) {
+      if (r1.error || r2.error || r3.error || r4.error || r5.error || r6.error) {
         setError('Erro ao carregar métricas')
         setLoading(false)
         return
       }
+
+      // Metas cadastradas por mês (aba Metas) — chave = mês 1-based.
+      const metasByMes: Record<number, KpiMetaRow> = {}
+      for (const r of (r6.data ?? [])) {
+        metasByMes[Number(r.mes)] = {
+          ig_views: Number(r.ig_views), ig_alcance: Number(r.ig_alcance),
+          ig_interacoes: Number(r.ig_interacoes), tt_views: Number(r.tt_views),
+        }
+      }
+      const weeklyGoalFor = (views: number) => Math.round(views * 7 / 30)
+      const igMetas = { views: metasByMes[mes]?.ig_views ?? 0, alcance: metasByMes[mes]?.ig_alcance ?? 0, interacoes: metasByMes[mes]?.ig_interacoes ?? 0 }
+      const ttMetas = { views: metasByMes[mes]?.tt_views ?? 0 }
+      const igWeeklyGoal = weeklyGoalFor(igMetas.views)
+      const ttWeeklyGoal = weeklyGoalFor(ttMetas.views)
 
       // IG mensal
       const igMensal: IgMonthEntry[] = (r1.data ?? []).map((r) => ({
@@ -172,13 +183,15 @@ function useMetricsData(brand: Brand) {
         if (r.tipo === 'Posts') breakdown[key].posts = toBreakdown(r as Record<string, unknown>)
       }
 
-      // IG semanal
+      // IG semanal — meta usa a meta mensal do mês em que a semana começa
       const igSemanal: IgWeekEntry[] = (r3.data ?? []).map((r) => {
-        const days = weekDays(String(r.dias))
+        const dias = String(r.dias)
+        const days = weekDays(dias)
+        const weekGoal = weeklyGoalFor(metasByMes[weekStartMonth(dias)]?.ig_views ?? 0)
         return {
           semana: Number(r.semana),
-          dias: String(r.dias),
-          meta: days < 7 ? Math.round(igWeeklyGoal * days / 7) : igWeeklyGoal,
+          dias,
+          meta: days < 7 ? Math.round(weekGoal * days / 7) : weekGoal,
           views: Number(r.views),
           alcance: Number(r.alcance),
           interacoes: Number(r.interacoes),
@@ -197,13 +210,15 @@ function useMetricsData(brand: Brand) {
         engaj: Number(r.engaj),
       }))
 
-      // TT semanal
+      // TT semanal — meta usa a meta mensal do mês em que a semana começa
       const ttSemanal: TtWeekEntry[] = (r5.data ?? []).map((r) => {
-        const days = weekDays(String(r.dias))
+        const dias = String(r.dias)
+        const days = weekDays(dias)
+        const weekGoal = weeklyGoalFor(metasByMes[weekStartMonth(dias)]?.tt_views ?? 0)
         return {
           semana: Number(r.semana),
-          dias: String(r.dias),
-          meta: days < 7 ? Math.round(ttWeeklyGoal * days / 7) : ttWeeklyGoal,
+          dias,
+          meta: days < 7 ? Math.round(weekGoal * days / 7) : weekGoal,
           views: Number(r.views),
           posts: Number(r.qtd_posts),
           engaj: Number(r.engaj),
@@ -224,8 +239,8 @@ function useMetricsData(brand: Brand) {
         mes,
         dia,
         diasNoMes,
-        ig: { metas: IG_METAS_BY_BRAND[brand], weeklyGoal: igWeeklyGoal, mensal: igMensal, breakdown, semanal: igSemanal },
-        tt: { metas: TT_METAS_BY_BRAND[brand], weeklyGoal: ttWeeklyGoal, mensal: ttMensal, semanal: ttSemanal },
+        ig: { metas: igMetas, weeklyGoal: igWeeklyGoal, mensal: igMensal, breakdown, semanal: igSemanal },
+        tt: { metas: ttMetas, weeklyGoal: ttWeeklyGoal, mensal: ttMensal, semanal: ttSemanal },
       })
       setLoading(false)
     }

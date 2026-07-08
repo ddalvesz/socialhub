@@ -48,7 +48,7 @@ export default async function HomePage() {
     supabase.from('lives').select('*').eq('brand', 'gocase').order('date', { ascending: true }),
     supabase.from('merchans').select('*').eq('brand', 'gocase').order('nome', { ascending: true }),
     supabase.from('stories').select('*').eq('brand', 'gocase').order('date', { ascending: false }),
-    supabase.from('stories_day_aggregates').select('*').eq('brand', 'gocase').order('date', { ascending: true }),
+    supabase.from('stories_day_aggregates_live').select('*').eq('brand', 'gocase').order('date', { ascending: true }),
     supabase.from('profiles').select('*').order('name', { ascending: true }),
   ])
 

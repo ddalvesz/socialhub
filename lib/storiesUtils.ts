@@ -14,7 +14,9 @@ export function fmtBRLk(n: number): string {
 
 export function fmtNumk(n: number): string {
   if (n === 0) return '0'
-  if (Math.abs(n) >= 1000) return (n / 1000).toFixed(1).replace('.', ',') + 'k'
+  const abs = Math.abs(n)
+  if (abs >= 1_000_000) return (n / 1_000_000).toFixed(1).replace('.', ',') + 'M'
+  if (abs >= 1000) return (n / 1000).toFixed(1).replace('.', ',') + 'k'
   return String(Math.round(n))
 }
 

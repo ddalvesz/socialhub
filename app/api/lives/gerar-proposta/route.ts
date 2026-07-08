@@ -6,7 +6,7 @@
 // UPSERT SEGURO: só sobrescreve linhas cujo status já é 'proposta'.
 // Datas com status 'realizada' ou 'confirmada' são puladas e reportadas.
 //
-// Body:    { semana?: "YYYY-MM-DD" }  ← segunda da semana alvo; default = próxima segunda
+// Body:    { semana?: "YYYY-MM-DD", brand?: Brand }  ← segunda da semana alvo (default = próxima segunda) e marca (default = 'gocase')
 // Returns: { proposta, lives, inseridas, atualizadas, puladas }
 // ============================================================================
 
@@ -19,7 +19,7 @@ import {
   type ScoreRow,
   type MerchanInfo,
 } from '@/lib/lives/gerarProposta'
-import type { Live } from '@/lib/types'
+import type { Live, Brand } from '@/lib/types'
 
 // ─── Helpers de data (UTC) ───────────────────────────────────────────────────
 
@@ -45,11 +45,12 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
-    // ── Semana alvo
-    const body = await req.json().catch(() => ({})) as { semana?: string }
+    // ── Semana alvo + marca
+    const body = await req.json().catch(() => ({})) as { semana?: string; brand?: Brand }
     const semanaIso = body.semana && /^\d{4}-\d{2}-\d{2}$/.test(body.semana)
       ? body.semana
       : proximaSegunda(toIsoUTC(new Date()))
+    const brand: Brand = body.brand ?? 'gocase'
 
     const semana = parseIsoUTC(semanaIso)
     const hist84Inicio = toIsoUTC(addDaysUTC(semana, -84))
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest) {
     const { data: hist, error: histErr } = await supabase
       .from('lives')
       .select('date, dia_semana, merchan1, receita1, merchan2, receita2')
+      .eq('brand', brand)
       .in('status', ['realizada', 'confirmada'])
       .gte('date', hist84Inicio)
       .lt('date', semanaIso)
@@ -69,6 +71,7 @@ export async function POST(req: NextRequest) {
     const { data: merchansRows, error: mErr } = await supabase
       .from('merchans')
       .select('nome, ativo, forte, sempre_sozinho')
+      .eq('brand', brand)
       .eq('ativo', true)
       .order('nome')
     if (mErr) return NextResponse.json({ error: mErr.message }, { status: 500 })
@@ -77,6 +80,7 @@ export async function POST(req: NextRequest) {
     const { data: recentesRows, error: rErr } = await supabase
       .from('lives')
       .select('date, merchan1, merchan2')
+      .eq('brand', brand)
       .gte('date', recentes14Inicio)
       .lt('date', semanaIso)
       .order('date')
@@ -86,6 +90,7 @@ export async function POST(req: NextRequest) {
     const { data: nomesRows, error: nErr } = await supabase
       .from('lives')
       .select('nominal1, nominal2')
+      .eq('brand', brand)
       .gte('date', nomes30Inicio)
       .lt('date', semanaIso)
     if (nErr) return NextResponse.json({ error: nErr.message }, { status: 500 })
@@ -163,6 +168,7 @@ export async function POST(req: NextRequest) {
     const { data: existentes, error: exErr } = await supabase
       .from('lives')
       .select('id, date, status')
+      .eq('brand', brand)
       .in('date', datas)
     if (exErr) return NextResponse.json({ error: exErr.message }, { status: 500 })
 
@@ -196,6 +202,7 @@ export async function POST(req: NextRequest) {
         receita_utm:   0,
         status:        'proposta',
         origem:        'skill',
+        brand,
       }
 
       if (!cur) {

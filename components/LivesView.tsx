@@ -6,8 +6,10 @@ import {
   ScatterChart, Scatter, ZAxis, ReferenceLine,
   AreaChart, Area,
 } from 'recharts'
-import type { Live, Merchan } from '@/lib/types'
+import type { Live, Merchan, LiveStatus } from '@/lib/types'
 import { LIVE_STATUSES, LIVE_STATUS_BY_ID } from '@/lib/types'
+import { MerchanSelect } from './LiveModal'
+import { DatePicker } from './FormHelpers'
 import {
   fmtBRL, fmtBRLk, fmtPct, inPeriod,
   liveKpis, perMerchanMetrics, weeklyTrend, heatmapMatrix, monthVsPrev,
@@ -736,11 +738,104 @@ function StatusCell({ live, onStatusChange }: { live: Live; onStatusChange?: (l:
 
 // ─── Lives Calendar — List view ──────────────────────────────
 
-function LivesCalListView({ year, month, lives, merchans, onLiveClick }: {
+interface DraftLiveRow {
+  tempId: string
+  date: string
+  hora: string
+  merchan1: string
+  nominal1: string
+  status: LiveStatus
+}
+
+function draftToFakeLive(d: DraftLiveRow): Live {
+  return {
+    id: d.tempId, date: d.date, hora: d.hora, diaSemana: '', cupomLigado: true, criativo: '',
+    merchan1: d.merchan1, nominal1: d.nominal1, receita1: 0, merchan2: '', nominal2: '', receita2: 0,
+    cupomExtra: '', receitaExtra: 0, receitaTotal: 0, receitaUtm: 0,
+    ordersCupom: null, ordersUtm: null, ordersTotal: null, alcance: 0, produto: '',
+    linkUtm: '', utmCampaign: '', status: d.status, origem: 'manual', notes: '',
+  }
+}
+
+function LiveDraftRow({
+  draft, merchans, saving, onHoraChange, onMerchanCommit, onNominalChange, onStatusChange, onDiscard, onAddMerchan,
+}: {
+  draft: DraftLiveRow
+  merchans: Merchan[]
+  saving: boolean
+  onHoraChange: (hora: string) => void
+  onMerchanCommit: (merchan1: string) => void
+  onNominalChange: (nominal1: string) => void
+  onStatusChange: (l: Live, id: string) => void
+  onDiscard: () => void
+  onAddMerchan: (nome: string) => Promise<Merchan>
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', marginBottom: 4,
+        borderRadius: 10, background: 'var(--surface)', border: '1px dashed var(--line-2)',
+        opacity: saving ? 0.55 : 1, pointerEvents: saving ? 'none' : 'auto', transition: 'opacity 0.12s',
+      }}
+    >
+      <input
+        type="time"
+        className="field"
+        value={draft.hora}
+        onChange={e => onHoraChange(e.target.value)}
+        style={{ fontSize: 12.5, padding: '5px 8px', width: 92, flexShrink: 0, fontFamily: 'var(--font-mono)', boxSizing: 'border-box' }}
+      />
+      <div style={{ width: 220, flexShrink: 0, boxSizing: 'border-box' }}>
+        <MerchanSelect
+          value={draft.merchan1}
+          merchans={merchans}
+          onChange={onMerchanCommit}
+          onAddMerchan={onAddMerchan}
+          placeholder="Merchan…"
+        />
+      </div>
+      <input
+        className="field"
+        value={draft.nominal1}
+        onChange={e => onNominalChange(e.target.value)}
+        placeholder="Cupom…"
+        style={{ fontSize: 12.5, padding: '5px 8px', width: 130, flexShrink: 0, boxSizing: 'border-box' }}
+      />
+      <div style={{ flex: 1 }} />
+      <StatusCell live={draftToFakeLive(draft)} onStatusChange={onStatusChange} />
+      <button
+        onClick={onDiscard}
+        title="Descartar rascunho"
+        style={{
+          width: 22, height: 22, flexShrink: 0, borderRadius: 6, border: 'none', background: 'transparent',
+          color: 'var(--ink-3)', cursor: 'pointer', display: 'grid', placeItems: 'center',
+        }}
+      >
+        <svg viewBox="0 0 16 16" width={12} height={12} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/>
+        </svg>
+      </button>
+    </div>
+  )
+}
+
+function LivesCalListView({ year, month, lives, merchans, onLiveClick, onQuickCreateLive, onAddMerchan }: {
   year: number; month: number; lives: Live[]; merchans: Merchan[]
   onLiveClick: (l: Live) => void
+  onQuickCreateLive: (partial: { date: string; hora: string; merchan1: string; nominal1: string; status: LiveStatus }) => Promise<void>
+  onAddMerchan: (nome: string) => Promise<Merchan>
 }) {
   const today = todayISO()
+  const [drafts, setDrafts] = useState<DraftLiveRow[]>([])
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkDate, setBulkDate] = useState(today)
+  const [bulkQty, setBulkQty] = useState(7)
+  const [bulkSkipped, setBulkSkipped] = useState(0)
+
+  const datesWithLive = useMemo(() => new Set(lives.map(l => l.date)), [lives])
+  const datesWithDraft = new Set(drafts.map(d => d.date))
+
   const monthLives = lives
     .filter(l => {
       const [y, m] = l.date.split('-').map(Number)
@@ -748,29 +843,106 @@ function LivesCalListView({ year, month, lives, merchans, onLiveClick }: {
     })
     .sort((a, b) => a.date !== b.date ? a.date.localeCompare(b.date) : a.hora.localeCompare(b.hora))
 
-  const grouped: [string, Live[]][] = []
-  for (const l of monthLives) {
-    const last = grouped[grouped.length - 1]
-    if (last && last[0] === l.date) last[1].push(l)
-    else grouped.push([l.date, [l]])
-  }
+  const monthDrafts = drafts
+    .filter(d => {
+      const [y, m] = d.date.split('-').map(Number)
+      return y === year && m - 1 === month
+    })
 
-  if (!grouped.length) {
-    return (
-      <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--ink-3)' }}>
-        Nenhuma live neste mês.
-      </div>
-    )
-  }
+  const dates = Array.from(new Set([...monthLives.map(l => l.date), ...monthDrafts.map(d => d.date)])).sort()
 
   const weekdayShort = (iso: string) => {
     const d = parseISO(iso)
     return ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][d.getDay()]
   }
 
+  const nextFreeDate = (from: string) => {
+    let d = from
+    while (datesWithLive.has(d) || datesWithDraft.has(d)) d = addDaysISO(d, 1)
+    return d
+  }
+
+  const addDraft = (date: string) => {
+    if (datesWithLive.has(date) || datesWithDraft.has(date)) return
+    setDrafts(ds => [...ds, { tempId: crypto.randomUUID(), date, hora: '20:00', merchan1: '', nominal1: '', status: 'confirmada' as LiveStatus }])
+  }
+
+  const patchDraft = (tempId: string, patch: Partial<DraftLiveRow>) => {
+    setDrafts(ds => ds.map(d => d.tempId === tempId ? { ...d, ...patch } : d))
+  }
+
+  const removeDraft = (tempId: string) => setDrafts(ds => ds.filter(d => d.tempId !== tempId))
+
+  const commitDraftMerchan = async (draft: DraftLiveRow, merchan1: string) => {
+    patchDraft(draft.tempId, { merchan1 })
+    if (!merchan1) return
+    setSavingIds(ids => new Set(ids).add(draft.tempId))
+    await onQuickCreateLive({ date: draft.date, hora: draft.hora, merchan1, nominal1: draft.nominal1, status: draft.status })
+    removeDraft(draft.tempId)
+    setSavingIds(ids => { const next = new Set(ids); next.delete(draft.tempId); return next })
+  }
+
+  const confirmBulk = () => {
+    const n = Math.max(1, Math.min(30, Math.round(bulkQty) || 1))
+    let cursor = bulkDate
+    let skipped = 0
+    const novos: DraftLiveRow[] = []
+    for (let i = 0; i < n; i++) {
+      if (datesWithLive.has(cursor) || datesWithDraft.has(cursor) || novos.some(d => d.date === cursor)) {
+        skipped++
+      } else {
+        novos.push({ tempId: crypto.randomUUID(), date: cursor, hora: '20:00', merchan1: '', nominal1: '', status: 'confirmada' as LiveStatus })
+      }
+      cursor = addDaysISO(cursor, 1)
+    }
+    setDrafts(ds => [...ds, ...novos])
+    setBulkSkipped(skipped)
+    setBulkOpen(false)
+  }
+
+  const toolbar = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+      <button className="btn btn-ghost" style={{ fontSize: 12.5, padding: '6px 12px' }} onClick={() => addDraft(nextFreeDate(today))}>
+        + Nova live
+      </button>
+      <button className="btn btn-ghost" style={{ fontSize: 12.5, padding: '6px 12px' }} onClick={() => setBulkOpen(o => !o)}>
+        + Adicionar em lote
+      </button>
+      {bulkOpen && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--ink-2)' }}>
+          <DatePicker value={bulkDate} onChange={setBulkDate} style={{ width: 130 }} />
+          <span>×</span>
+          <input type="number" min={1} max={30} className="field" value={bulkQty} onChange={e => setBulkQty(Number(e.target.value))} style={{ fontSize: 12.5, padding: '5px 8px', width: 56 }} />
+          <span>dias</span>
+          <button className="btn btn-accent" style={{ fontSize: 12.5, padding: '5px 12px' }} onClick={confirmBulk}>Adicionar</button>
+          <button className="btn btn-ghost" style={{ fontSize: 12.5, padding: '5px 12px' }} onClick={() => setBulkOpen(false)}>Cancelar</button>
+        </div>
+      )}
+      {bulkSkipped > 0 && (
+        <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+          {bulkSkipped} dia{bulkSkipped === 1 ? '' : 's'} já {bulkSkipped === 1 ? 'tinha' : 'tinham'} live e {bulkSkipped === 1 ? 'foi pulado' : 'foram pulados'}
+        </span>
+      )}
+    </div>
+  )
+
+  if (!dates.length) {
+    return (
+      <div style={{ paddingTop: 16 }}>
+        {toolbar}
+        <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--ink-3)' }}>
+          Nenhuma live neste mês.
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="pautas-view" style={{ paddingTop: 16 }}>
-      {grouped.map(([date, dayLives]) => {
+      {toolbar}
+      {dates.map(date => {
+        const dayLives = monthLives.filter(l => l.date === date)
+        const dayDrafts = monthDrafts.filter(d => d.date === date)
         const isToday = date === today
         const isPast = date < today
         const [, mm, dd] = date.split('-')
@@ -835,6 +1007,20 @@ function LivesCalListView({ year, month, lives, merchans, onLiveClick }: {
                   </div>
                 )
               })}
+              {dayDrafts.map(d => (
+                <LiveDraftRow
+                  key={d.tempId}
+                  draft={d}
+                  merchans={merchans}
+                  saving={savingIds.has(d.tempId)}
+                  onHoraChange={hora => patchDraft(d.tempId, { hora })}
+                  onMerchanCommit={v => commitDraftMerchan(d, v)}
+                  onNominalChange={v => patchDraft(d.tempId, { nominal1: v })}
+                  onStatusChange={(_, id) => patchDraft(d.tempId, { status: id as LiveStatus })}
+                  onDiscard={() => removeDraft(d.tempId)}
+                  onAddMerchan={onAddMerchan}
+                />
+              ))}
             </div>
           </div>
         )
@@ -1075,6 +1261,8 @@ interface Props {
   onGenerateProposta: () => void
   generatingProposta: boolean
   onStatusChange?: (l: Live, newStatus: string) => void
+  onQuickCreateLive: (partial: { date: string; hora: string; merchan1: string; nominal1: string; status: LiveStatus }) => Promise<void>
+  onAddMerchan: (nome: string) => Promise<Merchan>
 }
 
 export default function LivesView({
@@ -1083,6 +1271,7 @@ export default function LivesView({
   onApproveProposta, onApproveAll, onDiscardProposta,
   onGenerateProposta, generatingProposta,
   onStatusChange,
+  onQuickCreateLive, onAddMerchan,
 }: Props) {
   const today = todayISO()
   const todayDate = parseISO(today)
@@ -1240,11 +1429,9 @@ export default function LivesView({
             </div>
             {period === 'custom' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <input type="date" className="field" style={{ fontSize: 12, padding: '3px 8px', width: 130 }}
-                  value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
+                <DatePicker value={customFrom} onChange={setCustomFrom} style={{ width: 130 }} />
                 <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>até</span>
-                <input type="date" className="field" style={{ fontSize: 12, padding: '3px 8px', width: 130 }}
-                  value={customTo} onChange={e => setCustomTo(e.target.value)} />
+                <DatePicker value={customTo} onChange={setCustomTo} style={{ width: 130 }} />
               </div>
             )}
             <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
@@ -1294,6 +1481,8 @@ export default function LivesView({
           lives={lives}
           merchans={merchans}
           onLiveClick={onLiveClick}
+          onQuickCreateLive={onQuickCreateLive}
+          onAddMerchan={onAddMerchan}
         />
       )}
 

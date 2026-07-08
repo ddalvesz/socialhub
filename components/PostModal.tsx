@@ -171,7 +171,7 @@ function SourceSelect({ value, options, onChange }: { value: PostSource; options
         }}
       >
         {cur.label}
-        <Icon.chevD />
+        <Icon.chevD width={12} height={12} style={{ flexShrink: 0 }} />
       </button>
       <Popover open={open} onClose={() => setOpen(false)}>
         {list.map(o => (

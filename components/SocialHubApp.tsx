@@ -1086,7 +1086,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     branding:      { title: 'Branding',             sub: 'Posts com tag Branding'                },
     mh:            { title: 'Máquina de Hits',      sub: 'Posts MH'                              },
     comemorativas: { title: 'Datas comemorativas',  sub: 'Pauta anual'                           },
-    futebol:       { title: 'Futebol 2026',         sub: 'Calendário esportivo'                  },
+    futebol:       { title: 'Futebol',              sub: 'Calendário esportivo'                  },
     campaigns:     { title: 'Campanhas',            sub: 'Controle e cronograma'                 },
     collections:   { title: 'Coleções',             sub: 'Ilustra · Marketing'                   },
     lives:         { title: 'Lives',                sub: 'Performance · Proposta semanal'        },
@@ -1144,17 +1144,6 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
               <span className="sb-count">{posts.filter(p => p.source === 'mh' && parseISO(p.date).getFullYear() === year && parseISO(p.date).getMonth() === month).length}</span>
             </button>
           </div>
-          <div className="sb-section">
-            <div className="sb-label">Planejamento</div>
-            <button className={`sb-item ${view === 'comemorativas' ? 'active' : ''}`} onClick={() => setView('comemorativas')}><Icon.events /> <span>Datas comemorativas</span></button>
-            <button className={`sb-item ${view === 'futebol' ? 'active' : ''}`} onClick={() => setView('futebol')}><Icon.ball /> <span>Futebol 2026</span></button>
-            <button className={`sb-item ${view === 'campaigns' ? 'active' : ''}`} onClick={() => setView('campaigns')}><Icon.campaign /> <span>Campanhas</span><span className="sb-count">{campaigns.length}</span></button>
-            <button className={`sb-item ${view === 'collections' ? 'active' : ''}`} onClick={() => setView('collections')}><Icon.collections /> <span>Coleções</span><span className="sb-count">{collections.length}</span></button>
-            <button className={`sb-item ${view === 'site_links' ? 'active' : ''}`} onClick={() => setView('site_links')}><Icon.link /> <span>Links do Site</span></button>
-            <button className={`sb-item ${view === 'archived' ? 'active' : ''}`} onClick={() => setView('archived')}><Icon.trash /> <span>Arquivados</span></button>
-          </div>
-          <div className="sb-section">
-          </div>
           <div className="sb-section" style={{ marginTop: -5 }}>
             <div className="sb-label">Performance</div>
             <button className={`sb-item ${view === 'metrics' ? 'active' : ''}`} onClick={() => setView('metrics')}>
@@ -1168,11 +1157,23 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             <button className={`sb-item ${view === 'share_social' ? 'active' : ''}`} onClick={() => setView('share_social')}>
               <Icon.share /> <span>Share Social</span>
             </button>
+            <button className={`sb-item ${view === 'lives' ? 'active' : ''}`} onClick={() => setView('lives')}><Icon.live /> <span>Lives</span><span className="sb-count">{lives.filter(l => l.status === 'realizada').length}</span></button>
+            <button className={`sb-item ${view === 'stories' ? 'active' : ''}`} onClick={() => setView('stories')}><Icon.stories /> <span>Stories</span><span className="sb-count">{storiesCount}</span></button>
+          </div>
+          <div className="sb-section">
+            <div className="sb-label">Planejamento</div>
             <button className={`sb-item ${view === 'metas' ? 'active' : ''}`} onClick={() => setView('metas')}>
               <Icon.target /> <span>Metas</span>
             </button>
-            <button className={`sb-item ${view === 'lives' ? 'active' : ''}`} onClick={() => setView('lives')}><Icon.live /> <span>Lives</span><span className="sb-count">{lives.filter(l => l.status === 'realizada').length}</span></button>
-            <button className={`sb-item ${view === 'stories' ? 'active' : ''}`} onClick={() => setView('stories')}><Icon.stories /> <span>Stories</span><span className="sb-count">{storiesCount}</span></button>
+            <button className={`sb-item ${view === 'futebol' ? 'active' : ''}`} onClick={() => setView('futebol')}><Icon.ball /> <span>Futebol</span></button>
+            <button className={`sb-item ${view === 'collections' ? 'active' : ''}`} onClick={() => setView('collections')}><Icon.collections /> <span>Coleções</span><span className="sb-count">{collections.length}</span></button>
+            <button className={`sb-item ${view === 'campaigns' ? 'active' : ''}`} onClick={() => setView('campaigns')}><Icon.campaign /> <span>Campanhas</span><span className="sb-count">{campaigns.length}</span></button>
+            <button className={`sb-item ${view === 'comemorativas' ? 'active' : ''}`} onClick={() => setView('comemorativas')}><Icon.events /> <span>Datas comemorativas</span></button>
+          </div>
+          <div className="sb-section">
+            <div className="sb-label">Ferramentas</div>
+            <button className={`sb-item ${view === 'site_links' ? 'active' : ''}`} onClick={() => setView('site_links')}><Icon.link /> <span>Links do Site</span></button>
+            <button className={`sb-item ${view === 'archived' ? 'active' : ''}`} onClick={() => setView('archived')}><Icon.trash /> <span>Arquivados</span></button>
           </div>
         </>)}
 
@@ -1189,14 +1190,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
               <span className="sb-count">{canalPosts.length}</span>
             </button>
           </div>
-          <div className="sb-section">
-            <div className="sb-label">Planejamento</div>
-            <button className={`sb-item ${view === 'comemorativas' ? 'active' : ''}`} onClick={() => setView('comemorativas')}><Icon.events /> <span>Datas comemorativas</span></button>
-            <button className={`sb-item ${view === 'campaigns' ? 'active' : ''}`} onClick={() => setView('campaigns')}><Icon.campaign /> <span>Campanhas</span><span className="sb-count">{campaigns.length}</span></button>
-            <button className={`sb-item ${view === 'site_links' ? 'active' : ''}`} onClick={() => setView('site_links')}><Icon.link /> <span>Links do Site</span></button>
-            <button className={`sb-item ${view === 'archived' ? 'active' : ''}`} onClick={() => setView('archived')}><Icon.trash /> <span>Arquivados</span></button>
-          </div>
-          <div className="sb-section">
+          <div className="sb-section" style={{ marginTop: -5 }}>
             <div className="sb-label">Performance</div>
             <button className={`sb-item ${view === 'metrics' ? 'active' : ''}`} onClick={() => setView('metrics')}>
               <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
@@ -1209,23 +1203,35 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             <button className={`sb-item ${view === 'share_social' ? 'active' : ''}`} onClick={() => setView('share_social')}>
               <Icon.share /> <span>Share Social</span>
             </button>
+            <button className={`sb-item ${view === 'lives' ? 'active' : ''}`} onClick={() => setView('lives')}><Icon.live /> <span>Lives</span><span className="sb-count">{lives.filter(l => l.status === 'realizada').length}</span></button>
+            <button className={`sb-item ${view === 'stories' ? 'active' : ''}`} onClick={() => setView('stories')}><Icon.stories /> <span>Stories</span><span className="sb-count">{storiesCount}</span></button>
+          </div>
+          <div className="sb-section">
+            <div className="sb-label">Planejamento</div>
             <button className={`sb-item ${view === 'metas' ? 'active' : ''}`} onClick={() => setView('metas')}>
               <Icon.target /> <span>Metas</span>
             </button>
-            <button className={`sb-item ${view === 'lives' ? 'active' : ''}`} onClick={() => setView('lives')}><Icon.live /> <span>Lives</span><span className="sb-count">{lives.filter(l => l.status === 'realizada').length}</span></button>
-            <button className={`sb-item ${view === 'stories' ? 'active' : ''}`} onClick={() => setView('stories')}><Icon.stories /> <span>Stories</span><span className="sb-count">{storiesCount}</span></button>
+            <button className={`sb-item ${view === 'campaigns' ? 'active' : ''}`} onClick={() => setView('campaigns')}><Icon.campaign /> <span>Campanhas</span><span className="sb-count">{campaigns.length}</span></button>
+            <button className={`sb-item ${view === 'comemorativas' ? 'active' : ''}`} onClick={() => setView('comemorativas')}><Icon.events /> <span>Datas comemorativas</span></button>
+          </div>
+          <div className="sb-section">
+            <div className="sb-label">Ferramentas</div>
+            <button className={`sb-item ${view === 'site_links' ? 'active' : ''}`} onClick={() => setView('site_links')}><Icon.link /> <span>Links do Site</span></button>
+            <button className={`sb-item ${view === 'archived' ? 'active' : ''}`} onClick={() => setView('archived')}><Icon.trash /> <span>Arquivados</span></button>
           </div>
         </>)}
 
         {/* ── Sidebar: Kokeshi / Lescent ──────────────────── */}
-        {(brand === 'kokeshi' || brand === 'lescent') && (
+        {(brand === 'kokeshi' || brand === 'lescent') && (<>
           <div className="sb-section">
+            <div className="sb-label">Calendários</div>
             <button className={`sb-item ${view === 'calendar' ? 'active' : ''}`} onClick={() => setView('calendar')}>
               <Icon.cal /> <span>Calendário do mês</span>
               <span className="sb-count">{monthPosts.length}</span>
             </button>
-            <button className={`sb-item ${view === 'campaigns' ? 'active' : ''}`} onClick={() => setView('campaigns')}><Icon.campaign /> <span>Campanhas</span><span className="sb-count">{campaigns.length}</span></button>
-            <button className={`sb-item ${view === 'site_links' ? 'active' : ''}`} onClick={() => setView('site_links')}><Icon.link /> <span>Links do Site</span></button>
+          </div>
+          <div className="sb-section" style={{ marginTop: -5 }}>
+            <div className="sb-label">Performance</div>
             <button className={`sb-item ${view === 'metrics' ? 'active' : ''}`} onClick={() => setView('metrics')}>
               <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
                 <rect x="2" y="11" width="3" height="5" rx="1"/>
@@ -1237,13 +1243,21 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             <button className={`sb-item ${view === 'share_social' ? 'active' : ''}`} onClick={() => setView('share_social')}>
               <Icon.share /> <span>Share Social</span>
             </button>
-            <button className={`sb-item ${view === 'metas' ? 'active' : ''}`} onClick={() => setView('metas')}>
-              <Icon.target /> <span>Metas</span>
-            </button>
             <button className={`sb-item ${view === 'lives' ? 'active' : ''}`} onClick={() => setView('lives')}><Icon.live /> <span>Lives</span><span className="sb-count">{lives.filter(l => l.status === 'realizada').length}</span></button>
             <button className={`sb-item ${view === 'stories' ? 'active' : ''}`} onClick={() => setView('stories')}><Icon.stories /> <span>Stories</span><span className="sb-count">{storiesCount}</span></button>
           </div>
-        )}
+          <div className="sb-section">
+            <div className="sb-label">Planejamento</div>
+            <button className={`sb-item ${view === 'metas' ? 'active' : ''}`} onClick={() => setView('metas')}>
+              <Icon.target /> <span>Metas</span>
+            </button>
+            <button className={`sb-item ${view === 'campaigns' ? 'active' : ''}`} onClick={() => setView('campaigns')}><Icon.campaign /> <span>Campanhas</span><span className="sb-count">{campaigns.length}</span></button>
+          </div>
+          <div className="sb-section">
+            <div className="sb-label">Ferramentas</div>
+            <button className={`sb-item ${view === 'site_links' ? 'active' : ''}`} onClick={() => setView('site_links')}><Icon.link /> <span>Links do Site</span></button>
+          </div>
+        </>)}
 
         <div
           className={`sb-user ${view === 'profile' ? 'active' : ''}`}

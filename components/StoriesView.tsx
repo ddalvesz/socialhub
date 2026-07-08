@@ -6,7 +6,7 @@ import {
   ResponsiveContainer, BarChart, LabelList, Cell,
 } from 'recharts'
 import type { Story, StoryStatus, DayAggregate } from '@/lib/types'
-import { FreeCombobox } from './FormHelpers'
+import { FreeCombobox, DatePicker } from './FormHelpers'
 import {
   storiesKpis, eficienciaAlcance,
   receitaComparacao, receitaVariacao, engajamentoDiario, correlacaoReceitaAlcance,
@@ -1203,7 +1203,7 @@ function StoriesListView({
       </button>
       {bulkOpen && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--ink-2)' }}>
-          <input type="date" className="field" value={bulkDate} onChange={e => setBulkDate(e.target.value)} style={{ fontSize: 12.5, padding: '5px 8px', width: 130 }} />
+          <DatePicker value={bulkDate} onChange={setBulkDate} style={{ width: 130 }} />
           <span>×</span>
           <input type="number" min={1} max={30} className="field" value={bulkQty} onChange={e => setBulkQty(Number(e.target.value))} style={{ fontSize: 12.5, padding: '5px 8px', width: 56 }} />
           <span>linhas</span>
@@ -1460,11 +1460,9 @@ export default function StoriesView({ stories, dayAggregates, knownProducts, kno
             </div>
             {period === 'custom' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <input type="date" className="field" style={{ fontSize: 12, padding: '3px 8px', width: 130 }}
-                  value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
+                <DatePicker value={customFrom} onChange={setCustomFrom} style={{ width: 130 }} />
                 <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>até</span>
-                <input type="date" className="field" style={{ fontSize: 12, padding: '3px 8px', width: 130 }}
-                  value={customTo} onChange={e => setCustomTo(e.target.value)} />
+                <DatePicker value={customTo} onChange={setCustomTo} style={{ width: 130 }} />
               </div>
             )}
             <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>

@@ -6,7 +6,7 @@ import { LIVE_STATUSES, LIVE_STATUS_BY_ID } from '@/lib/types'
 import { fmtBRL, fmtPct } from '@/lib/livesUtils'
 import { buildUtmForLive } from '@/lib/storiesUtils'
 import { Icon } from './Icons'
-import { Popover } from './FormHelpers'
+import { Popover, DatePicker } from './FormHelpers'
 
 /* ── CopyBtn ─────────────────────────────────────────────── */
 
@@ -271,11 +271,9 @@ export default function LiveModal({ live, brand, merchans, siteLinks, onClose, o
 
             <div className="modal-grid">
               <label>Data</label>
-              <input
-                className="field"
-                type="date"
+              <DatePicker
                 value={draft.date}
-                onChange={e => set('date', e.target.value)}
+                onChange={v => set('date', v)}
                 style={{ maxWidth: 200 }} />
 
               <label>Hora</label>

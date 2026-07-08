@@ -7,6 +7,7 @@ import type { Story, StoryStatus } from '@/lib/types'
 import { dbToStory } from '@/lib/supabase/mappers'
 import { buildStoryUtm } from '@/lib/storiesUtils'
 import { useBrand } from '@/lib/brand-context'
+import { DatePicker } from './FormHelpers'
 
 /* ── Constants ────────────────────────────────────────────── */
 
@@ -136,11 +137,10 @@ export default function CreateStoryModal({ onClose, onSaved }: Props) {
             <div className="st-form-2col">
               <div className="st-field">
                 <label className="st-label">Data</label>
-                <input
-                  type="date"
+                <DatePicker
                   className="st-input"
                   value={date}
-                  onChange={e => setDate(e.target.value)}
+                  onChange={setDate}
                 />
               </div>
               <div className="st-field">

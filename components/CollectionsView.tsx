@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Icon } from './Icons'
-import { GenericSelect, PackToggle, FieldCheckbox, DateRangeFilter, DateRange } from './FormHelpers'
+import { GenericSelect, PackToggle, FieldCheckbox, DateRangeFilter, DateRange, DatePicker } from './FormHelpers'
 import {
   Collection, Campaign, Linking, ExtraTask,
   COLECAO_TIPOS, COL_STATUS, COL_CONFIRMADO,
@@ -320,12 +320,12 @@ function CollectionFormModal({ initial, onClose, onSave }: { initial?: Collectio
             <div className="modal-section-label">Cronograma</div>
 
             <label>Data lançamento site</label>
-            <input className="field" type="date" value={draft.dataSite}
-              onChange={e => set('dataSite', e.target.value)} style={{ maxWidth: 200 }} />
+            <DatePicker value={draft.dataSite}
+              onChange={v => set('dataSite', v)} style={{ maxWidth: 200 }} />
 
             <label>Início do marketing</label>
-            <input className="field" type="date" value={draft.dataMarketing}
-              onChange={e => set('dataMarketing', e.target.value)} style={{ maxWidth: 200 }} />
+            <DatePicker value={draft.dataMarketing}
+              onChange={v => set('dataMarketing', v)} style={{ maxWidth: 200 }} />
 
             <div className="modal-section-label">Status</div>
 

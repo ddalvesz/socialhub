@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Icon, PlatformIcon } from './Icons'
 import { PLATFORMS, todayISO, parseISO, toISO, pad } from '@/lib/types'
+import { DatePicker } from './FormHelpers'
 
 interface Props {
   onClose: () => void
@@ -212,11 +213,11 @@ export default function ExportModal({ onClose, selectedIds }: Props) {
               <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', color: 'var(--ink-3)', marginBottom: 5, textTransform: 'uppercase' }}>De</div>
-                  <input className="field" type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} style={{ width: '100%' }} />
+                  <DatePicker value={customFrom} onChange={setCustomFrom} style={{ width: '100%' }} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', color: 'var(--ink-3)', marginBottom: 5, textTransform: 'uppercase' }}>Até</div>
-                  <input className="field" type="date" value={customTo} min={customFrom} onChange={e => setCustomTo(e.target.value)} style={{ width: '100%' }} />
+                  <DatePicker value={customTo} onChange={setCustomTo} style={{ width: '100%' }} />
                 </div>
               </div>
             )}

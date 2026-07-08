@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Icon } from './Icons'
-import { GenericSelect, DateRangeFilter, DateRange } from './FormHelpers'
+import { GenericSelect, DateRangeFilter, DateRange, DatePicker } from './FormHelpers'
 import { FutebolEvent, MONTHS, WEEKDAYS, fmtBR, buildMonthGrid, parseISO, toISO, todayISO } from '@/lib/types'
 import { FUT_TYPES } from '@/lib/data'
 
@@ -121,8 +121,8 @@ function FutebolModal({
               onChange={v => set('type', v)} width={240} />
 
             <label>Data</label>
-            <input className="field" type="date" value={draft.date}
-              onChange={e => set('date', e.target.value)} style={{ maxWidth: 200 }} />
+            <DatePicker value={draft.date}
+              onChange={v => set('date', v)} style={{ maxWidth: 200 }} />
 
             <label style={{ alignSelf: 'flex-start', paddingTop: 6 }}>Observações</label>
             <textarea className="field" value={draft.notes} placeholder="Detalhes sobre o evento..."

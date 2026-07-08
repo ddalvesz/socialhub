@@ -7,6 +7,7 @@ import { showToast } from '@/lib/toast'
 import type { CanalPost, PostStatus, Campaign, Brand } from '@/lib/types'
 import { fmtBR } from '@/lib/types'
 import { dbToCanalPost, canalPostToDb } from '@/lib/supabase/mappers'
+import { DatePicker } from './FormHelpers'
 
 // ─── Constants ───────────────────────────────────────────────
 
@@ -294,7 +295,7 @@ function CanalMessageModal({ post, isNew, campaigns, onClose, onSave, onDelete }
             </div>
             <div className="modal-grid">
               <label>Data</label>
-              <input className="field" type="date" value={draft.date} onChange={e => set('date', e.target.value)} />
+              <DatePicker value={draft.date} onChange={v => set('date', v)} style={{ maxWidth: 200 }} />
 
               <label>Tag</label>
               <CnTagSelect value={draft.tag} onChange={v => set('tag', v)} />

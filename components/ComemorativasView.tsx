@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Icon } from './Icons'
-import { GenericSelect, PackToggle, FieldCheckbox, DateRangeFilter, DateRange } from './FormHelpers'
+import { GenericSelect, PackToggle, FieldCheckbox, DateRangeFilter, DateRange, DatePicker } from './FormHelpers'
 import { EventDate, MONTHS, WEEKDAYS, fmtBR, buildMonthGrid, parseISO, toISO, todayISO, FORMATS_LIST } from '@/lib/types'
 import { EVENT_TYPES } from '@/lib/data'
 
@@ -97,12 +97,12 @@ function ComemorativaFormModal({ onClose, onSave }: { onClose: () => void, onSav
               onChange={v => set('type', v)} width={220} />
 
             <label>Início</label>
-            <input className="field" type="date" value={draft.start}
-              onChange={e => set('start', e.target.value)} style={{ maxWidth: 200 }} />
+            <DatePicker value={draft.start}
+              onChange={v => set('start', v)} style={{ maxWidth: 200 }} />
 
             <label>Fim</label>
-            <input className="field" type="date" value={draft.end}
-              onChange={e => set('end', e.target.value)} style={{ maxWidth: 200 }} />
+            <DatePicker value={draft.end}
+              onChange={v => set('end', v)} style={{ maxWidth: 200 }} />
 
             <label>Pacote</label>
             <PackToggle value={draft.pack} onChange={v => set('pack', v)} />

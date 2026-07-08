@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import type { Brand, SiteLink, Story, StoryStatus } from '@/lib/types'
 import { STORY_STATUS_META, buildUtmForStory, fmtBRL } from '@/lib/storiesUtils'
-import { Popover, FreeCombobox } from './FormHelpers'
+import { Popover, FreeCombobox, DatePicker } from './FormHelpers'
 import { Icon } from './Icons'
 
 /* ── Constants ────────────────────────────────────────────── */
@@ -243,11 +243,9 @@ export default function StoryModal({ story, brand, knownProducts, knownCategoria
 
             <div className="modal-grid">
               <label>Data</label>
-              <input
-                className="field"
-                type="date"
+              <DatePicker
                 value={draft.date}
-                onChange={e => set('date', e.target.value)}
+                onChange={v => set('date', v)}
                 style={{ maxWidth: 180 }}
               />
 

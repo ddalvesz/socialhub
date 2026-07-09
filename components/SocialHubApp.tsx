@@ -148,6 +148,11 @@ function CalendarListView({ posts, year, month, onPostClick, selectedIds, onTogg
                     <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', padding: '2px 6px', borderRadius: 5, background: pc.bg, color: pc.fg, flexShrink: 0 }}>
                       {p.platform === 'tiktok' ? 'TT' : p.platform === 'youtube' ? 'YT' : p.platform?.toUpperCase()}
                     </div>
+                    {p.source === 'mh' && (
+                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', padding: '2px 6px', borderRadius: 5, background: 'oklch(0.93 0.06 250)', color: 'oklch(0.45 0.14 250)', flexShrink: 0 }}>
+                        MH
+                      </div>
+                    )}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
                       {(p.product || p.campaign) && (

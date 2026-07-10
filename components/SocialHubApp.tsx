@@ -17,7 +17,7 @@ import {
   campaignToDb, collectionToDb, postToDb, sourceToTable,
   dbToPost, dbToCampaign, dbToCollection, dbToCanalPost,
   dbToLive, dbToMerchan, liveToDb, merchanToDb, dbToStory, storyToDb,
-  dbToEventDate, dbToFutebolEvent, futebolEventToDb, dbToDayAggregate,
+  dbToEventDate, eventDateToDb, dbToFutebolEvent, futebolEventToDb, dbToDayAggregate,
   dbToSiteLink, siteLinkToDb,
 } from '@/lib/supabase/mappers'
 import { showToast } from '@/lib/toast'
@@ -815,6 +815,27 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
 
   const approveLive = (l: Live) => saveLive({ ...l, status: 'confirmada' })
 
+  // ─── EventDates handlers ───────────────────────────────────────
+
+  const saveEventDate = async (e: EventDate): Promise<EventDate> => {
+    if (e.id === 0) {
+      const { data } = await supabase.from('event_dates').insert({ ...eventDateToDb(e), brand }).select().single()
+      const created = dbToEventDate(data as Record<string, unknown>)
+      setEventDates(arr => [...arr, created])
+      return created
+    } else {
+      const { id, ...rest } = e
+      await supabase.from('event_dates').update(eventDateToDb({ ...rest, id })).eq('id', id)
+      setEventDates(arr => arr.map(x => x.id === id ? e : x))
+      return e
+    }
+  }
+
+  const deleteEventDate = async (id: number) => {
+    setEventDates(arr => arr.filter(x => x.id !== id))
+    await supabase.from('event_dates').delete().eq('id', id)
+  }
+
   // ─── FutebolEvents handlers ────────────────────────────────────
 
   const saveFutebolEvent = async (e: FutebolEvent): Promise<FutebolEvent> => {
@@ -1516,7 +1537,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
             onPostDeleted={id => setCanalPosts(arr => arr.filter(x => x.id !== id))}
           />
         )}
-        {view === 'comemorativas' && <ComemorativasView initialItems={eventDates} />}
+        {view === 'comemorativas' && <ComemorativasView initialItems={eventDates} onSave={saveEventDate} onDelete={deleteEventDate} />}
         {view === 'futebol'       && <FutebolView initialItems={futebolEvents} onSave={saveFutebolEvent} onDelete={deleteFutebolEvent} />}
         {view === 'campaigns'     && (
           <CampaignsView

@@ -246,9 +246,18 @@ export default function PostModal({ post, onClose, onSave, onDelete, onArchive, 
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 6 }}>
               <StatusSelect value={draft.status} onChange={v => set('status', v)} />
               <SourceSelect value={draft.source} options={sourceOptions} onChange={v => set('source', v)} />
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
-                {String(draft.id).slice(0, 8)}
-              </span>
+              {draft.source === 'mh' && (draft.numVideo != null || draft.semana != null) && (
+                <span style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)',
+                  background: 'transparent', border: '1px solid var(--line)',
+                  borderRadius: 6, padding: '2px 8px',
+                }}>
+                  {draft.numVideo != null && `V${String(draft.numVideo).padStart(2, '0')}`}
+                  {draft.numVideo != null && draft.semana != null && ' · '}
+                  {draft.semana != null && `S${String(draft.semana).padStart(2, '0')}`}
+                </span>
+              )}
               {linkedPost && linkedPlat && (
                 <button
                   onClick={() => onLinkedPostClick?.(linkedPost)}

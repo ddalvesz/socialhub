@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 const ERROR_MESSAGES: Record<string, string> = {
-  domain_not_allowed: 'Essa conta não é @gocase.com. Use sua conta corporativa.',
+  domain_not_allowed: 'Essa conta não é @gocase.com ou @gobeaute.com.br. Use sua conta corporativa.',
   auth_failed: 'Não conseguimos entrar agora. Tente novamente.',
   no_code: 'Link inválido. Tente novamente.',
 }
@@ -25,7 +25,6 @@ function LoginForm() {
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: { hd: 'gocase.com' },
       },
     })
   }
@@ -79,7 +78,7 @@ function LoginForm() {
             <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
           </svg>
         </span>
-        Apenas contas <span className="dom">@gocase.com</span>
+        Apenas contas <span className="dom">@gocase.com</span> ou <span className="dom">@gobeaute.com.br</span>
       </p>
     </>
   )

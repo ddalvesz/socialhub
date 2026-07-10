@@ -20,7 +20,8 @@ export async function GET(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user?.email?.endsWith('@gocase.com')) {
+  const ALLOWED_DOMAINS = ['@gocase.com', '@gobeaute.com.br']
+  if (!user?.email || !ALLOWED_DOMAINS.some(d => user.email!.endsWith(d))) {
     await supabase.auth.signOut()
     return NextResponse.redirect(`${origin}/login?error=domain_not_allowed`)
   }

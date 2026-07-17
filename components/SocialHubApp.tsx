@@ -299,6 +299,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
     barbours: ['calendar','canal','comemorativas','campaigns','archived','lives','stories','site_links','metas','profile'],
     kokeshi:  ['calendar','campaigns','lives','stories','site_links','metas','profile'],
     lescent:  ['calendar','campaigns','lives','stories','site_links','metas','profile'],
+    aua:      ['calendar','canal','comemorativas','campaigns','archived','lives','stories','site_links','metas','profile'],
   }
   // A qual aba/AppView cada calendário (PostSource) pertence — usado para
   // só oferecer, no seletor do post, os calendários que existem para a marca ativa.
@@ -1219,7 +1220,7 @@ export default function SocialHubApp({ initialPosts, initialCampaigns, initialCo
         </>)}
 
         {/* ── Sidebar: Barbour's ──────────────────────────── */}
-        {brand === 'barbours' && (<>
+        {(brand === 'barbours' || brand === 'aua') && (<>
           <div className="sb-section">
             <div className="sb-label">Calendários</div>
             <button className={`sb-item ${view === 'calendar' ? 'active' : ''}`} onClick={() => setView('calendar')} title="Calendário do mês">

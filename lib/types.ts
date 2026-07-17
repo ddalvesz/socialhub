@@ -2,7 +2,7 @@ export type Platform = 'ig' | 'tiktok' | 'canal' | 'twitter' | 'youtube'
 export type PostStatus = 'prod' | 'sched' | 'pub' | 'cancel' | 'pauta' | 'entregue'
 export type PostSource = 'mh' | 'branding' | 'tiktok' | 'twitter' | 'canal' | 'copa'
 export type MHCreatorId = 'CARINA' | 'REBECA' | 'THA' | 'MARINA' | 'RECICLADO'
-export type Brand = 'gocase' | 'barbours' | 'kokeshi' | 'lescent'
+export type Brand = 'gocase' | 'barbours' | 'kokeshi' | 'lescent' | 'aua'
 
 interface BrandTheme {
   color: string
@@ -66,6 +66,19 @@ export const BRANDS: { slug: Brand; name: string; color: string; theme: BrandThe
       accentGradient:         'linear-gradient(135deg, oklch(0.50 0.02 250) 0%, oklch(0.45 0.02 255) 100%)',
       accentGradientSoft:     'linear-gradient(135deg, oklch(0.95 0.008 250) 0%, oklch(0.93 0.01 255) 100%)',
       accentGradientSofter:   'linear-gradient(135deg, oklch(0.975 0.004 250) 0%, oklch(0.97 0.005 255) 100%)',
+    },
+  },
+  {
+    slug: 'aua', name: 'AUÁ', color: '#588157',
+    theme: {
+      color:                  '#588157',
+      accent:                 'oklch(0.58 0.09 145)',
+      accentDeep:             'oklch(0.48 0.10 145)',
+      accentSoft:             'oklch(0.92 0.035 145)',
+      accentSofter:           'oklch(0.965 0.018 145)',
+      accentGradient:         'linear-gradient(135deg, oklch(0.64 0.075 135) 0%, oklch(0.58 0.09 145) 100%)',
+      accentGradientSoft:     'linear-gradient(135deg, oklch(0.94 0.03 135) 0%, oklch(0.90 0.045 145) 100%)',
+      accentGradientSofter:   'linear-gradient(135deg, oklch(0.97 0.015 135) 0%, oklch(0.955 0.022 145) 100%)',
     },
   },
 ]
